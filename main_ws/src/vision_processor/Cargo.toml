@@ -1,0 +1,9 @@
+[package]
+name = "qr_reader"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Docs.rsを確認すること
+opencv = "0.98.1"
+rclrs = "0.7.0"

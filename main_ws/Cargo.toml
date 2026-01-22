@@ -5,4 +5,5 @@ members = [
     "src/flipper_driver",
     "src/sensor_gateway",
     "src/track_driver",
+    "src/vision_processor",
 ]
