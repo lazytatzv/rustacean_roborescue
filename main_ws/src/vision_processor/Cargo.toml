@@ -1,5 +1,5 @@
 [package]
-name = "qr_reader"
+name = "vision_processor"
 version = "0.1.0"
 edition = "2024"
 
