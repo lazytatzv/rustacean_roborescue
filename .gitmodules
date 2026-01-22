@@ -1,0 +1,3 @@
+[submodule "stm32_ws"]
+	path = stm32_ws
+	url = git@github.com:lazytatzv/bno055_rust.git
