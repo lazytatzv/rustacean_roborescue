@@ -1,0 +1,27 @@
+# --- Rust (PC & STM32) ---
+target/
+**/*.rs.bk
+Cargo.lock
+
+# --- ROS 2 (colcon) ---
+install/
+build/
+log/
+COLCON_IGNORE
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- STM32 / Embedded ---
+*.bin
+*.elf
+*.hex
+
+# --- OS / IDE ---
+.DS_Store
+.vscode/
+.idea/
+.envrc
+.direnv/
