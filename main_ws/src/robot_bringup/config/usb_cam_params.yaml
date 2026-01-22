@@ -1,0 +1,9 @@
+usb_cam:
+  ros__parameters:
+    video_device: "/dev/video0"
+    framerate: 30.0
+    image_width: 640
+    image_height: 480
+    pixel_format: "mjpeg" # 高速化の鍵
+    brightness: -1        # 自動
+    camera_name: "front_camera"
