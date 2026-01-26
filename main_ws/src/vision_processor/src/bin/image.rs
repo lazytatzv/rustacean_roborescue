@@ -1,10 +1,4 @@
-use opencv::{
-    core::Vector,
-    imgcodecs,
-    prelude::*,
-    wechat_qrcode::WeChatQRCode,
-    Result,
-};
+use opencv::{Result, core::Vector, imgcodecs, prelude::*, wechat_qrcode::WeChatQRCode};
 use std::path::PathBuf; // パス操作用
 
 fn main() -> Result<()> {
@@ -19,10 +13,7 @@ fn main() -> Result<()> {
     println!("読み込み中: {:?}", img_path);
 
     // 2. 画像のロード (パスを文字列に変換して渡す)
-    let img = imgcodecs::imread(
-        img_path.to_str().unwrap(),
-        imgcodecs::IMREAD_COLOR
-    )?;
+    let img = imgcodecs::imread(img_path.to_str().unwrap(), imgcodecs::IMREAD_COLOR)?;
 
     if img.empty() {
         eprintln!("エラー: 画像が見つかりません: {:?}", img_path);

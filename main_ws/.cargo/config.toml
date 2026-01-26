@@ -1,1 +1,5 @@
-[patch.crates-io]
+[patch.crates-io.rclrs]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/rclrs/share/rclrs/rust"
+
+[patch.crates-io.sensor_msgs]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/sensor_msgs/share/sensor_msgs/rust"

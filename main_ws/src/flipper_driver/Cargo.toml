@@ -1,6 +1,12 @@
 [package]
 name = "flipper_driver"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
+anyhow = "1.0.100"
+dynamixel2 = "0.9.1"
+log = "0.4.29"
+rclrs = { path = "../ros2_rust/rclrs" }
+sensor_msgs = "*"
+std_msgs = "*"
