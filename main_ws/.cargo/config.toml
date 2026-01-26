@@ -25,6 +25,9 @@ path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/std_msgs/
 [patch.crates-io.rosgraph_msgs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/rosgraph_msgs/rust"
 
+[patch.crates-io.flipper_driver]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/flipper_driver/rust"
+
 [patch.crates-io.rcl_interfaces]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/rcl_interfaces/rust"
 
