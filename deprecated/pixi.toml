@@ -1,0 +1,22 @@
+[workspace]
+authors = ["lazytatzv <yano.tatsuki439@mail.kyutech.jp>"]
+channels = ["conda-forge", "robostack-jazzy"]
+name = "rustacean_roborescue"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+rust = ">=1.92.0,<1.93"
+pkg-config = ">=0.29.2,<0.30"
+libusb = ">=1.0.29,<2"
+cmake = ">=4.2.2,<5"
+ros-jazzy-desktop = ">=0.11.0,<0.12"
+colcon-common-extensions = ">=0.3.0,<0.4"
+ros-jazzy-test-interface-files = ">=0.11.0,<0.12"
+ros-jazzy-rosidl-adapter = ">=4.6.7,<5"
+
+[pypi-dependencies]
+colcon-cargo = ">=0.2.0, <0.3"
+colcon-ros-cargo = ">=0.2.0, <0.3"

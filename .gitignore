@@ -25,3 +25,6 @@ __pycache__/
 .idea/
 .envrc
 .direnv/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

@@ -7,6 +7,9 @@ edition = "2021"
 anyhow = "1.0.100"
 dynamixel2 = "0.9.1"
 log = "0.4.29"
-rclrs = { path = "../ros2_rust/rclrs" }
-sensor_msgs = "*"
-std_msgs = "*"
+rclrs = { path = "../../install/share/rclrs/rust" }
+sensor_msgs = { path = "../../install/share/sensor_msgs/rust" }
+#std_msgs = "*"
+
+#[package.metadata.ros]
+#msg_packages = ["sensor_msgs", "std_msgs", "geometry_msgs"]
