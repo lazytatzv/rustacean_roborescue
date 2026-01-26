@@ -47,6 +47,7 @@
             # デモ用パッケージ
             demo-nodes-cpp
             demo-nodes-py
+            joy
         ];
 
       in
