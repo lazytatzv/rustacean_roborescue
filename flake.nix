@@ -4,9 +4,7 @@
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
     
-    # 👇 ここを修正しました！
-    # url を削除し、follows だけにすることで、ROS overlayが使っているnixpkgsを強制的に使わせます。
-    # これにより、バイナリキャッシュがヒットしやすくなり、ビルド時間が激減します。
+    # 👇 キャッシュヒット率向上のための設定
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";
 
     rust-overlay = {
@@ -28,8 +26,28 @@
         ROS_VERSION = "jazzy";
         
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ]; # 補完に必要なソースも同梱
+          extensions = [ "rust-src" "rust-analyzer" ];
         };
+
+        # 🛠️ 【修正】変数の定義はここ (letの中) に書きます
+        myRosPackages = with pkgs.rosPackages.${ROS_VERSION}; [
+            ros-core
+            ros-environment
+            ament-cmake
+            
+            # 職人を完成品として入れる
+            rosidl-generator-rs 
+            
+            # メッセージ定義
+            std-msgs
+            sensor-msgs
+            geometry-msgs
+            builtin-interfaces
+
+            # デモ用パッケージ
+            demo-nodes-cpp
+            demo-nodes-py
+        ];
 
       in
       {
@@ -43,28 +61,14 @@
             llvmPackages.clang
             pkg-config
             git
-            #rustup
             rustNightly
             
             # Colcon本体
             colcon
           ]) 
-          # 🤖 ROS 2 パッケージ (Jazzy)
-          ++ (with pkgs.rosPackages.${ROS_VERSION}; [
-            ros-core
-            ros-environment
-            ament-cmake
-            
-            # 職人を完成品として入れる
-            rosidl-generator-rs 
-            
-            # メッセージ定義
-            std-msgs
-            sensor-msgs
-            geometry-msgs
-            builtin-interfaces
-          ])
-          # 🐍 Pythonツール (Colconプラグイン & 生成ツール)
+          # 🤖 ROS 2 パッケージ (上で定義した変数をここで足す)
+          ++ myRosPackages
+          # 🐍 Pythonツール
           ++ (with pkgs.python3Packages; [
             colcon-cargo
             colcon-ros-cargo
@@ -89,12 +93,9 @@
             # Rustupの設定
             export RUST_SRC_PATH="${rustNightly}/lib/rustlib/src/rust/library"
 
-            # まだRustが入ってなければ入れる
-            if ! command -v rustc &> /dev/null; then
-                echo "🦀 Installing Rust Nightly..."
-                rustup toolchain install nightly
-                rustup default nightly
-            fi
+            # 🛠️ 【重要】ライブラリパスをNixの魔法で自動生成
+            # これで demo_nodes_cpp が動くようになります
+            export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${pkgs.lib.makeLibraryPath myRosPackages}"
             
             # 常にRust生成をON
             export ROSIDL_GENERATOR_RUST=ON
@@ -106,6 +107,7 @@
 
             echo "=========================================="
             echo "🦀 PRO Environment Loaded (Jazzy + Rust) 🦀"
+            echo "   - demo-nodes-cpp installed"
             echo "=========================================="
           '';
         };
