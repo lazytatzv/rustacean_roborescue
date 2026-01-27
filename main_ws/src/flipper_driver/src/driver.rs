@@ -5,7 +5,7 @@ use dynamixel2::serial2::SerialPort;
 
 // XM540 Control Table Addresses
 const ADDR_OPERATING_MODE: u16 = 11;
-const ADDR_TORQUE_ENABLE: u16 = 64;
+const ADDR_TORQUE_ENABLE: u16 = 64; //1byte
 const ADDR_GOAL_VELOCITY: u16 = 104;
 const ADDR_PRESENT_POSITION: u16 = 132;
 
@@ -39,6 +39,7 @@ impl DynamixelDriver {
                 .map_err(|e| anyhow::anyhow!("Failed to set Velocity Mode for ID {}: {:?}", id, e))?;
         }
 
+        // トルクOn
         for &id in &self.ids {
             self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 1)
                 .map_err(|e| anyhow::anyhow!("Failed to enable torque for ID {}: {:?}", id, e))?;

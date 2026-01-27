@@ -9,6 +9,7 @@
 
   <buildtool_depend>ament_cargo</buildtool_depend>
 
+  <!-- packages-up-to -->
   <depend>rclrs</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
