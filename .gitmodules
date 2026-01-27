@@ -1,3 +1,21 @@
 [submodule "stm32_ws"]
 	path = stm32_ws
 	url = git@github.com:lazytatzv/bno055_rust.git
+[submodule "main_ws/src/ros2_rust"]
+	path = main_ws/src/ros2_rust
+	url = https://github.com/ros2-rust/ros2_rust.git
+[submodule "main_ws/src/common_interfaces"]
+	path = main_ws/src/common_interfaces
+	url = https://github.com/ros2/common_interfaces.git
+[submodule "main_ws/src/rcl_interfaces"]
+	path = main_ws/src/rcl_interfaces
+	url = https://github.com/ros2/rcl_interfaces.git
+[submodule "main_ws/src/rosidl_defaults"]
+	path = main_ws/src/rosidl_defaults
+	url = https://github.com/ros2/rosidl_defaults.git
+[submodule "main_ws/src/rosidl_rust"]
+	path = main_ws/src/rosidl_rust
+	url = https://github.com/ros2-rust/rosidl_rust.git
+[submodule "main_ws/main_ws/src/test_interface_files"]
+	path = main_ws/main_ws/src/test_interface_files
+	url = https://github.com/ros2/test_interface_files.git
