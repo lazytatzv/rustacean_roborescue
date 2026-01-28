@@ -3,114 +3,96 @@
 
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
-    
-    # 👇 キャッシュヒット率向上のための設定
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";
-
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay }:
-    nix-ros-overlay.inputs.flake-utils.lib.eachDefaultSystem (system:
+  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            nix-ros-overlay.overlays.default
-            (import rust-overlay)
-            ];
+          overlays = [ nix-ros-overlay.overlays.default (import rust-overlay) ];
         };
+
         ROS_VERSION = "jazzy";
         
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
+          targets = [ "thumbv7em-none-eabihf" ];
         };
 
-        # 🛠️ 【修正】変数の定義はここ (letの中) に書きます
-        myRosPackages = with pkgs.rosPackages.${ROS_VERSION}; [
-            ros-core
-            ros-environment
-            ament-cmake
-            
-            # 職人を完成品として入れる
-            rosidl-generator-rs 
-            
-            # メッセージ定義
-            std-msgs
-            sensor-msgs
-            geometry-msgs
-            builtin-interfaces
-
-            # デモ用パッケージ
-            demo-nodes-cpp
-            demo-nodes-py
-            joy
+        # 共通のパッケージリスト（ここを編集すれば両方に反映される）
+        basePackages = with pkgs; [
+          # --- 開発ツール ---
+          clang llvmPackages.clang pkg-config git rustNightly colcon
+          fish which procps  # 👈 これらが Docker 内の快適さを決める
+          # --- ROS 2 ---
+          rosPackages.${ROS_VERSION}.ros-core
+          rosPackages.${ROS_VERSION}.ros-environment
+          rosPackages.${ROS_VERSION}.ament-cmake
+          rosPackages.${ROS_VERSION}.rosidl-generator-rs 
+          rosPackages.${ROS_VERSION}.std-msgs
+          rosPackages.${ROS_VERSION}.sensor-msgs
+          rosPackages.${ROS_VERSION}.geometry-msgs
+          rosPackages.${ROS_VERSION}.builtin-interfaces
+          # --- Python ---
+          python3Packages.colcon-cargo
+          python3Packages.colcon-ros-cargo
+          python3Packages.empy
+          python3Packages.lark
+          python3Packages.numpy
         ];
+
+        # Docker用にパッケージを一つのディレクトリ構造にまとめる魔法
+        envApp = pkgs.buildEnv {
+          name = "robo-env-root";
+          paths = basePackages;
+          pathsToLink = [ "/bin" "/lib" "/share" "/include" ];
+        };
 
       in
       {
+        # 1. 開発環境（いつものやつ）
         devShells.default = pkgs.mkShell {
           name = "RoboRescue Pro Env";
-          
-          # 📦 必要なツールとライブラリ
-          packages = (with pkgs; [
-            # ビルドツール & 言語
-            clang
-            llvmPackages.clang
-            pkg-config
-            git
-            rustNightly
-            
-            # Colcon本体
-            colcon
-          ]) 
-          # 🤖 ROS 2 パッケージ (上で定義した変数をここで足す)
-          ++ myRosPackages
-          # 🐍 Pythonツール
-          ++ (with pkgs.python3Packages; [
-            colcon-cargo
-            colcon-ros-cargo
-            
-            empy
-            lark
-            numpy
-          ]);
-
-          # 🔧 環境変数の設定
+          packages = basePackages;
           shellHook = ''
-            # ROS環境のロード
-            source ${pkgs.rosPackages.${ROS_VERSION}.ros-environment}/setup.bash
-            
-            # Bindgen用パス設定
+            export DIRENV_LOG_FORMAT=""
+            export ROS_DISTRO="${ROS_VERSION}"
+            export ROS_VERSION=2
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
-            export BINDGEN_EXTRA_CLANG_ARGS="$(< ${pkgs.stdenv.cc}/nix-support/libc-cflags) \
-              -idirafter ${pkgs.rosPackages.${ROS_VERSION}.ros-core}/include \
-              -idirafter ${pkgs.rosPackages.${ROS_VERSION}.sensor-msgs}/include \
-              -idirafter ${pkgs.rosPackages.${ROS_VERSION}.std-msgs}/include"
-
-            # Rustupの設定
             export RUST_SRC_PATH="${rustNightly}/lib/rustlib/src/rust/library"
-
-            # 🛠️ 【重要】ライブラリパスをNixの魔法で自動生成
-            # これで demo_nodes_cpp が動くようになります
-            export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${pkgs.lib.makeLibraryPath myRosPackages}"
-            
-            # 常にRust生成をON
-            export ROSIDL_GENERATOR_RUST=ON
-            
-            # ローカルのワークスペース設定読み込み
-            if [ -f install/setup.bash ]; then
-              source install/setup.bash
-            fi
-
+            export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${pkgs.lib.makeLibraryPath basePackages}"
             echo "=========================================="
             echo "🦀 PRO Environment Loaded (Jazzy + Rust) 🦀"
-            echo "   - demo-nodes-cpp installed"
             echo "=========================================="
           '';
+        };
+
+        # 2. 配布用Dockerイメージ（最強版）
+        packages.dockerImage = pkgs.dockerTools.buildLayeredImage {
+          name = "lazytatzv/robo-env";
+          tag = "latest";
+          
+          # buildEnv でまとめた中身 + bash を入れる
+          contents = [ envApp pkgs.bashInteractive pkgs.coreutils ];
+
+          config = {
+            Cmd = [ "/bin/bash" ]; # 起動時はとりあえずbash
+            Env = [
+              "PATH=/bin" # 👈 これで /bin/fish や /bin/ros2 が見つかる！
+              "ROS_DISTRO=${ROS_VERSION}"
+              "ROS_VERSION=2"
+              "LD_LIBRARY_PATH=/lib"
+              "PYTHONPATH=/lib/python3.11/site-packages" # パスは環境に合わせて調整
+              "AMENT_PREFIX_PATH=/bin" # これがないと ROS コマンドが死ぬ
+            ];
+          };
         };
       }
     );

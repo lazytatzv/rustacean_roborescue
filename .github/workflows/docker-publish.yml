@@ -1,0 +1,46 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    branches: [ "main" ] # mainにpushされたら自動発動
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. Nixのインストール 
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v10
+
+      # 2. 魔法のキャッシュ
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v4
+
+      # 3. Docker Hub にログイン
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 4. Nixでイメージをビルド
+      - name: Build Docker Image
+        run: nix build .#dockerImage
+
+      # 5. イメージをロードして Push (Skopeoを使うとよりプロっぽいです)
+      - name: Load and Push
+        run: |
+          docker load < result
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/robo-env"
+          docker tag rustacean-roborescue-env:latest $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:latest

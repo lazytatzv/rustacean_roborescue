@@ -1,0 +1,27 @@
+services:
+  ros2_container:
+    image: rustacean-roborescue-env:latest
+    container_name: ros2_working_container
+    tty: true
+    privileged: true
+    network_mode: host
+    
+    working_dir: /workspace 
+
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1 
+    
+    volumes:
+      - .:/workspace
+      # X11 Forwarding
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # もしコンテナ内からホストのDockerコマンドを叩きたいなら
+      # - /var/run/docker.sock:/var/run/docker.sock
+
+    # Nixイメージにはエントリーポイントを仕込めるので、
+    # 起動時に自動で workspace のビルド済み設定を読ませることも可能
+
+      #xhost +local:docker
+      #おまじないは必要
