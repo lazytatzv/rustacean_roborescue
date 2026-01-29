@@ -9,7 +9,7 @@ fi
 
 echo "🚀 [Stage 1] ジェネレータ（道具）を先にビルドします..."
 # まず道具だけ作る
-colcon build --merge-install --packages-up-to rosidl_generator_rs
+colcon build --merge-install --symlink-install --packages-up-to rosidl_generator_rs
 
 echo "⚡ [Source] 新しい道具を装備中..."
 # これをしないと古いジェネレータが使われてしまう
@@ -19,6 +19,6 @@ echo "🚀 [Stage 2] メッセージとドライバーを一気にビルドし�
 # 最後に残りをビルド
 export ROSIDL_GENERATOR_RUST=ON
 # パスしていしなくてもなんか探してくれるっぽい
-colcon build --merge-install --symlink-install --packages-up-to flipper_driver
+colcon build --merge-install --symlink-install 
 
 echo "✅ ビルド完了！お疲れ様でした！"
