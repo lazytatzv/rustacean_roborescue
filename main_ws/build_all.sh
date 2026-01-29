@@ -18,6 +18,7 @@ source install/setup.bash
 echo "🚀 [Stage 2] メッセージとドライバーを一気にビルドします..."
 # 最後に残りをビルド
 export ROSIDL_GENERATOR_RUST=ON
+# パスしていしなくてもなんか探してくれるっぽい
 colcon build --merge-install --symlink-install --packages-up-to flipper_driver
 
 echo "✅ ビルド完了！お疲れ様でした！"

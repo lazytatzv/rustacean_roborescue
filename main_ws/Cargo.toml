@@ -1,9 +1,15 @@
 [workspace]
-resolver = "2"
 members = [
-    "src/drive_controller",
-    "src/flipper_driver",
-    "src/sensor_gateway",
-    "src/track_driver",
-    "src/vision_processor",
+    # ❌ 削除 (もう存在しないフォルダ)
+    # "src/drive_controller", 
+
+    # ✅ 追加 (今の正しい場所)
+    "src/hardware_drivers/crawler_driver",
+    "src/hardware_drivers/flipper_driver",
+    "src/hardware_drivers/sensor_gateway",
+    #"src/control/joy_operator",
+
+    # ✅ 外部ライブラリ (さっき移動したやつ)
+    # "src/external/ros2_rust/rclrs",
+    # ... 他の external/* もここに追加
 ]
