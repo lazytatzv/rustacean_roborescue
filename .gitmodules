@@ -19,3 +19,6 @@
 [submodule "main_ws/src/test_interface_files"]
 	path = main_ws/src/external/test_interface_files
 	url = https://github.com/ros2/test_interface_files.git
+[submodule "main_ws/src/external/kiss-icp"]
+	path = main_ws/src/external/kiss-icp
+	url = https://github.com/PRBonn/kiss-icp.git
