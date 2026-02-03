@@ -1,15 +1,34 @@
 [workspace]
-members = [
-    # ❌ 削除 (もう存在しないフォルダ)
-    # "src/drive_controller", 
-
-    # ✅ 追加 (今の正しい場所)
+members = ["src/control/arm_controller","src/control/joy_operator",
     "src/hardware_drivers/crawler_driver",
-    "src/hardware_drivers/flipper_driver",
+    "src/hardware_drivers/flipper_driver", "src/hardware_drivers/gripper_driver",
     "src/hardware_drivers/sensor_gateway",
-    #"src/control/joy_operator",
-
-    # ✅ 外部ライブラリ (さっき移動したやつ)
-    # "src/external/ros2_rust/rclrs",
-    # ... 他の external/* もここに追加
 ]
+
+
+# 依存関係の解決ルール（Rust 2021以降の推奨）
+resolver = "2"
+
+[patch.crates-io]
+# 1. rclrs本体は「ソースコード」を参照させる
+#    (src/external/rclrs/rclrs がある場所に合わせて調整)
+rclrs = { path = "src/external/ros2_rust/rclrs" }
+
+# 2. メッセージ型は「ビルド生成物 (installフォルダ)」を参照させる
+#    これがないと "No such file" エラーになります
+action_msgs = { path = "install/share/action_msgs/rust" }
+geometry_msgs = { path = "install/share/geometry_msgs/rust" }
+nav_msgs = { path = "install/share/nav_msgs/rust" }
+sensor_msgs = { path = "install/share/sensor_msgs/rust" }
+std_msgs = { path = "install/share/std_msgs/rust" }
+builtin_interfaces = { path = "install/share/builtin_interfaces/rust" }
+rcl_interfaces = { path = "install/share/rcl_interfaces/rust" }
+rosgraph_msgs = { path = "install/share/rosgraph_msgs/rust" }
+statistics_msgs = { path = "install/share/statistics_msgs/rust" }
+trajectory_msgs = { path = "install/share/trajectory_msgs/rust" }
+visualization_msgs = { path = "install/share/visualization_msgs/rust" }
+#tf2_msgs = { path = "install/share/tf2_msgs/rust" }
+# [patch.crates-io] セクションの中に追記してください
+
+service_msgs = { path = "install/share/service_msgs/rust" }
+unique_identifier_msgs = { path = "install/share/unique_identifier_msgs/rust" }

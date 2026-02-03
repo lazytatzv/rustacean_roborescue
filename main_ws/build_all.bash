@@ -1,4 +1,4 @@
-#!/bin/bash
+##!/bin/bash
 set -e # エラーが出たら即座に止まる設定
 
 echo "🧹 (Option) クリーンビルドしたい場合は 'clean' を引数につけてね"

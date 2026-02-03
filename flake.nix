@@ -38,6 +38,7 @@
           mold            # 現代の最強リンカ (ld/lldより圧倒的に速い)
           ninja           # Makeより速いビルドシステム
           clang-tools     # clang-format (C++の整形)
+          clang
           
           # =========================================
           # 🦀 Rust 快適化ツール

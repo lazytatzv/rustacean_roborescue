@@ -1,29 +1,5 @@
-[patch.crates-io.service_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/service_msgs/rust"
-
-[patch.crates-io.geometry_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/geometry_msgs/rust"
-
-[patch.crates-io.test_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/test_msgs/rust"
-
-[patch.crates-io.action_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/action_msgs/rust"
-
-[patch.crates-io.rclrs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/rclrs/rust"
-
-[patch.crates-io.std_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/std_msgs/rust"
-
-[patch.crates-io.rosgraph_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/rosgraph_msgs/rust"
-
-[patch.crates-io.rcl_interfaces]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/rcl_interfaces/rust"
-
-[patch.crates-io.builtin_interfaces]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/builtin_interfaces/rust"
-
-[patch.crates-io.sensor_msgs]
-path = "/home/rodep/rust/rustacean_roborescue/main_ws/install/share/sensor_msgs/rust"
+[target.x86_64-unknown-linux-gnu]
+# gcc (cc) の代わりに clang を使う
+linker = "clang"
+# lldリンカを使って高速化＆安定化 (moldは避ける)
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
