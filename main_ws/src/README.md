@@ -16,6 +16,17 @@ ps4コントローラの入力を配信
 - pub topic: 
   - /joy (sensor_msgs/Joy)
 
+#### 備考
+
+flake.nixでいれているので、以下コマンドで起動出来る
+
+```bash
+# 起動
+ros2 run joy joy_node
+# 確認
+ros2 topic echo /joy
+```
+
 ### joy_operator (Rust)
 
 人間のJoystickからの操作をロボットへの物理指令へと変換する層
@@ -97,7 +108,7 @@ Lidarの点群を吐く
    - /velodyne_points (sensor_msgs/PointCloud2)
      - 3D点群 
 
-### KISS-ICP (C++既存)
+### [廃止予定] KISS-ICP (C++既存)
 
 多分最強のLidarOdom
 軽い、高精度
@@ -110,7 +121,7 @@ Lidarの点群を吐く
     - /odom_lidar (nav_msgs/Odometry)
       - ロボットがどう動いたかのメインの情報源
 
-### robot_localization (c++既存)
+### [廃止予定] robot_localization (c++既存)
 
 センサ融合. EKFノード
 IMU & LidarOdomのfusion, encoderは使わない気がする(精度が..)
