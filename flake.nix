@@ -22,7 +22,7 @@
 
         ROS_VERSION = "jazzy";
 
-        # 🦀 Rust環境 (STM32 & ホスト両対応)
+        # Rust環境seutp
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "llvm-tools-preview" ];
           targets = [ "thumbv7em-none-eabihf" ]; 
@@ -31,8 +31,9 @@
         basePackages = with pkgs; [
           cmake
           eigen
+          vtk
           # =========================================
-          # 🚀 ビルド高速化 & 開発ツール (ここが重要)
+          #  dev tools
           # =========================================
           ccache          # C++の再ビルドを爆速にするキャッシュ
           mold            # 現代の最強リンカ (ld/lldより圧倒的に速い)
@@ -41,7 +42,7 @@
           clang
           
           # =========================================
-          # 🦀 Rust 快適化ツール
+          #  rust optimization tools
           # =========================================
           rustNightly
           bacon           # バックグラウンドで常にコンパイルエラーを監視してくれる神ツール
@@ -51,7 +52,7 @@
           probe-rs        # STM32への書き込み・デバッグ (OpenOCDより楽)
 
           # =========================================
-          # 🐍 Python & Vision ツール
+          #  Python & Vision ツール
           # =========================================
           python3
           python3Packages.numpy
@@ -98,7 +99,7 @@
           rosPackages.${ROS_VERSION}.tf2-sensor-msgs
 
           # =========================================
-          # 💻 ターミナル & システム管理
+          #  ターミナル & システム管理
           # =========================================
           git
           lazygit         # TUIでGit操作 (めちゃくちゃ便利)
@@ -130,13 +131,12 @@
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath basePackages}:$LD_LIBRARY_PATH"
+            
+            # --- CMake設定 (VTK等を認識させる) ---
+            export CMAKE_PREFIX_PATH="${pkgs.vtk}/lib/cmake/vtk-9.2:$CMAKE_PREFIX_PATH"
 
             echo "======================================================="
-            echo "🛡️  RoboRescue Full Armor Env Loaded 🛡️"
-            echo "   🔨 Build: ccache + mold (Ultra Fast Mode)"
-            echo "   🦀 Rust: bacon, probe-rs, cargo-watch"
-            echo "   🤖 ROS2: Rviz2, RQT, Colcon"
-            echo "   🐍 Py  : OpenCV, Black, IPDB"
+            echo " Ready to Dev !
             echo "======================================================="
           '';
         };
