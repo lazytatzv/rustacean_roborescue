@@ -1,0 +1,7 @@
+/**:
+  ros__parameters:
+    topic: /imu/data
+    frame_id: imu_link
+    rate_hz: 100.0
+    use_gravity: true
+    gravity_mps2: 9.80665

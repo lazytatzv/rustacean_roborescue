@@ -1,0 +1,4 @@
+/**:
+  ros__parameters:
+    frame_id: "velodyne"
+    model: "VLP16"

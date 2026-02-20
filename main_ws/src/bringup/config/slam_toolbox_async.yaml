@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    # Frames
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_link
+
+    # Topics
+    scan_topic: /scan
+
+    # Timing / queue
+    use_sim_time: false
+
+    # Mode
+    mode: mapping
+
+    # Submap / loop settings (keep default-ish)
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
