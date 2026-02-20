@@ -9,9 +9,9 @@
     preprocess:
       lidar_type: 2 # velodyne lidarは2
       scan_line: 16 # 縦のレーザ本数。vlp-16使うので16
-      scan_rate: 10
-      timestamp_unit: 2
-      blind: 2 # 近距離の無効化距離(m)
+      scan_rate: 15
+      timestamp_unit: 1
+      blind: 0.5 # 近距離の無効化距離(m)
 
     mapping:
       acc_cov: 0.1 # ノイズ共分散。imuよりlidarを信頼したいので、大きめにする予定
@@ -33,3 +33,6 @@
       scan_publish_en: true
       dense_publish_en: true
       scan_bodyframe_pub_en: true
+
+    gravity_alignment:
+      enable_gravity_alignment: false

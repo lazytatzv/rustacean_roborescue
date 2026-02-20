@@ -1,4 +1,10 @@
-/**:
+velodyne_pointcloud:
   ros__parameters:
     frame_id: "velodyne"
     model: "VLP16"
+    organize_cloud: true
+    min_range: 0.9
+    max_range: 130.0
+    view_direction: 0.0
+    fixed_frame: ""
+    target_frame: ""

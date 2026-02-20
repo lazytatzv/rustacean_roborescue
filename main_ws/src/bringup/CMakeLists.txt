@@ -19,6 +19,7 @@ install(DIRECTORY
 
 install(PROGRAMS
   scripts/dummy_imu_node.py
+  scripts/fix_pointcloud_time_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
