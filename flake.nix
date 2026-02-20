@@ -1,5 +1,5 @@
 {
-  description = "Pro Rustacean RoboRescue Env (Full Armor)";
+  description = "robot dev env";
 
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
@@ -40,6 +40,7 @@
           ninja           # Makeより速いビルドシステム
           clang-tools     # clang-format (C++の整形)
           clang
+          llvmPackages.openmp  # OpenMP (omp.h)
           
           # =========================================
           #  rust optimization tools
@@ -128,12 +129,16 @@
             export CXX="ccache clang++"
             # リンカをmoldに強制 (爆速化)
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+            # OpenMP
+            export CFLAGS="-fopenmp $CFLAGS"
+            export CXXFLAGS="-fopenmp $CXXFLAGS"
+            export LDFLAGS="-fopenmp $LDFLAGS"
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath basePackages}:$LD_LIBRARY_PATH"
             
             # --- CMake設定 (VTK等を認識させる) ---
-            export CMAKE_PREFIX_PATH="${pkgs.vtk}/lib/cmake/vtk-9.2:$CMAKE_PREFIX_PATH"
+            export CMAKE_PREFIX_PATH="${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
 
             echo "======================================================="
             echo " Ready to Dev !
