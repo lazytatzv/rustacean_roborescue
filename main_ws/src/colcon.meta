@@ -7,7 +7,7 @@
     ]
   },
   "names": {
-    "kiss-icp": {
+    "kiss_icp": {
       "build": {
         "skip": true
       }
