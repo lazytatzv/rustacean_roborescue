@@ -4,6 +4,7 @@
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";
+    nixgl.url = "github:nix-community/nixGL";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -11,12 +12,15 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay, flake-utils }:
+  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay, flake-utils, nixgl }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ nix-ros-overlay.overlays.default (import rust-overlay) ];
+          overlays = [
+            nix-ros-overlay.overlays.default (import rust-overlay)
+            nixgl.overlay
+          ];
           config.allowUnfree = true; # VSCodeやプロプライエタリなツール用
         };
 
@@ -41,6 +45,14 @@
           clang-tools     # clang-format (C++の整形)
           clang
           llvmPackages.openmp  # OpenMP (omp.h)
+
+          # fishまわり
+          fish
+          fishPlugins.bass
+
+          just
+
+          pkgs.nixgl.auto.nixGLDefault
           
           # =========================================
           #  rust optimization tools
@@ -134,6 +146,11 @@
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
 
+            alias ros2="nixGL ros2"
+            alias rviz2="nixGL rviz2"
+            alias rqt="nixGL rqt"
+            
+
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath basePackages}:$LD_LIBRARY_PATH"
             
@@ -141,7 +158,7 @@
             export CMAKE_PREFIX_PATH="${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
 
             echo "======================================================="
-            echo " Ready to Dev !
+            echo " Ready to Dev !"
             echo "======================================================="
           '';
         };
