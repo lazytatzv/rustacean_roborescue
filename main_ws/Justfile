@@ -1,5 +1,7 @@
 set shell := ["bash", "-c"]
 
+export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
+
 # colconのoptionについては、colcon.metaで管理するのはやめた
 
 # configs
@@ -12,6 +14,8 @@ ignore_list := "kiss_icp"
 
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
+filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
+
 default: forge
 
 clean:
@@ -20,11 +24,11 @@ clean:
 
 build-tools:
   @echo "道具だけビルド"
-  colcon build {{common_args}} --packages-up-to rosidl_generator_rs
+  colcon build {{common_args}} --packages-up-to rosidl_generator_rs {{filter}}
 
 forge: build-tools
   @echo "Pathを通してから残りをビルド"
-  source install/setup.bash && colcon build {{common_args}} {{ignore_args}}
+  source install/setup.bash && colcon build {{common_args}} {{ignore_args}} {{filter}}
   @echo "ビルド完了!"
 
 reforge: clean forge

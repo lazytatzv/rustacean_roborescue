@@ -78,6 +78,9 @@
           # 🤖 ROS 2 Utilities
           # =========================================
           colcon
+          #rosPackages.${ROS_VERSION}.colcon-common-extensions
+          python3Packages.colcon-cargo
+          python3Packages.colcon-ros-cargo
           rosPackages.${ROS_VERSION}.ros-core
           rosPackages.${ROS_VERSION}.ament-cmake
           rosPackages.${ROS_VERSION}.rosidl-generator-rs 

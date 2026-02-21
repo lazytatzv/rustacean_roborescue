@@ -1,17 +1,16 @@
 [workspace]
-members = ["src/control/arm_controller","src/control/joy_operator",
-    "src/hardware_drivers/crawler_driver",
-    "src/hardware_drivers/flipper_driver", "src/hardware_drivers/gripper_driver",
-    "src/hardware_drivers/sensor_gateway",
+members = [
+    "src/control/*",
+    "src/perception/*",
+    "src/hardware_drivers/*",
 ]
-
 
 # 依存関係の解決ルール（Rust 2021以降の推奨）
 resolver = "2"
 
 [patch.crates-io]
 # 1. rclrs本体は「ソースコード」を参照させる
-#    (src/external/rclrs/rclrs がある場所に合わせて調整)
+# crates.ioからとってくるのは地雷なのでやらない！！！
 rclrs = { path = "src/external/ros2_rust/rclrs" }
 
 # 2. メッセージ型は「ビルド生成物 (installフォルダ)」を参照させる
