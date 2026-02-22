@@ -29,7 +29,7 @@
         # Rust環境seutp
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "llvm-tools-preview" ];
-          targets = [ "thumbv7em-none-eabihf" ]; 
+          targets = [ "thumbv7em-none-eabihf" ]; # stm32用だが、基本的に必要ないかも
         };
 
         basePackages = with pkgs; [
@@ -52,6 +52,7 @@
 
           just
 
+          # nixgl設定
           pkgs.nixgl.auto.nixGLDefault
           
           # =========================================
@@ -75,7 +76,7 @@
           python3Packages.ipdb    # インタラクティブデバッガ (printデバッグ卒業)
           
           # =========================================
-          # 🤖 ROS 2 Utilities
+          #  ROS 2 Utilities
           # =========================================
           colcon
           #rosPackages.${ROS_VERSION}.colcon-common-extensions
@@ -118,17 +119,18 @@
           #  ターミナル & システム管理
           # =========================================
           git
-          lazygit         # TUIでGit操作 (めちゃくちゃ便利)
-          ripgrep         # grepの爆速版 (rg)
-          fd              # findの爆速版
-          btop            # カッコいいシステムモニタ
-          zellij          # Rust製ターミナルマルチプレクサ (tmuxの現代版)
+          lazygit         
+          ripgrep         
+          fd              
+          btop            
+          zellij          
+          tmux
         ];
 
       in
       {
         devShells.default = pkgs.mkShell {
-          name = "RoboRescue Pro Env";
+          name = "RoboRescue Env";
           packages = basePackages;
 
           shellHook = ''
@@ -142,16 +144,20 @@
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
             export CC="ccache clang"   # ccacheを噛ませて高速化
             export CXX="ccache clang++"
-            # リンカをmoldに強制 (爆速化)
+            # リンカをmoldに強制し、高速化
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
-            # OpenMP
+            
+            # OpenMP 
+            # fast-lio用に必要
             export CFLAGS="-fopenmp $CFLAGS"
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
 
+            # GUIを使うならnixGL経由であることが必要
             alias ros2="nixGL ros2"
             alias rviz2="nixGL rviz2"
             alias rqt="nixGL rqt"
+            alais rqt_graph="nixGL rqt_graph"
             
 
             # --- ライブラリパス ---
