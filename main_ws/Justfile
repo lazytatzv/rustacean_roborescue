@@ -43,4 +43,6 @@ ready:
   @echo "bass . install/setup.bash"
 
 mm:
-  mmdc -i topology.mmd -o topology.png
+  mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
+
+
