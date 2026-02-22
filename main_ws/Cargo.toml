@@ -9,12 +9,12 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-# 1. rclrs本体は「ソースコード」を参照させる
+# rclrsはソースを参照させる
 # crates.ioからとってくるのは地雷なのでやらない！！！
 rclrs = { path = "src/external/ros2_rust/rclrs" }
 
-# 2. メッセージ型は「ビルド生成物 (installフォルダ)」を参照させる
-#    これがないと "No such file" エラーになります
+# メッセージ型は「ビルド生成物 (installフォルダ)」を参照させる
+# これがないと "No such file" エラーになる
 action_msgs = { path = "install/share/action_msgs/rust" }
 geometry_msgs = { path = "install/share/geometry_msgs/rust" }
 nav_msgs = { path = "install/share/nav_msgs/rust" }
