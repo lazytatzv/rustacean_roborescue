@@ -1,11 +1,27 @@
 graph TD
   %% node
   joy_node((joy_node))
-  joy_driver((joy_driver))
+  joy_operator((joy_operator))
+  crawler_driver((crawler_driver))
+  flipper_driver((flipper_driver))
+  arm_controller((arm_controller))
+  sensor_gateway((sensor_gateway))
 
   %% topic
   /joy{{/joy}}
+  /flipper_cmd_vel{{/flipper_cmd_vel}}
+  /crawler_cmd_vel{{/crawler_cmd_vel}}
+  /arm_cmd_vel{{/arm_cmd_vel}}
 
   %% Relation
-  joy_node -->|sensor_msgs/msg/Joy| /joy
-  /joy --> joy_driver
+  joy_node -->|sensor_msgs/Joy| /joy
+  /joy --> joy_operator
+
+  joy_operator -->|std_msgs/Float64MultiArray| /flipper_cmd_vel
+  joy_operator -->|custom| /crawler_cmd_vel
+  joy_operator -->|geometry_msgs/Twist| /arm_cmd_vel
+
+  /crawler_cmd_vel --> crawler_driver
+  /flipper_cmd_vel --> flipper_driver
+  /arm_cmd_vel --> arm_controller
+
