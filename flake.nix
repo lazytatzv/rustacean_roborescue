@@ -125,6 +125,8 @@
           btop            
           zellij          
           tmux
+
+          nodePackages.mermaid-cli
         ];
 
       in

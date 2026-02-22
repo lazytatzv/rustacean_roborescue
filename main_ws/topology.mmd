@@ -1,0 +1,11 @@
+graph TD
+  %% node
+  joy_node((joy_node))
+  joy_driver((joy_driver))
+
+  %% topic
+  /joy{{/joy}}
+
+  %% Relation
+  joy_node -->|sensor_msgs/msg/Joy| /joy
+  /joy --> joy_driver

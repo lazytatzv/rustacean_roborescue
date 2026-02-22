@@ -42,4 +42,5 @@ ready:
   @echo "RUN below command"
   @echo "bass . install/setup.bash"
 
-
+mm:
+  mmdc -i topology.mmd -o topology.png
