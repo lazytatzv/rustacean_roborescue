@@ -1,0 +1,6 @@
+{
+  mode: "client",
+  connect: { endpoints: ["tcp/127.0.0.1:7447"] }, // localのzenoh
+  scouting: { multicast: { enabled: false } }, // wifiへのmulticast漏れを防ぐ
+  transport: { shared_memory: { enabled: true } } // SHM
+}

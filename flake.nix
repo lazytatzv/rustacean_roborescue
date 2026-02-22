@@ -65,6 +65,7 @@
           cargo-binutils  # Embedded用 (objcopy, size)
           probe-rs        # STM32への書き込み・デバッグ (OpenOCDより楽)
 
+          zenoh
           # =========================================
           #  Python & Vision ツール
           # =========================================
@@ -161,6 +162,10 @@
             alias rqt="nixGL rqt"
             alais rqt_graph="nixGL rqt_graph"
             
+            # zenoh設定
+            export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+            # zenohを黙らせる
+            #export RUST_LOG=warn,zenoh=error
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath basePackages}:$LD_LIBRARY_PATH"

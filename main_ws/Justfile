@@ -1,7 +1,8 @@
 set shell := ["bash", "-c"]
 
-# 恐らく意味が無いが、一応
+# 環境変数
 export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
+export RMW_IMPLEMENTATION := "rmw_zenoh_cpp"
 
 # colconのoptionについては、colcon.metaで管理するのはやめた
 
@@ -37,11 +38,15 @@ forge: build-tools
 # clean build
 reforge: clean forge
 
+launch:
+  ros2 launch bringup launch.py
+
 # fishを使う際は自分でsourceする
 ready:
   @echo "RUN below command"
   @echo "bass . install/setup.bash"
 
+# Mermaid utilities
 mm:
   mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
 
