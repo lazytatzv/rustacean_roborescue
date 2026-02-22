@@ -1,5 +1,6 @@
 set shell := ["bash", "-c"]
 
+# 恐らく意味が無いが、一応
 export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
 
 # colconのoptionについては、colcon.metaで管理するのはやめた
@@ -14,12 +15,14 @@ ignore_list := "kiss_icp"
 
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
+# nix特有のpathに関連したwarnによってログが埋め尽くされてしまうので標準出力に出さない
 filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
 
+# just -> just forge
 default: forge
 
 clean:
-  @echo "Clean build..."
+  @echo "Clean..."
   rm -rf build/ install/ log/
 
 build-tools:
@@ -31,8 +34,12 @@ forge: build-tools
   source install/setup.bash && colcon build {{common_args}} {{ignore_args}} {{filter}}
   @echo "ビルド完了!"
 
+# clean build
 reforge: clean forge
 
+# fishを使う際は自分でsourceする
 ready:
   @echo "RUN below command"
   @echo "bass . install/setup.bash"
+
+

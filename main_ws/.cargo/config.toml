@@ -7,6 +7,12 @@ path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/type_desc
 [patch.crates-io.std_msgs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/std_msgs/rust"
 
+[patch.crates-io.flipper_driver]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/flipper_driver/rust"
+
+[patch.crates-io.joy_operator]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/joy_operator/rust"
+
 [patch.crates-io.nav_msgs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/nav_msgs/rust"
 
@@ -15,6 +21,9 @@ path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/action_ms
 
 [patch.crates-io.std_srvs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/std_srvs/rust"
+
+[patch.crates-io.vision_processor]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/vision_processor/rust"
 
 [patch.crates-io.sensor_msgs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/sensor_msgs/rust"
