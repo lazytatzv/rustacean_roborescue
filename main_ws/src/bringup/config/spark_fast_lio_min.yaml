@@ -26,13 +26,13 @@
                     0.0, 1.0, 0.0,
                     0.0, 0.0, 1.0]
 
-    filter_size_map: 0.3
+    filter_size_map: 0.5
 
     publish:
       path_en: true
-      scan_publish_en: true
-      dense_publish_en: true
-      scan_bodyframe_pub_en: true
+      scan_publish_en: false
+      dense_publish_en: false
+      scan_bodyframe_pub_en: false
 
     gravity_alignment:
       enable_gravity_alignment: false

@@ -98,6 +98,8 @@
           rosPackages.${ROS_VERSION}.pcl-conversions
           rosPackages.${ROS_VERSION}.tf2-eigen
           rosPackages.${ROS_VERSION}.tf2-sensor-msgs
+          rosPackages.${ROS_VERSION}.pointcloud-to-laserscan
+          rosPackages.${ROS_VERSION}.slam-toolbox
 
           # =========================================
           #  ターミナル & システム管理
