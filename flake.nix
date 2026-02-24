@@ -4,6 +4,7 @@
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";
+    nixgl.url = "github:nix-community/nixGL";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -11,12 +12,15 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay, flake-utils }:
+  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay, flake-utils, nixgl }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ nix-ros-overlay.overlays.default (import rust-overlay) ];
+          overlays = [
+            nix-ros-overlay.overlays.default (import rust-overlay)
+            nixgl.overlay
+          ];
           config.allowUnfree = true; # VSCodeやプロプライエタリなツール用
         };
 
@@ -25,7 +29,7 @@
         # Rust環境seutp
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "llvm-tools-preview" ];
-          targets = [ "thumbv7em-none-eabihf" ]; 
+          targets = [ "thumbv7em-none-eabihf" ]; # stm32用だが、基本的に必要ないかも
         };
 
         basePackages = with pkgs; [
@@ -41,6 +45,15 @@
           clang-tools     # clang-format (C++の整形)
           clang
           llvmPackages.openmp  # OpenMP (omp.h)
+
+          # fishまわり
+          fish
+          fishPlugins.bass
+
+          just
+
+          # nixgl設定
+          pkgs.nixgl.auto.nixGLDefault
           
           # =========================================
           #  rust optimization tools
@@ -52,6 +65,7 @@
           cargo-binutils  # Embedded用 (objcopy, size)
           probe-rs        # STM32への書き込み・デバッグ (OpenOCDより楽)
 
+          zenoh
           # =========================================
           #  Python & Vision ツール
           # =========================================
@@ -63,9 +77,12 @@
           python3Packages.ipdb    # インタラクティブデバッガ (printデバッグ卒業)
           
           # =========================================
-          # 🤖 ROS 2 Utilities
+          #  ROS 2 Utilities
           # =========================================
           colcon
+          #rosPackages.${ROS_VERSION}.colcon-common-extensions
+          python3Packages.colcon-cargo
+          python3Packages.colcon-ros-cargo
           rosPackages.${ROS_VERSION}.ros-core
           rosPackages.${ROS_VERSION}.ament-cmake
           rosPackages.${ROS_VERSION}.rosidl-generator-rs 
@@ -105,17 +122,20 @@
           #  ターミナル & システム管理
           # =========================================
           git
-          lazygit         # TUIでGit操作 (めちゃくちゃ便利)
-          ripgrep         # grepの爆速版 (rg)
-          fd              # findの爆速版
-          btop            # カッコいいシステムモニタ
-          zellij          # Rust製ターミナルマルチプレクサ (tmuxの現代版)
+          lazygit         
+          ripgrep         
+          fd              
+          btop            
+          zellij          
+          tmux
+
+          nodePackages.mermaid-cli
         ];
 
       in
       {
         devShells.default = pkgs.mkShell {
-          name = "RoboRescue Pro Env";
+          name = "RoboRescue Env";
           packages = basePackages;
 
           shellHook = ''
@@ -129,12 +149,25 @@
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
             export CC="ccache clang"   # ccacheを噛ませて高速化
             export CXX="ccache clang++"
-            # リンカをmoldに強制 (爆速化)
+            # リンカをmoldに強制し、高速化
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
-            # OpenMP
+            
+            # OpenMP 
+            # fast-lio用に必要
             export CFLAGS="-fopenmp $CFLAGS"
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
+
+            # GUIを使うならnixGL経由であることが必要
+            alias ros2="nixGL ros2"
+            alias rviz2="nixGL rviz2"
+            alias rqt="nixGL rqt"
+            alais rqt_graph="nixGL rqt_graph"
+            
+            # zenoh設定
+            export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+            # zenohを黙らせる
+            #export RUST_LOG=warn,zenoh=error
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath basePackages}:$LD_LIBRARY_PATH"
@@ -143,7 +176,7 @@
             export CMAKE_PREFIX_PATH="${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
 
             echo "======================================================="
-            echo " Ready to Dev !
+            echo " Ready to Dev !"
             echo "======================================================="
           '';
         };

@@ -1,0 +1,5 @@
+{
+  mode: "client", // QUICつかう
+  connect: { endpoints: ["quic/192.168.X.X:7447"] }, // ロボットの実機IPを指定！
+  scouting: { multicast: { enabled: false } }
+}

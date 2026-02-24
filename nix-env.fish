@@ -1,0 +1,2 @@
+set -x RMW_IMPLEMENTATION rmw_zenoh_cpp
+# set -x ZENOH_ROUTER_ENDPOINTS "tcp/192.168.1.100:7447"

@@ -1,0 +1,77 @@
+graph LR
+  %% -------------------------------------
+  %% Styles
+  %% -------------------------------------
+  classDef node_style fill:#fff,stroke:#333,stroke-width:2px;
+  classDef topic_style fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+  classDef tf_style fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+
+  %% -------------------------------------
+  %% Subgraphs for Logical Grouping
+  %% -------------------------------------
+  subgraph Operator["Operator Interface"]
+    joy[joy_node]:::node_style
+    op[joy_operator]:::node_style
+    T_joy{{/joy<br/>sensor_msgs/msg/Joy}}:::topic_style
+    
+    joy --> T_joy --> op
+  end
+
+  subgraph Mobility["Mobility"]
+    crawler[crawler_driver]:::node_style
+    flipper[flipper_driver]:::node_style
+    
+    T_c_cmd{{/crawler_cmd_vel<br/>custom}}:::topic_style
+    T_cmd_vel{{/cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
+    T_f_cmd{{/flipper_cmd_vel<br/>std_msgs/msg/Float64MultiArray}}:::topic_style
+    T_odom_w{{/odom_wheel<br/>nav_msgs/msg/Odometry}}:::topic_style
+    T_f_state{{/flipper_states<br/>sensor_msgs/msg/JointState}}:::topic_style
+
+    op --> T_c_cmd --> crawler
+    T_cmd_vel -.->|Auto Nav| crawler
+    op --> T_f_cmd --> flipper
+    crawler --> T_odom_w
+    flipper --> T_f_state
+  end
+
+  subgraph Arm_Vision["Arm & Vision"]
+    arm[arm_controller]:::node_style
+    gripper[gripper_driver]:::node_style
+    vision[vision_processor]:::node_style
+    
+    T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
+    T_g_cmd{{/gripper_cmd<br/>custom}}:::topic_style
+    T_cam{{/camera/image_raw<br/>sensor_msgs/msg/Image}}:::topic_style
+    T_qr{{/qt_codes<br/>std_msgs/msg/String}}:::topic_style
+
+    op --> T_a_cmd --> arm
+    op -.-> T_g_cmd --> gripper
+    T_cam --> vision
+    vision --> T_qr
+  end
+
+  subgraph Perception["Perception & L11n"]
+    gateway[sensor_gateway]:::node_style
+    v_driver[velodyne_driver]:::node_style
+    v_pc[velodyne_pc]:::node_style
+    time_fix[time_fix]:::node_style
+    spark_lio[spark_fast_lio]:::node_style
+    pc2ls[pc2laserscan]:::node_style
+    slam[slam_toolbox]:::node_style
+
+    T_imu{{/imu/data_raw<br/>sensor_msgs/msg/Imu}}:::topic_style
+    T_raw{{/velodyne_points<br/>sensor_msgs/msg/PointCloud2}}:::topic_style
+    T_scan{{/scan<br/>sensor_msgs/msg/LaserScan}}:::topic_style
+    T_odom{{/odom<br/>nav_msgs/msg/Odometry}}:::tf_style
+    T_map{{/map<br/>nav_msgs/msg/OccupancyGrid}}:::tf_style
+
+    gateway --> T_imu --> spark_lio
+    v_driver --> v_pc --> T_raw
+    T_raw --> time_fix --> spark_lio
+    T_raw --> pc2ls --> T_scan --> slam
+    
+    spark_lio --> T_odom
+    spark_lio -.->|TF: odom->base_link| slam
+    slam -.->|TF: map->odom| spark_lio
+    slam --> T_map
+  end
