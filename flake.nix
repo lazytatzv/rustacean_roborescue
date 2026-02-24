@@ -63,6 +63,7 @@
           cargo-watch     # ファイル変更検知して自動コマンド実行
           cargo-expand    # マクロ展開後のコードを見る (ROS2マクロのデバッグに便利)
           cargo-binutils  # Embedded用 (objcopy, size)
+          cargo-ament-build # ROS2 Rust パッケージのビルドツール
           probe-rs        # STM32への書き込み・デバッグ (OpenOCDより楽)
 
           zenoh
@@ -165,9 +166,9 @@
             alais rqt_graph="nixGL rqt_graph"
             
             # zenoh設定
-            export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+            # export RMW_IMPLEMENTATION=rmw_zenoh_cpp
             # zenohを黙らせる
-            #export RUST_LOG=warn,zenoh=error
+            # export RUST_LOG=warn,zenoh=error
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath basePackages}:$LD_LIBRARY_PATH"

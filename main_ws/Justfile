@@ -1,10 +1,14 @@
 set shell := ["bash", "-c"]
+# 各Rustパッケージのpackage.xmlでcolconが依存順序を解決する
 
 # 環境変数
 export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
-export RMW_IMPLEMENTATION := "rmw_zenoh_cpp"
+# export RMW_IMPLEMENTATION := "rmw_zenoh_cpp"
 
-# colconのoptionについては、colcon.metaで管理するのはやめた
+# Nix環境下ではgccのcollect2が "Argument list too long" で死ぬので clang+mold を使う
+# CARGO_TARGET_*_LINKER は最優先。CC=gcc を上書きする
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER := "clang"
+export CARGO_BUILD_RUSTFLAGS := "-C link-arg=-fuse-ld=mold"
 
 # configs
 distro := "jazzy"
@@ -26,14 +30,8 @@ clean:
   @echo "Clean..."
   rm -rf build/ install/ log/
 
-build-tools:
-  @echo "道具だけビルド"
-  colcon build {{common_args}} --packages-up-to rosidl_generator_rs {{filter}}
-
-forge: build-tools
-  @echo "Pathを通してから残りをビルド"
-  source install/setup.bash && colcon build {{common_args}} {{ignore_args}} {{filter}}
-  @echo "ビルド完了!"
+forge:
+  colcon build {{common_args}} {{ignore_args}} {{filter}}
 
 # clean build
 reforge: clean forge
