@@ -30,8 +30,11 @@ clean:
   @echo "Clean..."
   rm -rf build/ install/ log/
 
-forge:
-  colcon build {{common_args}} {{ignore_args}} {{filter}}
+forge-bindings:
+  colcon build --packages-up-to rosidl_generator_rs {{common_args}} {{filter}}
+
+forge: forge-bindings
+  source install/setup.bash && colcon build {{common_args}} {{ignore_args}} {{filter}}
 
 # clean build
 reforge: clean forge

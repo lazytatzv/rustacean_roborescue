@@ -12,6 +12,7 @@ resolver = "2"
 # rclrsはソースを参照させる
 # crates.ioからとってくるのは地雷なのでやらない！！！
 rclrs = { path = "src/external/ros2_rust/rclrs" }
+#rosidl_default_runtime = { version = "0.6.0", path = "src/external/rosidl_rust/rosidl_generator_rs" }
 
 # メッセージ型は「ビルド生成物 (installフォルダ)」を参照させる
 # これがないと "No such file" エラーになる

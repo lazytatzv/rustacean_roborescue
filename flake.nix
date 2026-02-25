@@ -86,7 +86,7 @@
           python3Packages.colcon-ros-cargo
           rosPackages.${ROS_VERSION}.ros-core
           rosPackages.${ROS_VERSION}.ament-cmake
-          rosPackages.${ROS_VERSION}.rosidl-generator-rs 
+          # rosPackages.${ROS_VERSION}.rosidl-generator-rs 
           
           # 必須メッセージ型
           rosPackages.${ROS_VERSION}.std-msgs
