@@ -82,6 +82,8 @@ class Operator : public rclcpp::Node
         return;
       }
 
+      // 変数名を変えてほしくはある
+
       float m1_axis_y = applyDeadzone(std::clamp<float>(msg.axes[1], -0.95f, 0.95f), DEADZONE);
       float m2_axis_y = applyDeadzone(std::clamp<float>(msg.axes[4], -0.95f, 0.95f), DEADZONE);
 
