@@ -106,44 +106,46 @@ class Operator : public rclcpp::Node
     int flipper4_speed = 0;
 
     // left backward
-    if (msg.axes[7] == 1)
+    if (msg.axes[7] == 1) // Dpad y
     {
       flipper1_sign = -1;
     }
-    else if (msg.axes[7] == -1)
+    else if (msg.axes[7] == -1) // Dpad y
     {
       flipper1_sign = 1;
     }
     flipper1_speed = FLIPPER_SPEED * flipper1_sign;
 
     // right backward
-    if (msg.buttons[2] == 1)
+    if (msg.buttons[2] == 1) // △
     {
       flipper2_sign = -1;
     }
-    else if (msg.buttons[0] == 1)
+    else if (msg.buttons[0] == 1) // ✕
     {
       flipper2_sign = 1;
     }
     flipper2_speed = FLIPPER_SPEED * flipper2_sign;
 
     // left forward
-    if (msg.axes[2] == -1)
+    if (msg.axes[2] == -1) // L2
     {
       flipper3_sign = -1;
     }
-    else if (msg.buttons[4] == 1)
+    else if (msg.buttons[4] == 1) // L1
     {
       flipper3_sign = 1;
     }
     flipper3_speed = FLIPPER_SPEED * flipper3_sign;
 
     // right forward
-    if (msg.buttons[5] == 1)
+    // ここおかしいかも多分プラマイ逆な気が
+    // LFとRFの対象性
+    if (msg.buttons[5] == 1) // R2
     {
       flipper4_sign = 1;
     }
-    else if (msg.axes[5] == -1)
+    else if (msg.axes[5] == -1) // R1
     {
       flipper4_sign = -1;
     }
