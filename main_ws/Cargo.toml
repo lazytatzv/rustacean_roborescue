@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "src/control/*",
+    "src/control/arm_controller",
     "src/perception/*",
-    "src/hardware_drivers/*",
+    "src/hardware_drivers/sensor_gateway",
 ]
 
 # 依存関係の解決ルール（Rust 2021以降の推奨）
