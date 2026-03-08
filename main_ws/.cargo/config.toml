@@ -4,8 +4,17 @@ path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/service_ms
 [patch.crates-io.test_msgs]
 path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/test_msgs/rust"
 
+[patch.crates-io.custom_interfaces]
+path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/custom_interfaces/rust"
+
+[patch.crates-io.geometry_msgs]
+path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/geometry_msgs/rust"
+
 [patch.crates-io.action_msgs]
 path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/action_msgs/rust"
+
+[patch.crates-io.rclrs]
+path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/rclrs/rust"
 
 [patch.crates-io.type_description_interfaces]
 path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/type_description_interfaces/rust"
@@ -21,6 +30,12 @@ path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/rosgraph_m
 
 [patch.crates-io.rcl_interfaces]
 path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/rcl_interfaces/rust"
+
+[patch.crates-io.actionlib_msgs]
+path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/actionlib_msgs/rust"
+
+[patch.crates-io.composition_interfaces]
+path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/composition_interfaces/rust"
 
 [patch.crates-io.builtin_interfaces]
 path = "/home/yano/working/rustacean_roborescue/main_ws/install/share/builtin_interfaces/rust"
