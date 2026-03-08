@@ -1,5 +1,5 @@
 [package]
-name = "flipper_driver"
+name = "flipper_driver_rust"
 version = "0.1.0"
 edition = "2021"
 
