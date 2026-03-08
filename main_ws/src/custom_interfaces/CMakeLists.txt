@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(flipper_driver)
+project(custom_interfaces)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -10,30 +10,16 @@ find_package(ament_cmake REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(custom_interfaces REQUIRED)
-find_package(dynamixel_workbench_toolbox REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-add_executable(flipper_driver_node src/flipper_driver.cpp)
-
-ament_target_dependencies(
-	flipper_driver_node
-	rclcpp
-	std_msgs
-	dynamixel_workbench_toolbox
-	custom_interfaces
+# define custom messages
+rosidl_generate_interfaces(${PROJECT_NAME}
+		msg/DriverVelocity.msg
 )
 
-include_directories(
-  include
-  ${dynamixel_workbench_toolbox_INCLUDE_DIRS}
-)
-
-
-install(TARGETS
-	flipper_driver_node
-	DESTINATION lib/${PROJECT_NAME}
+install(
+	DIRECTORY msg
+	DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

@@ -29,7 +29,7 @@
         # Rust環境seutp
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "llvm-tools-preview" ];
-          targets = [ "thumbv7em-none-eabihf" ]; # stm32用だが、基本的に必要ないかも
+          #targets = [ "thumbv7em-none-eabihf" ]; # stm32用だが、基本的に必要ないかも
         };
 
         basePackages = with pkgs; [
@@ -163,7 +163,7 @@
             alias ros2="nixGL ros2"
             alias rviz2="nixGL rviz2"
             alias rqt="nixGL rqt"
-            alais rqt_graph="nixGL rqt_graph"
+            alias rqt_graph="nixGL rqt_graph"
             
             # zenoh設定
             # export RMW_IMPLEMENTATION=rmw_zenoh_cpp
