@@ -1,0 +1,10 @@
+arm_controller:
+  ros__parameters:
+    # URDF file path for the arm kinematic model
+    # k crate reads the file directly (not via ament), so use an absolute path
+    # or override at launch time.
+    urdf_path: "urdf/sekirei.urdf"
+    # Name of the end-effector link in the URDF
+    end_link: "link_tip"
+    # Watchdog timeout (ms) — arm stops if no command received within this period
+    watchdog_timeout_ms: 500

@@ -6,7 +6,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # configファイルのパスを取得
     config = os.path.join(
-        get_package_share_directory('robot_bringup'),
+        get_package_share_directory('bringup'),
         'config',
         'usb_cam_params.yaml'
     )

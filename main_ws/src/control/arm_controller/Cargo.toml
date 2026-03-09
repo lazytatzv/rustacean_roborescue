@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0"
+k = "0.32"
+urdf-rs = "0.8"
+rclrs = "*"
+geometry_msgs = "*"
+sensor_msgs = "*"

@@ -1,5 +1,5 @@
 {
-  description = "robot dev env";
+  description = "Rustacean RoboRescue — レスキューロボット開発環境";
 
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
@@ -18,106 +18,192 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
-            nix-ros-overlay.overlays.default (import rust-overlay)
+            nix-ros-overlay.overlays.default
+            (import rust-overlay)
             nixgl.overlay
           ];
           config.allowUnfree = true;
+          config.permittedInsecurePackages = [
+            "freeimage-3.18.0-unstable-2024-04-18"
+          ];
         };
 
         ROS_VERSION = "jazzy";
+        ros = pkgs.rosPackages.${ROS_VERSION};
 
+        # ── Rust ツールチェーン ──────────────────────────────
+        # nightly: proc-macro / bindgen に必要
+        # targets: stm32_ws の STM32F4 ベアメタル用
         rustNightly = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "llvm-tools-preview" ];
+          targets = [ "thumbv7em-none-eabihf" ];
         };
 
-        # 🛠️ ツール類（パス爆発の原因にならないもの）
+        # ── ビルドツール & CLI ──────────────────────────────
         buildTools = with pkgs; [
-          cmake ccache mold ninja clang-tools clang llvmPackages.openmp
-          fish fishPlugins.bass just pkgs.nixgl.auto.nixGLDefault
-          rustNightly bacon cargo-watch cargo-expand cargo-binutils cargo-ament-build probe-rs zenoh
-          python3 python3Packages.numpy python3Packages.opencv4 python3Packages.black python3Packages.isort python3Packages.ipdb
-          colcon python3Packages.colcon-cargo python3Packages.colcon-ros-cargo
-          git lazygit ripgrep fd btop zellij tmux nodePackages.mermaid-cli boost
+          # --- C++ ビルド ---
+          cmake ccache mold ninja
+          clang-tools clang llvmPackages.openmp
+          boost                       # crawler_driver (boost::asio)
 
-          rosPackages.${ROS_VERSION}.ros-core
-          rosPackages.${ROS_VERSION}.ament-cmake
+          # --- Rust ---
+          rustNightly
+          bacon                       # バックグラウンド コンパイルチェック
+          cargo-watch cargo-expand cargo-binutils
+          cargo-ament-build           # ROS 2 Rust パッケージビルド
+          probe-rs                    # STM32 書き込み・デバッグ
+
+          # --- Zenoh (RMW ミドルウェア) ---
+          zenoh
+
+          # --- Python ---
+          python3
+          python3Packages.numpy
+          python3Packages.opencv4     # qr_detector / vision_processor
+          python3Packages.black
+          python3Packages.isort
+          python3Packages.ipdb
+
+          # --- colcon ---
+          colcon
+          python3Packages.colcon-cargo
+          python3Packages.colcon-ros-cargo
+
+          # --- Shell & DevTools ---
+          fish fishPlugins.bass just
+          pkgs.nixgl.auto.nixGLDefault
+          git lazygit ripgrep fd btop zellij tmux
+          nodePackages.mermaid-cli    # topology/*.mmd 図の生成
+
+          # --- ROS 2 ビルドインフラ (buildTools 側に置く) ---
+          ros.ros-core
+          ros.ament-cmake
         ];
 
-        # 📦 ROS 2 パッケージ群（これらがパス爆発の真犯人）
-        rosDeps = with pkgs; [
-          eigen vtk
-          #rosPackages.${ROS_VERSION}.ros-core
-          #rosPackages.${ROS_VERSION}.ament-cmake
-          rosPackages.${ROS_VERSION}.std-msgs
-          rosPackages.${ROS_VERSION}.sensor-msgs
-          rosPackages.${ROS_VERSION}.geometry-msgs
-          rosPackages.${ROS_VERSION}.nav-msgs
-          rosPackages.${ROS_VERSION}.visualization-msgs
-          rosPackages.${ROS_VERSION}.rviz2
-          rosPackages.${ROS_VERSION}.rqt-graph
-          rosPackages.${ROS_VERSION}.rqt-plot
-          rosPackages.${ROS_VERSION}.rqt-console
-          rosPackages.${ROS_VERSION}.joy
-          rosPackages.${ROS_VERSION}.joy-linux
-          rosPackages.${ROS_VERSION}.teleop-twist-joy
-          rosPackages.${ROS_VERSION}.demo-nodes-cpp
-          rosPackages.${ROS_VERSION}.demo-nodes-py
-          rosPackages.${ROS_VERSION}.image-tools
-          rosPackages.${ROS_VERSION}.image-transport
-          rosPackages.${ROS_VERSION}.compressed-image-transport
-          rosPackages.${ROS_VERSION}.velodyne
-          rosPackages.${ROS_VERSION}.usb-cam
-          rosPackages.${ROS_VERSION}.pcl-ros
-          rosPackages.${ROS_VERSION}.pcl-conversions
-          rosPackages.${ROS_VERSION}.tf2-eigen
-          rosPackages.${ROS_VERSION}.tf2-sensor-msgs
-          rosPackages.${ROS_VERSION}.pointcloud-to-laserscan
-          rosPackages.${ROS_VERSION}.slam-toolbox
-          rosPackages.${ROS_VERSION}.dynamixel-workbench-toolbox
-          rosPackages.${ROS_VERSION}.dynamixel-sdk
+        # ── ROS 2 パッケージ群 ──────────────────────────────
+        # symlinkJoin で1ディレクトリに圧縮し PATH 爆発を防ぐ
+        rosDeps = [
+          # --- メッセージ生成 (custom_interfaces) ---
+          ros.rosidl-default-generators
+
+          # --- メッセージ型 ---
+          ros.std-msgs
+          ros.sensor-msgs
+          ros.geometry-msgs
+          ros.nav-msgs
+          ros.visualization-msgs
+          ros.std-srvs
+          ros.example-interfaces      # rclrs が link 時に必要
+
+          # --- TF2 (spark_fast_lio / perception.launch.py) ---
+          ros.tf2                     # core tf2 library
+          ros.tf2-msgs                # tf2 message types
+          ros.tf2-ros                 # static_transform_publisher
+          ros.tf2-eigen
+          ros.tf2-sensor-msgs
+          ros.tf2-geometry-msgs
+          ros.orocos-kdl-vendor       # transitive dep of tf2_geometry_msgs
+          ros.eigen3-cmake-module     # transitive dep of orocos_kdl_vendor
+          ros.message-filters         # spark_fast_lio dep
+
+          # --- Perception ---
+          ros.velodyne                # VLP-16 LiDAR ドライバ
+          ros.pointcloud-to-laserscan # 3D → 2D LaserScan
+          ros.slam-toolbox            # 2D SLAM
+          ros.pcl-ros
+          ros.pcl-conversions
+          ros.pcl-msgs                # transitive dep of pcl_conversions
+          ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
+          ros.image-transport
+          ros.compressed-image-transport
+
+          # --- Hardware ---
+          ros.joy                     # PS4 コントローラ
+          ros.joy-linux
+          ros.usb-cam                 # USB カメラ
+          ros.dynamixel-workbench-toolbox  # フリッパ / gripper_driver
+          ros.dynamixel-sdk
+
+          # --- Simulation (Gazebo Harmonic via ros-gz) ---
+          ros.xacro                   # URDF xacro 処理
+          ros.robot-state-publisher   # TF from URDF
+          ros.urdf                    # URDF パーサ
+          ros.urdf-parser-plugin      # robot_state_publisher が pluginlib で要求
+          ros.joint-state-publisher   # joint_state_publisher
+          ros.ros-gz-sim              # Gazebo Harmonic シミュレータ
+          ros.ros-gz-bridge           # ROS 2 ↔ Gazebo トピックブリッジ
+          ros.ros-gz-image            # Gazebo カメラ画像 → ROS 2
+          ros.ros-gz-interfaces       # Gazebo メッセージ型
+          ros.gz-tools-vendor         # gz コマンド (gz sim 等)
+          ros.gz-sim-vendor           # Gazebo Harmonic 本体
+
+          # --- Navigation (Nav2) ---
+          ros.navigation2             # Nav2 フルスタック
+
+          # --- ノード合成 (spark_fast_lio) ---
+          ros.rclcpp-components
+
+          # --- 可視化 & デバッグ ---
+          ros.rviz2
+          ros.rqt-graph
+          ros.rqt-plot
+          ros.rqt-console
         ];
 
-        # 🌟 最終奥義：ROSライブラリだけを1つのディレクトリに完全圧縮
+        # C++ ライブラリ (ROS 外)
+        cppLibs = with pkgs; [ eigen vtk orocos-kdl pcl ];
+
+        # ROS + C++ ライブラリを1ディレクトリに圧縮
         roboRescueEnv = pkgs.symlinkJoin {
           name = "roborescue-compressed-env";
-          paths = rosDeps;
+          paths = rosDeps ++ cppLibs;
         };
 
       in
       {
         devShells.default = pkgs.mkShell {
           name = "RoboRescue Env";
-          
-          # 🚨 超重要：rosDeps をシェルに直接渡さない！ 圧縮した環境だけを渡す！
+
+          # rosDeps を直接渡すと PATH が爆発するので圧縮環境のみ渡す
           packages = buildTools ++ [ roboRescueEnv ];
 
           shellHook = ''
+            # --- ROS 2 ---
             export ROS_DISTRO="${ROS_VERSION}"
             export ROS_VERSION=2
-            
+
+            # --- Rust ---
             export RUST_SRC_PATH="${rustNightly}/lib/rustlib/src/rust/library"
-            
+
+            # --- C++ ビルド高速化 ---
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
             export CC="ccache clang"
             export CXX="ccache clang++"
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
-            
+
+            # --- OpenMP (spark_fast_lio 用) ---
             export CFLAGS="-fopenmp $CFLAGS"
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
 
+            # --- nixGL (GUI アプリ用) ---
             alias ros2="nixGL ros2"
             alias rviz2="nixGL rviz2"
             alias rqt="nixGL rqt"
             alias rqt_graph="nixGL rqt_graph"
-            
-            # ライブラリパスを圧縮ディレクトリ1つだけに指定
+            alias gz="nixGL gz"
+
+            # --- ライブラリパス (圧縮ディレクトリ1つだけ) ---
             export LD_LIBRARY_PATH="${roboRescueEnv}/lib:$LD_LIBRARY_PATH"
             export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
 
+            # --- Gazebo Harmonic (gz sim) リソースパス ---
+            export GZ_SIM_RESOURCE_PATH="${roboRescueEnv}/share:$GZ_SIM_RESOURCE_PATH"
+
             echo "======================================================="
-            echo " Ready to Dev ! (完全圧縮モード発動 🚀)"
+            echo " Rustacean RoboRescue Dev Environment"
+            echo " ROS: ${ROS_VERSION} | Rust: nightly | Sim: Gazebo Harmonic"
             echo "======================================================="
           '';
         };

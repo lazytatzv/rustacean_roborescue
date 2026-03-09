@@ -11,7 +11,6 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(custom_interfaces REQUIRED)
 find_package(dynamixel_workbench_toolbox REQUIRED)
 
@@ -20,7 +19,6 @@ add_executable(flipper_driver_node src/flipper_driver.cpp)
 ament_target_dependencies(
 	flipper_driver_node
 	rclcpp
-	std_msgs
 	dynamixel_workbench_toolbox
 	custom_interfaces
 )

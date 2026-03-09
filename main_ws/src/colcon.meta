@@ -1,0 +1,59 @@
+{
+    "_comment": "Cargo resolves [patch.crates-io] eagerly for ALL workspace members. Every patched message crate path in install/share/*/rust must exist before ANY Rust package starts. We inject these as colcon dependencies so the build ordering is correct even when rclrs is cached.",
+    "names": {
+        "rclrs": {
+            "dependencies": [
+                "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
+                "std_msgs", "builtin_interfaces", "rcl_interfaces",
+                "rosgraph_msgs", "statistics_msgs", "trajectory_msgs",
+                "visualization_msgs", "service_msgs",
+                "unique_identifier_msgs", "custom_interfaces"
+            ]
+        },
+        "arm_controller": {
+            "dependencies": [
+                "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
+                "std_msgs", "builtin_interfaces", "rcl_interfaces",
+                "rosgraph_msgs", "statistics_msgs", "trajectory_msgs",
+                "visualization_msgs", "service_msgs",
+                "unique_identifier_msgs", "custom_interfaces"
+            ]
+        },
+        "gripper_driver": {
+            "dependencies": [
+                "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
+                "std_msgs", "builtin_interfaces", "rcl_interfaces",
+                "rosgraph_msgs", "statistics_msgs", "trajectory_msgs",
+                "visualization_msgs", "service_msgs",
+                "unique_identifier_msgs", "custom_interfaces"
+            ]
+        },
+        "sensor_gateway": {
+            "dependencies": [
+                "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
+                "std_msgs", "builtin_interfaces", "rcl_interfaces",
+                "rosgraph_msgs", "statistics_msgs", "trajectory_msgs",
+                "visualization_msgs", "service_msgs",
+                "unique_identifier_msgs", "custom_interfaces"
+            ]
+        },
+        "flipper_driver_rust": {
+            "dependencies": [
+                "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
+                "std_msgs", "builtin_interfaces", "rcl_interfaces",
+                "rosgraph_msgs", "statistics_msgs", "trajectory_msgs",
+                "visualization_msgs", "service_msgs",
+                "unique_identifier_msgs", "custom_interfaces"
+            ]
+        },
+        "qr_reader": {
+            "dependencies": [
+                "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
+                "std_msgs", "builtin_interfaces", "rcl_interfaces",
+                "rosgraph_msgs", "statistics_msgs", "trajectory_msgs",
+                "visualization_msgs", "service_msgs",
+                "unique_identifier_msgs", "custom_interfaces"
+            ]
+        }
+    }
+}

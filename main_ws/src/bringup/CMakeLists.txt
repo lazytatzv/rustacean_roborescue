@@ -14,12 +14,15 @@ find_package(ament_cmake REQUIRED)
 install(DIRECTORY
   config
   launch
+  urdf
+  worlds
   DESTINATION share/${PROJECT_NAME}
 )
 
 install(PROGRAMS
   scripts/dummy_imu_node.py
   scripts/fix_pointcloud_time_node.py
+  scripts/crawler_vel_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

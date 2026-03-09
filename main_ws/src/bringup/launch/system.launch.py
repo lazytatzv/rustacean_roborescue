@@ -12,6 +12,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -21,23 +22,34 @@ def generate_launch_description():
     # 各サブLaunchファイルのパス
     network_launch = os.path.join(bringup_dir, 'launch', 'network.launch.py')
     perception_launch = os.path.join(bringup_dir, 'launch', 'perception.launch.py')
-    control_launch = os.path.in(bringup_dir, 'launch', 'control.launch.py')
+    control_launch = os.path.join(bringup_dir, 'launch', 'control.launch.py')
+    nav2_launch = os.path.join(bringup_dir, 'launch', 'nav2.launch.py')
+
+    use_nav2 = DeclareLaunchArgument('use_nav2', default_value='false',
+                                      description='Nav2 自律走行を有効にする')
 
     return LaunchDescription([
+        use_nav2,
+
         # 1. ネットワーク（Zenoh）の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(network_launch),
         ),
 
-        # 2. 認識・SLAM系の起動 (今見せてくれたファイル)
+        # 2. 認識・SLAM系の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(perception_launch),
-            # 必要ならここから子ファイルへ引数を渡せる
             launch_arguments={'use_slam': 'true', 'use_rviz': 'false'}.items()
         ),
 
         # 3. 制御系の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(control_launch),
+        ),
+
+        # 4. Nav2 自律走行（オプション）
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(nav2_launch),
+            condition=IfCondition(LaunchConfiguration('use_nav2')),
         ),
     ])

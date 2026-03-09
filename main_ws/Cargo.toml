@@ -1,8 +1,10 @@
 [workspace]
 members = [
     "src/control/arm_controller",
-    "src/perception/*",
     "src/hardware_drivers/sensor_gateway",
+    "src/hardware_drivers/gripper_driver",
+    "src/hardware_drivers/flipper_driver_rust",
+    "src/perception/vision_processor",
 ]
 
 # 依存関係の解決ルール（Rust 2021以降の推奨）
@@ -32,3 +34,4 @@ visualization_msgs = { path = "install/share/visualization_msgs/rust" }
 
 service_msgs = { path = "install/share/service_msgs/rust" }
 unique_identifier_msgs = { path = "install/share/unique_identifier_msgs/rust" }
+custom_interfaces = { path = "install/share/custom_interfaces/rust" }

@@ -11,24 +11,22 @@ graph LR
   %% -------------------------------------
   subgraph Operator["Operator Interface"]
     joy[joy_node]:::node_style
-    op[joy_operator]:::node_style
+    op[joy_controller]:::node_style
     T_joy{{/joy<br/>sensor_msgs/msg/Joy}}:::topic_style
-    
+
     joy --> T_joy --> op
   end
 
   subgraph Mobility["Mobility"]
     crawler[crawler_driver]:::node_style
     flipper[flipper_driver]:::node_style
-    
-    T_c_cmd{{/crawler_cmd_vel<br/>custom}}:::topic_style
-    T_cmd_vel{{/cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
-    T_f_cmd{{/flipper_cmd_vel<br/>std_msgs/msg/Float64MultiArray}}:::topic_style
+
+    T_c_cmd{{/crawler_driver<br/>custom_interfaces/CrawlerVelocity}}:::topic_style
+    T_f_cmd{{/flipper_driver<br/>custom_interfaces/FlipperVelocity}}:::topic_style
     T_odom_w{{/odom_wheel<br/>nav_msgs/msg/Odometry}}:::topic_style
-    T_f_state{{/flipper_states<br/>sensor_msgs/msg/JointState}}:::topic_style
+    T_f_state{{/joint_states<br/>sensor_msgs/msg/JointState}}:::topic_style
 
     op --> T_c_cmd --> crawler
-    T_cmd_vel -.->|Auto Nav| crawler
     op --> T_f_cmd --> flipper
     crawler --> T_odom_w
     flipper --> T_f_state
@@ -37,20 +35,26 @@ graph LR
   subgraph Arm_Vision["Arm & Vision"]
     arm[arm_controller]:::node_style
     gripper[gripper_driver]:::node_style
-    vision[vision_processor]:::node_style
-    
+    qr[qr_detector]:::node_style
+
     T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
-    T_g_cmd{{/gripper_cmd<br/>custom}}:::topic_style
+    T_a_joint{{/arm_joint_commands<br/>sensor_msgs/msg/JointState}}:::topic_style
+    T_g_cmd{{/gripper_cmd<br/>custom_interfaces/GripperCommand}}:::topic_style
+    T_g_status{{/gripper_status<br/>custom_interfaces/GripperStatus}}:::topic_style
     T_cam{{/camera/image_raw<br/>sensor_msgs/msg/Image}}:::topic_style
-    T_qr{{/qt_codes<br/>std_msgs/msg/String}}:::topic_style
+    T_qr{{/qr_codes<br/>std_msgs/msg/String}}:::topic_style
+    T_img_c{{/image/compressed<br/>sensor_msgs/CompressedImage}}:::topic_style
 
     op --> T_a_cmd --> arm
+    arm --> T_a_joint
     op -.-> T_g_cmd --> gripper
-    T_cam --> vision
-    vision --> T_qr
+    gripper --> T_g_status
+    T_cam --> qr
+    qr --> T_qr
+    qr --> T_img_c
   end
 
-  subgraph Perception["Perception & L11n"]
+  subgraph Perception["Perception & Localization"]
     gateway[sensor_gateway]:::node_style
     v_driver[velodyne_driver]:::node_style
     v_pc[velodyne_pc]:::node_style
@@ -69,9 +73,29 @@ graph LR
     v_driver --> v_pc --> T_raw
     T_raw --> time_fix --> spark_lio
     T_raw --> pc2ls --> T_scan --> slam
-    
+
     spark_lio --> T_odom
     spark_lio -.->|TF: odom->base_link| slam
     slam -.->|TF: map->odom| spark_lio
     slam --> T_map
+  end
+
+  subgraph Navigation["Autonomous Navigation (Nav2)"]
+    bt[bt_navigator]:::node_style
+    planner[planner_server]:::node_style
+    controller[controller_server]:::node_style
+    behavior[behavior_server]:::node_style
+    smoother[velocity_smoother]:::node_style
+
+    T_goal{{/goal_pose<br/>geometry_msgs/PoseStamped}}:::topic_style
+    T_cmd_vel{{/cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
+
+    T_goal --> bt
+    bt --> planner
+    bt --> controller
+    bt --> behavior
+    controller --> smoother --> T_cmd_vel --> crawler
+
+    T_map --> planner
+    T_scan --> controller
   end

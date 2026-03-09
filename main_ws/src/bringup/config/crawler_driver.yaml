@@ -1,0 +1,9 @@
+crawler_driver:
+  ros__parameters:
+    serial_port: "/dev/roboclaw" # ここはudevで名前を縛る必要がある
+    crawler_circumference: 0.39
+    counts_per_rev: 256
+    gearhead_ratio: 66
+    pulley_ratio: 2
+    watchdog_timeout_ms: 500
+    track_width: 0.4  # クローラ間距離 [m] (Nav2 cmd_vel → 差動駆動用)

@@ -1,0 +1,6 @@
+flipper_driver:
+  ros__parameters:
+    port_name: "/dev/dynamixel" # udevで縛る
+    baud_rate: 115200
+    dynamixel_ids: [1, 2, 3, 4]
+    watchdog_timeout_ms: 500

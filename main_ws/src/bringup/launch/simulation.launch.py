@@ -1,0 +1,234 @@
+"""Gazebo Harmonic シミュレーション Launch ファイル.
+
+gz sim (Gazebo Harmonic) + ros_gz_bridge + robot_state_publisher を起動する。
+実機のハードウェアドライバの代わりに Gazebo プラグインがセンサ/odom を提供し、
+ros_gz_bridge で gz トピックを ROS 2 トピックへ変換する。
+
+使い方:
+  # シミュレーション単体
+  ros2 launch bringup simulation.launch.py
+
+  # SLAM + Nav2 付き
+  ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=true
+
+  # ヘッドレス (GUI なし)
+  ros2 launch bringup simulation.launch.py headless:=true
+"""
+import os
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+)
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import (
+    Command,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+    PythonExpression,
+)
+from launch_ros.actions import Node
+from launch_ros.descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
+
+
+def generate_launch_description() -> LaunchDescription:
+    bringup_share = FindPackageShare("bringup")
+    bringup_dir = get_package_share_directory("bringup")
+
+    # ── Arguments ──
+    world_file = DeclareLaunchArgument(
+        "world",
+        default_value=PathJoinSubstitution([bringup_share, "worlds", "rescue_field.sdf"]),
+        description="Gazebo Harmonic ワールドファイルのパス (.sdf)",
+    )
+    use_slam_arg = DeclareLaunchArgument("use_slam", default_value="true")
+    use_nav2_arg = DeclareLaunchArgument("use_nav2", default_value="false")
+    use_rviz_arg = DeclareLaunchArgument("use_rviz", default_value="true")
+    headless_arg = DeclareLaunchArgument("headless", default_value="false",
+                                         description="true でヘッドレス (GUI なし) 起動")
+
+    urdf_file = os.path.join(bringup_dir, "urdf", "robot.urdf.xacro")
+    robot_description = ParameterValue(
+        Command(["xacro ", urdf_file]),
+        value_type=str,
+    )
+
+    # ── sim_time を全ノードで有効化 ──
+    use_sim_time = SetEnvironmentVariable("USE_SIM_TIME", "true")
+
+    # ── Gazebo Harmonic (gz sim) ──
+    # headless=true のとき "-s --headless-rendering" (server only + EGL) を付与
+    gz_args = PythonExpression([
+        "'-s -r --headless-rendering ' + '",
+        LaunchConfiguration("world"),
+        "' if '",
+        LaunchConfiguration("headless"),
+        "' == 'true' else '-r ' + '",
+        LaunchConfiguration("world"),
+        "'",
+    ])
+    gz_sim_share = get_package_share_directory("ros_gz_sim")
+    gz_sim = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(gz_sim_share, "launch", "gz_sim.launch.py")
+        ),
+        launch_arguments={
+            "gz_args": gz_args,
+            "on_exit_shutdown": "true",
+        }.items(),
+    )
+
+    # ── Robot State Publisher ──
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="robot_state_publisher",
+        output="screen",
+        parameters=[{
+            "robot_description": robot_description,
+            "use_sim_time": True,
+        }],
+    )
+
+    # ── Spawn robot in Gazebo ──
+    spawn_entity = Node(
+        package="ros_gz_sim",
+        executable="create",
+        name="spawn_entity",
+        arguments=[
+            "-topic", "robot_description",
+            "-name", "rescue_robot",
+            "-x", "0.0", "-y", "0.0", "-z", "0.2",
+        ],
+        output="screen",
+    )
+
+    # ── ros_gz_bridge: gz topics ↔ ROS 2 topics ──
+    bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="ros_gz_bridge",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+        arguments=[
+            # cmd_vel: ROS 2 → Gazebo
+            "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
+            # odom: Gazebo → ROS 2
+            "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
+            # LiDAR: Gazebo → ROS 2
+            "/velodyne_points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked",
+            # IMU: Gazebo → ROS 2
+            "/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU",
+            # Camera: Gazebo → ROS 2
+            "/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+            "/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+            # Joint states: Gazebo → ROS 2
+            "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model",
+            # Clock: Gazebo → ROS 2
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+        ],
+    )
+
+    # ── CrawlerVelocity → Twist ブリッジ (teleop 用) ──
+    crawler_bridge = Node(
+        package="bringup",
+        executable="crawler_vel_bridge.py",
+        name="crawler_vel_bridge",
+        output="screen",
+        parameters=[{
+            "track_width": 0.4,
+            "use_sim_time": True,
+        }],
+    )
+
+    # ── Joy Controller (teleop、シミュレーションでも使える) ──
+    joy_controller = Node(
+        package="joy_controller",
+        executable="joy_controller_node",
+        name="joy_controller",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
+    # ── PointCloud → LaserScan ──
+    scan_params_file = os.path.join(bringup_dir, "config", "pointcloud_to_laserscan.yaml")
+    pointcloud_to_laserscan = Node(
+        package="pointcloud_to_laserscan",
+        executable="pointcloud_to_laserscan_node",
+        name="pointcloud_to_laserscan",
+        output="screen",
+        remappings=[
+            ("cloud_in", "/velodyne_points"),
+            ("scan", "/scan"),
+        ],
+        parameters=[
+            scan_params_file,
+            {"use_sim_time": True},
+        ],
+    )
+
+    # ── SLAM Toolbox (オプション) ──
+    slam_params_file = os.path.join(bringup_dir, "config", "slam_toolbox_async.yaml")
+    slam_toolbox = Node(
+        package="slam_toolbox",
+        executable="async_slam_toolbox_node",
+        name="slam_toolbox",
+        output="screen",
+        parameters=[
+            slam_params_file,
+            {
+                "use_sim_time": True,
+                "map_frame": "map",
+                "odom_frame": "odom",
+                "base_frame": "base_footprint",
+            },
+        ],
+        condition=IfCondition(LaunchConfiguration("use_slam")),
+    )
+
+    # ── Nav2 (オプション) ──
+    nav2_launch_file = os.path.join(bringup_dir, "launch", "nav2.launch.py")
+    nav2 = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(nav2_launch_file),
+        condition=IfCondition(LaunchConfiguration("use_nav2")),
+    )
+
+    # ── RViz ──
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+        condition=IfCondition(LaunchConfiguration("use_rviz")),
+    )
+
+    return LaunchDescription([
+        world_file,
+        use_slam_arg,
+        use_nav2_arg,
+        use_rviz_arg,
+        headless_arg,
+        use_sim_time,
+        # Gazebo Harmonic
+        gz_sim,
+        robot_state_publisher,
+        spawn_entity,
+        # gz ↔ ROS 2 Bridge
+        bridge,
+        # Bridge + Teleop
+        crawler_bridge,
+        joy_controller,
+        # Perception
+        pointcloud_to_laserscan,
+        slam_toolbox,
+        # Navigation
+        nav2,
+        # Visualization
+        rviz,
+    ])

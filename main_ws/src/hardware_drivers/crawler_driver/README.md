@@ -1,84 +1,60 @@
 # Roboclaw Driver for ROS2
 
 ## 概要
-このパッケージは、Roboclaw モータードライバを ROS2 で制御するためのノードを提供します。シリアル通信を用いてモーターの速度制御やエンコーダーのリセットを行います。
+このパッケージは、Roboclaw モータードライバを ROS2 で制御するためのノードを提供します。同期シリアル通信を用いてモーターの速度制御やエンコーダーのリセットを行います。ウォッチドッグタイマーにより、一定時間指令が途絶えた場合は自動停止します。
 
 ## 必要な依存関係
-このパッケージを動作させるためには、以下のパッケージとライブラリが必要です。
 
 - ROS2 Humble 以降
 - Boost Asio (`boost::asio`)
 - `rclcpp`
-- `std_msgs` (`std_msgs/msg/bool.hpp`)
-- `custom_interfaces` (`custom_interfaces/msg/driver_velocity.hpp`)
+- `custom_interfaces`（`custom_interfaces/msg/CrawlerVelocity`）
 
-## インストール方法
-1. ワークスペースを作成し、`src` ディレクトリに移動します。
+## ビルド方法
 
 ```sh
-mkdir -p ~/ros2_ws/src
-cd ~/ros2_ws/src
-```
-
-2. このリポジトリをクローンします。
-
-```sh
-git clone <リポジトリのURL>
-```
-
-3. 依存関係をインストールします。
-
-```sh
-cd ~/ros2_ws
-rosdep install --from-paths src --ignore-src -r -y
-```
-
-4. パッケージをビルドします。
-
-```sh
-colcon build --packages-select <パッケージ名>
+colcon build --packages-select crawler_driver
+source install/setup.bash
 ```
 
 ## 使用方法
-1. ROS2 をセットアップします。
+
+ノードを起動します。
 
 ```sh
-source ~/ros2_ws/install/setup.bash
+ros2 run crawler_driver crawler_driver_node
 ```
 
-2. ドライバーノードを起動します。
+`/crawler_driver` トピックに速度コマンドを送信すると、モーターが動作します。
 
 ```sh
-ros2 run <パッケージ名> driver
+ros2 topic pub /crawler_driver custom_interfaces/msg/CrawlerVelocity "{m1_vel: 1.0, m2_vel: 1.0}"
 ```
 
-3. `/operator` トピックに速度コマンドを送信すると、モーターが動作します。
+ウォッチドッグにより、指令が `watchdog_timeout_ms` ミリ秒以上途絶えるとモーターが自動停止します。
+
+## トピック
+
+| トピック名         | 型                                        | 説明                            |
+|--------------------|-------------------------------------------|---------------------------------|
+| `/crawler_driver`  | `custom_interfaces/msg/CrawlerVelocity`   | クローラ速度指令をSubscribe     |
+
+## パラメータ
+
+| パラメータ名            | デフォルト値    | 説明                                |
+|-------------------------|-----------------|-------------------------------------|
+| `serial_port`           | `/dev/roboclaw` | シリアルポートのパス                |
+| `crawler_circumference` | `0.39`          | クローラーの円周（m）               |
+| `counts_per_rev`        | `256`           | 1回転あたりのエンコーダーカウント数 |
+| `gearhead_ratio`        | `66`            | 減速機の比率                        |
+| `pulley_ratio`          | `2`             | プーリーの比率                      |
+| `watchdog_timeout_ms`   | `500`           | ウォッチドッグタイムアウト（ms）    |
+
+パラメータは YAML ファイルまたは起動時に指定できます。
 
 ```sh
-ros2 topic pub /operator custom_interfaces/msg/DriverVelocity "{m1_vel: 1.0, m2_vel: 1.0}"
-```
-
-4. `/emergency_stop` トピックに `true` を送信すると、モーターが停止します。
-
-```sh
-ros2 topic pub /emergency_stop std_msgs/msg/Bool "{data: true}"
-```
-
-## パラメータ設定
-ノードは以下のパラメータをサポートしています。
-
-| パラメータ名            | デフォルト値 | 説明 |
-|----------------|---------|--------------------------------------|
-| `crawler_circumference` | 0.39    | クローラーの円周（m） |
-| `pulse_per_rev`        | 256     | 1回転あたりのパルス数（エンコーダー） |
-| `gearhead_ratio`       | 66      | 減速機の比率 |
-| `pulley_ratio`         | 2       | プーリーの比率 |
-
-パラメータを変更する場合は、起動時に指定することができます。
-
-```sh
-ros2 run <パッケージ名> driver --ros-args -p crawler_circumference:=0.5
+ros2 run crawler_driver crawler_driver_node --ros-args -p serial_port:=/dev/ttyACM0
 ```
 
 ## ライセンス
-このプロジェクトは [MIT License](LICENSE) のもとで提供されます。
+MIT

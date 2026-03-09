@@ -1,0 +1,35 @@
+graph LR
+  classDef device fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+  classDef proto fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+
+  subgraph Robot["ロボット実機"]
+    NUC[Intel NUC<br/>Ubuntu 22.04]:::device
+    STM32[STM32F4<br/>BNO055 IMU]:::device
+    VLP16[VLP-16<br/>LiDAR]:::device
+    ROBOCLAW[Roboclaw<br/>モータコントローラ]:::device
+    DXL_G[Dynamixel<br/>グリッパ]:::device
+    DXL_F[Dynamixel<br/>フリッパ]:::device
+    USB_CAM[USB Camera]:::device
+
+    NUC -- "USB Serial<br/>115200 bps" --> STM32
+    NUC -- "USB Serial<br/>38400 bps" --> ROBOCLAW
+    NUC -- "USB Serial (U2D2)<br/>57600 bps" --> DXL_G
+    NUC -- "USB Serial (U2D2)<br/>57600 bps" --> DXL_F
+    NUC -- "Ethernet<br/>UDP 2368" --> VLP16
+    NUC -- "USB" --> USB_CAM
+  end
+
+  subgraph Network["ネットワーク"]
+    ZENOH_R{{Zenoh Router<br/>QUIC :7447}}:::proto
+    ZENOH_O{{Zenoh Router<br/>QUIC connect}}:::proto
+    ZENOH_R <-. "Wi-Fi / Ethernet<br/>QUIC (UDP)" .-> ZENOH_O
+  end
+
+  subgraph Operator["オペレータ PC"]
+    OPE_PC[Operator PC]:::device
+    PS4[PS4 Controller<br/>USB / Bluetooth]:::device
+    PS4 -- "HID" --> OPE_PC
+  end
+
+  NUC --- ZENOH_R
+  OPE_PC --- ZENOH_O

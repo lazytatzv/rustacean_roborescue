@@ -1,0 +1,4 @@
+sensor_gateway:
+  ros__parameters:
+    serial_port: "/dev/stm32"
+    baud_rate: 115200

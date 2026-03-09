@@ -1,0 +1,5 @@
+gripper_driver:
+  ros__parameters:
+    port_name: "/dev/ttyUSB1"
+    baud_rate: 115200
+    motor_id: 10
