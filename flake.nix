@@ -145,6 +145,16 @@
 
           # --- 可視化 & デバッグ ---
           ros.rviz2
+          ros.rviz-common
+          ros.rviz-rendering
+          ros.rviz-default-plugins
+          ros.rviz-ogre-vendor
+          ros.rviz-assimp-vendor
+          ros.point-cloud-transport    # rviz_default_plugins 依存
+          ros.laser-geometry           # LaserScan 表示
+          ros.interactive-markers      # rviz interactive markers
+          ros.resource-retriever       # URDF メッシュ読み込み
+          ros.map-msgs                 # Map 表示
           ros.rqt-graph
           ros.rqt-plot
           ros.rqt-console
@@ -186,15 +196,17 @@
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
 
-            # --- nixGL (GUI アプリ用) ---
-            alias ros2="nixGL ros2"
+            # --- GPU ドライバ パススルー (非-NixOS NVIDIA) ---
+            # Nix の Mesa はホスト NVIDIA カーネルドライバにアクセスできないため、
+            # GUI (gz sim, rviz2, rqt) は nixGL 経由で起動する必要がある。
+            # ヘッドレスモード (headless:=true) では不要。
+            alias gz="nixGL gz"
             alias rviz2="nixGL rviz2"
             alias rqt="nixGL rqt"
             alias rqt_graph="nixGL rqt_graph"
-            alias gz="nixGL gz"
 
-            # --- ライブラリパス (圧縮ディレクトリ1つだけ) ---
-            export LD_LIBRARY_PATH="${roboRescueEnv}/lib:$LD_LIBRARY_PATH"
+            # --- ライブラリパス ---
+            export LD_LIBRARY_PATH="${roboRescueEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
 

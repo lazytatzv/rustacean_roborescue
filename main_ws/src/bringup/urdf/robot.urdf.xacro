@@ -192,7 +192,7 @@
     <link name="${name}">
       <visual>
         <geometry>
-          <mesh filename="package://arm_controller/meshes/flipper.STL"/>
+          <mesh filename="package://bringup/meshes/flipper.STL"/>
         </geometry>
         <origin xyz="0 0 0" rpy="${flip_rpy}"/>
         <material name="white"><color rgba="0.9 0.9 0.9 1"/></material>
@@ -206,7 +206,7 @@
       <xacro:box_inertia m="${flipper_mass}" x="${flipper_length}" y="${flipper_width}" z="${flipper_height}"/>
     </link>
     <joint name="${name}_joint" type="revolute">
-      <origin xyz="${x_offset} ${y_offset} 0.06" rpy="0 0 0"/>
+      <origin xyz="${x_offset} ${y_offset} ${-base_height/2}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <parent link="base_link"/>
       <child link="${name}"/>
@@ -219,16 +219,19 @@
     </gazebo>
   </xacro:macro>
 
-  <!-- 前方: x = -base_length/2 付近, 後方: x = +base_length/2 付近 -->
-  <xacro:flipper name="flipper_fr" x_offset="-0.2135" y_offset="0.205"  flip_rpy="0 0 1.57"/>
-  <xacro:flipper name="flipper_fl" x_offset="-0.2135" y_offset="-0.205" flip_rpy="0 0 -1.57"/>
-  <xacro:flipper name="flipper_br" x_offset="0.2135"  y_offset="0.205"  flip_rpy="0 0 1.57"/>
-  <xacro:flipper name="flipper_bl" x_offset="0.2135"  y_offset="-0.205" flip_rpy="0 0 -1.57"/>
+  <!-- 前方 (+X = カメラ側): base_length/2, 後方 (-X = アーム側): -base_length/2 -->
+  <!-- flipper.STL は Z 方向に 0.28m 伸びる。pitch ±90° で水平に倒す。  -->
+  <!-- 前方: pitch +90° → Z_mesh → +X_robot (前方に伸びる) -->
+  <!-- 後方: pitch -90° → Z_mesh → -X_robot (後方に伸びる) -->
+  <xacro:flipper name="flipper_fr" x_offset="${base_length/2}"  y_offset="${track_width/2}"   flip_rpy="0 ${pi/2} 0"/>
+  <xacro:flipper name="flipper_fl" x_offset="${base_length/2}"  y_offset="${-track_width/2}"  flip_rpy="0 ${pi/2} 0"/>
+  <xacro:flipper name="flipper_br" x_offset="${-base_length/2}" y_offset="${track_width/2}"   flip_rpy="0 ${-pi/2} 0"/>
+  <xacro:flipper name="flipper_bl" x_offset="${-base_length/2}" y_offset="${-track_width/2}"  flip_rpy="0 ${-pi/2} 0"/>
 
   <!-- ======================== 6DOF Arm (sekirei URDF 由来) ======================== -->
   <!--
     arm_controller の sekirei.urdf をシミュ用に再構成。
-    Visual: 実機と同じ STL メッシュ (package://arm_controller/meshes/)
+    Visual: 実機と同じ STL メッシュ (package://bringup/meshes/)
     Collision: 簡易ボックスで軽量化
     Inertia: 各リンク 0.5 kg 均一近似
   -->
@@ -236,7 +239,7 @@
   <!-- Arm base (固定取付) -->
   <link name="arm_base_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_2020_asm1.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm1.STL"/></geometry>
       <origin xyz="-0.08 -0.081 0" rpy="1.57 0 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
@@ -254,7 +257,7 @@
   <!-- Joint 1: 旋回 (Z 軸) -->
   <link name="arm1_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_2020_asm2.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm2.STL"/></geometry>
       <origin xyz="0 0 0.004" rpy="1.57 0 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
@@ -276,7 +279,7 @@
   <!-- Joint 2: 肩 (Y 軸) -->
   <link name="arm2_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_2020_asm3.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm3.STL"/></geometry>
       <origin xyz="0 0 0" rpy="1.57 0 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
@@ -298,7 +301,7 @@
   <!-- Joint 3: 肘 (Y 軸) -->
   <link name="arm3_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_2020_asm4.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm4.STL"/></geometry>
       <origin xyz="0 0 0" rpy="1.57 0 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
@@ -320,7 +323,7 @@
   <!-- Joint 4: 手首ピッチ (Y 軸) -->
   <link name="arm4_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_2020_asm5.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm5.STL"/></geometry>
       <origin xyz="0 0 0" rpy="1.57 3.14 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
@@ -341,7 +344,7 @@
   <!-- Joint 5: 手首ヨー (Z 軸) -->
   <link name="arm5_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_l_asm6.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm6.STL"/></geometry>
       <origin xyz="0 0 0" rpy="1.57 3.14 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
@@ -362,7 +365,7 @@
   <!-- Joint 6: 手首ロール (X 軸) -->
   <link name="arm6_link">
     <visual>
-      <geometry><mesh filename="package://arm_controller/meshes/r_a_2019_l_asm7_ver2.STL"/></geometry>
+      <geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm7_ver2.STL"/></geometry>
       <origin xyz="0 0 0" rpy="0 3.14 0"/>
       <material name="white"><color rgba="1 1 1 1"/></material>
     </visual>
