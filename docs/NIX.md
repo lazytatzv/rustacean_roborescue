@@ -41,17 +41,32 @@ just nix
 | 可視化 | rviz2, joint-state-publisher-gui, plotjuggler |
 | ビルド | colcon, cmake, ninja, clang, mold |
 
-#### nixGL のメモ
+#### Nav2 パッケージ一覧 (flake.nix)
 
-Nix 環境では OpenGL アプリ (rviz2, gz sim) は直接使うと GLX エラーが出る場合がある。
-`nixGL` 経由で起動する:
+Jazzy では navigation2 メタパッケージが使えないため、以下の個別パッケージを flake.nix で指定:
 
-```bash
-nixGL rviz2
-nixGL gz sim
-```
+- ros.navigation2
+- ros.nav2-common
+- ros.nav2-core
+- ros.nav2-util
+- ros.nav2-msgs
+- ros.nav2-map-server
+- ros.nav2-controller
+- ros.nav2-planner
+- ros.nav2-behaviors
+- ros.nav2-bt-navigator
+- ros.nav2-velocity-smoother
+- ros.nav2-lifecycle-manager
+- ros.nav2-costmap-2d
+- ros.nav2-regulated-pure-pursuit-controller
+- ros.nav2-smac-planner
+- ros.nav2-rviz-plugins
 
-`flake.nix` で `alias gz="nixGL gz"` が設定されているため Gazebo は通常通り使える。
-`display.launch.py` は `use_rviz:=false` 引数で RViz なし起動が可能。
+#### GPU/nixGL 注意
+
+- Gazebo/RViz2 のセンサレンダリング (ogre2/ogre) は **GPU + ディスプレイ必須**
+- ヘッドレス環境では sensors-system プラグインを SDF でコメントアウトする (デフォルトで対応済み)
+- 物理シミュレーション・差動駆動・TF は GPU なしで動作
+- `nixGL` 経由で GUI を起動する場合は `ros2 launch bringup simulation.launch.py headless:=false` を推奨
 
 

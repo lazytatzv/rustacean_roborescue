@@ -333,14 +333,17 @@ ros2 launch bringup simulation.launch.py world:=/path/to/custom.sdf
 | robot_state_publisher | robot_state_publisher | URDF → TF 変換 |
 | create (spawn) | ros_gz_sim | ロボットモデルを Gazebo に投入 |
 | parameter_bridge | ros_gz_bridge | Gazebo ↔ ROS 2 トピック変換 |
+| odom_tf_bridge | bringup | /odom (Odometry) → odom→base_footprint TF 変換 |
 | crawler_vel_bridge | bringup | CrawlerVelocity → Twist 変換 |
 | joy_controller | joy_controller | PS4 → 指令値 (シミュレーション時はローカル起動) |
 | arm_controller | arm_controller | IK → 目標位置 |
 | arm_gz_bridge | bringup | JointState → per-joint cmd_pos (Gazebo 用) |
 | pointcloud_to_laserscan | pointcloud_to_laserscan | 3D → 2D 変換 |
 | slam_toolbox | slam_toolbox | 2D SLAM (オプション) |
-| nav2 スタック | navigation2 | 自律走行 (オプション) |
-| rviz2 | rviz2 | 可視化 (オプション) |
+| lifecycle_manager_slam | nav2_lifecycle_manager | SLAM ノードのライフサイクル管理 (autostart) |
+| static_map_odom_tf | tf2_ros | map→odom 静的 TF (フォールバック) |
+| nav2 スタック | navigation2 | 自律走行 (オプション, 5秒遅延起動) |
+| rviz2 | rviz2 | 可視化 (オプション, simulation.rviz) |
 
 ### 4.5 ros_gz_bridge トピックマッピング
 
@@ -384,9 +387,14 @@ ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
 
 ### 4.8 センサレンダリングについて
 
-GPU がない環境 (SSH, CI 等) ではセンサ系プラグイン (`gz-sim-sensors-system`) がクラッシュする場合がある。
-その場合はワールド SDF の sensors plugin をコメントアウトする (デフォルトではコメントアウト済み)。
-物理シミュレーション・差動駆動・odometry・TF は GPU なしでも動作する。
+GPU がない環境 (SSH, CI 等) ではセンサ系プラグイン (`gz-sim-sensors-system`) が SEGV でクラッシュする。
+レンダリングエンジン (ogre2 / ogre) はいずれも **GPU + ディスプレイ** が必要。
+`--headless-rendering` オプションでもセンサプラグインは GPU を要求するため、ヘッドレス環境では動作しない。
+
+対処:
+- `rescue_field.sdf` の `gz-sim-sensors-system` プラグインは **デフォルトでコメントアウト済み**
+- 物理シミュレーション・差動駆動・オドメトリ・ジョイント制御・ TF は GPU なしで動作する
+- センサデータ (LiDAR/IMU/カメラ) が必要な場合は GPU 付き環境で SDF のプラグインを有効化する
 
 GUI 起動時は nixGL 経由で:
 
@@ -395,6 +403,20 @@ GUI 起動時は nixGL 経由で:
 ros2 launch bringup simulation.launch.py headless:=false
 # ※ flake.nix で alias gz="nixGL gz" が設定済み
 ```
+
+### 4.9 SLAM ライフサイクルについて
+
+ROS 2 Jazzy の `slam_toolbox` は **Lifecycle ノード** として実装されている。
+明示的にアクティベートしないと `/scan` を購読せず、`map→odom` TF も配信されない。
+
+`simulation.launch.py` では以下の仕組みで対応:
+
+1. **`lifecycle_manager_slam`** — `autostart: true` で SLAM ノードを自動アクティベート
+2. **`static_map_odom_tf`** — SLAM が起動するまでの間、`map→odom` を単位変換で配信するフォールバック
+3. **`TimerAction(5秒)`** — Nav2 の起動を 5 秒遅延し、SLAM/TF が安定してからナビゲーションを開始
+
+> `map` フレームが存在しないエラーが出る場合は、SLAM のアクティベーションが失敗している可能性がある。
+> `ros2 lifecycle get /slam_toolbox` で状態を確認すること。
 
 ---
 
@@ -730,7 +752,9 @@ ros2 run joy joy_node
 | 症状 | 原因 | 対処 |
 |------|------|------|
 | `Could not initialize GLX` | Gazebo/RViz2 GUI に GPU がない | `headless:=true` で起動、または `nixGL rviz2` / `nixGL gz sim` を使用 |
-| `SensorsPrivate::WaitForInit` SEGV | レンダリングエンジン初期化失敗 | SDF の sensors-system plugin をコメントアウト |
+| `SensorsPrivate::WaitForInit` SEGV | レンダリングエンジン (ogre2/ogre) が GPU を要求 | SDF の sensors-system plugin をコメントアウト (デフォルトで対応済み) |
+| `frame [map] does not exist` | SLAM がアクティベートされていない | `ros2 lifecycle get /slam_toolbox` で確認。Jazzy では `lifecycle_manager_slam` が必要 |
+| `jump back in time` TF 警告 | シミュレーション時刻のジッター | 物理レートを 250Hz に下げて対処済み (`rescue_field.sdf`) |
 | `urdf_parser_plugin not found` | パッケージ不足 | `flake.nix` に `ros.urdf` + `ros.urdf-parser-plugin` 追加 |
 | Entity creation timeout | Gazebo が起動前にスポーン | Gazebo 起動を待ってから再実行 |
 
