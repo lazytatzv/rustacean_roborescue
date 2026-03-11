@@ -61,14 +61,21 @@ def generate_launch_description() -> LaunchDescription:
     # ── sim_time を全ノードで有効化 ──
     use_sim_time = SetEnvironmentVariable("USE_SIM_TIME", "true")
 
+    # ── Gazebo がメッシュ等を解決できるようリソースパスを設定 ──
+    gz_resource_path = SetEnvironmentVariable(
+        "GZ_SIM_RESOURCE_PATH",
+        os.path.join(bringup_dir, os.pardir),
+    )
+
     # ── Gazebo Harmonic (gz sim) ──
-    # headless=true のとき "-s --headless-rendering" (server only + EGL) を付与
+    # headless=true  → server only + EGL
+    # headless=false → GUI, ogre レンダラ (Nix 環境で ogre2/Vulkan が動かないため)
     gz_args = PythonExpression([
         "'-s -r --headless-rendering ' + '",
         LaunchConfiguration("world"),
         "' if '",
         LaunchConfiguration("headless"),
-        "' == 'true' else '-r ' + '",
+        "' == 'true' else '-r --render-engine ogre ' + '",
         LaunchConfiguration("world"),
         "'",
     ])
@@ -162,6 +169,15 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{"use_sim_time": True}],
     )
 
+    # ── Odom → TF Bridge: /odom → odom→base_footprint TF ──
+    odom_tf_bridge = Node(
+        package="bringup",
+        executable="odom_tf_bridge.py",
+        name="odom_tf_bridge",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
     # ── Arm Controller (IK → target positions) ──
     arm_controller = Node(
         package="arm_controller",
@@ -245,12 +261,14 @@ def generate_launch_description() -> LaunchDescription:
         use_rviz_arg,
         headless_arg,
         use_sim_time,
+        gz_resource_path,
         # Gazebo Harmonic
         gz_sim,
         robot_state_publisher,
         spawn_entity,
         # gz ↔ ROS 2 Bridge
         bridge,
+        odom_tf_bridge,
         # Bridge + Teleop
         crawler_bridge,
         joy_controller,

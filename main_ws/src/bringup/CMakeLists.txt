@@ -26,6 +26,7 @@ install(PROGRAMS
   scripts/fix_pointcloud_time_node.py
   scripts/crawler_vel_bridge.py
   scripts/arm_gz_bridge.py
+  scripts/odom_tf_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

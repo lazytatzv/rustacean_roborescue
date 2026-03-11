@@ -120,6 +120,7 @@
           # --- Hardware ---
           ros.joy                     # PS4 コントローラ
           ros.joy-linux
+          ros.teleop-twist-keyboard   # キーボードでロボット操作
           ros.usb-cam                 # USB カメラ
           ros.dynamixel-workbench-toolbox  # フリッパ / gripper_driver
           ros.dynamixel-sdk

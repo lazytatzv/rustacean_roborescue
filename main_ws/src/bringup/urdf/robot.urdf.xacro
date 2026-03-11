@@ -124,6 +124,9 @@
     <parent link="base_link"/>
     <child link="caster_link"/>
   </joint>
+  <gazebo reference="caster_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- ======================== VLP-16 LiDAR ======================== -->
   <link name="velodyne">
@@ -145,6 +148,9 @@
     <parent link="base_link"/>
     <child link="velodyne"/>
   </joint>
+  <gazebo reference="velodyne_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- ======================== IMU ======================== -->
   <link name="imu_link">
@@ -159,6 +165,9 @@
     <parent link="base_link"/>
     <child link="imu_link"/>
   </joint>
+  <gazebo reference="imu_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- ======================== Camera ======================== -->
   <link name="camera_link">
@@ -180,6 +189,9 @@
     <parent link="base_link"/>
     <child link="camera_link"/>
   </joint>
+  <gazebo reference="camera_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- ======================== Flippers (sekirei_workspace 由来) ======================== -->
   <!--
@@ -255,6 +267,9 @@
     <parent link="base_link"/>
     <child link="arm_base_link"/>
   </joint>
+  <gazebo reference="arm_base_link_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- Joint 1: 旋回 (Z 軸) -->
   <link name="arm1_link">
@@ -274,8 +289,8 @@
     <axis xyz="0 0 1"/>
     <parent link="arm_base_link"/>
     <child link="arm1_link"/>
-    <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
-    <dynamics damping="0.3" friction="0.1"/>
+    <limit effort="10" lower="-3.14" upper="3.14" velocity="1.571"/>
+    <dynamics damping="1.0" friction="0.2"/>
   </joint>
 
   <!-- Joint 2: 肩 (Y 軸) -->
@@ -296,8 +311,8 @@
     <axis xyz="0 1 0"/>
     <parent link="arm1_link"/>
     <child link="arm2_link"/>
-    <limit effort="5" lower="-3.14" upper="0" velocity="1.571"/>
-    <dynamics damping="0.3" friction="0.1"/>
+    <limit effort="20" lower="-3.14" upper="0" velocity="1.571"/>
+    <dynamics damping="2.0" friction="0.3"/>
   </joint>
 
   <!-- Joint 3: 肘 (Y 軸) -->
@@ -318,8 +333,8 @@
     <axis xyz="0 1 0"/>
     <parent link="arm2_link"/>
     <child link="arm3_link"/>
-    <limit effort="5" lower="0" upper="3.14" velocity="1.571"/>
-    <dynamics damping="0.3" friction="0.1"/>
+    <limit effort="20" lower="0" upper="3.14" velocity="1.571"/>
+    <dynamics damping="2.0" friction="0.3"/>
   </joint>
 
   <!-- Joint 4: 手首ピッチ (Y 軸) -->
@@ -339,8 +354,8 @@
     <axis xyz="0 1 0"/>
     <parent link="arm3_link"/>
     <child link="arm4_link"/>
-    <limit effort="5" lower="-4.71" upper="0" velocity="1.571"/>
-    <dynamics damping="0.2" friction="0.1"/>
+    <limit effort="10" lower="-4.71" upper="0" velocity="1.571"/>
+    <dynamics damping="1.0" friction="0.2"/>
   </joint>
 
   <!-- Joint 5: 手首ヨー (Z 軸) -->
@@ -361,7 +376,7 @@
     <parent link="arm4_link"/>
     <child link="arm5_link"/>
     <limit effort="5" lower="-1.57" upper="1.57" velocity="1.571"/>
-    <dynamics damping="0.2" friction="0.1"/>
+    <dynamics damping="0.5" friction="0.1"/>
   </joint>
 
   <!-- Joint 6: 手首ロール (X 軸) -->
@@ -382,7 +397,7 @@
     <parent link="arm5_link"/>
     <child link="arm6_link"/>
     <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
-    <dynamics damping="0.2" friction="0.1"/>
+    <dynamics damping="0.5" friction="0.1"/>
   </joint>
 
   <!-- End effector (tip) -->
@@ -398,10 +413,18 @@
     <parent link="arm6_link"/>
     <child link="link_tip"/>
   </joint>
+  <gazebo reference="tip_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- ============================================================ -->
   <!--                Gazebo Harmonic (gz sim) Plugins              -->
   <!-- ============================================================ -->
+
+  <!-- モデルレベル: 自己衝突無効化 -->
+  <gazebo reference="base_link">
+    <self_collide>false</self_collide>
+  </gazebo>
 
   <!-- Differential Drive (クローラの近似) -->
   <gazebo>
@@ -539,73 +562,79 @@
             name="gz::sim::systems::JointPositionController">
       <joint_name>flipper_fr_joint</joint_name>
       <topic>flipper_fr_joint/cmd_pos</topic>
-      <p_gain>20</p_gain>
-      <i_gain>0</i_gain>
-      <d_gain>5</d_gain>
+      <p_gain>50</p_gain>
+      <i_gain>0.5</i_gain>
+      <d_gain>15</d_gain>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>flipper_fl_joint</joint_name>
       <topic>flipper_fl_joint/cmd_pos</topic>
-      <p_gain>20</p_gain>
-      <i_gain>0</i_gain>
-      <d_gain>5</d_gain>
+      <p_gain>50</p_gain>
+      <i_gain>0.5</i_gain>
+      <d_gain>15</d_gain>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>flipper_br_joint</joint_name>
       <topic>flipper_br_joint/cmd_pos</topic>
-      <p_gain>20</p_gain>
-      <i_gain>0</i_gain>
-      <d_gain>5</d_gain>
+      <p_gain>50</p_gain>
+      <i_gain>0.5</i_gain>
+      <d_gain>15</d_gain>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>flipper_bl_joint</joint_name>
       <topic>flipper_bl_joint/cmd_pos</topic>
-      <p_gain>20</p_gain>
-      <i_gain>0</i_gain>
-      <d_gain>5</d_gain>
+      <p_gain>50</p_gain>
+      <i_gain>0.5</i_gain>
+      <d_gain>15</d_gain>
     </plugin>
   </gazebo>
 
-  <!-- Arm joints の位置制御 -->
+  <!-- Arm joints の位置制御 (重力補償のため高ゲイン) -->
   <gazebo>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>arm_joint1</joint_name>
       <topic>arm_joint1/cmd_pos</topic>
-      <p_gain>30</p_gain><i_gain>0</i_gain><d_gain>8</d_gain>
+      <p_gain>100</p_gain><i_gain>2</i_gain><d_gain>20</d_gain>
+      <cmd_max>50</cmd_max><cmd_min>-50</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>arm_joint2</joint_name>
       <topic>arm_joint2/cmd_pos</topic>
-      <p_gain>30</p_gain><i_gain>0</i_gain><d_gain>8</d_gain>
+      <p_gain>150</p_gain><i_gain>5</i_gain><d_gain>30</d_gain>
+      <cmd_max>80</cmd_max><cmd_min>-80</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>arm_joint3</joint_name>
       <topic>arm_joint3/cmd_pos</topic>
-      <p_gain>30</p_gain><i_gain>0</i_gain><d_gain>8</d_gain>
+      <p_gain>150</p_gain><i_gain>5</i_gain><d_gain>30</d_gain>
+      <cmd_max>80</cmd_max><cmd_min>-80</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>arm_joint4</joint_name>
       <topic>arm_joint4/cmd_pos</topic>
-      <p_gain>30</p_gain><i_gain>0</i_gain><d_gain>8</d_gain>
+      <p_gain>100</p_gain><i_gain>2</i_gain><d_gain>20</d_gain>
+      <cmd_max>50</cmd_max><cmd_min>-50</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>arm_joint5</joint_name>
       <topic>arm_joint5/cmd_pos</topic>
-      <p_gain>30</p_gain><i_gain>0</i_gain><d_gain>8</d_gain>
+      <p_gain>60</p_gain><i_gain>1</i_gain><d_gain>12</d_gain>
+      <cmd_max>30</cmd_max><cmd_min>-30</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>arm_joint6</joint_name>
       <topic>arm_joint6/cmd_pos</topic>
-      <p_gain>30</p_gain><i_gain>0</i_gain><d_gain>8</d_gain>
+      <p_gain>60</p_gain><i_gain>1</i_gain><d_gain>12</d_gain>
+      <cmd_max>30</cmd_max><cmd_min>-30</cmd_min>
     </plugin>
   </gazebo>
 
