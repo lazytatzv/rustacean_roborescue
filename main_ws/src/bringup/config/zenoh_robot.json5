@@ -1,6 +1,6 @@
 {
   mode: "client",
-  connect: { endpoints: ["tcp/127.0.0.1:7447"] }, // localのzenoh
-  scouting: { multicast: { enabled: false } }, // wifiへのmulticast漏れを防ぐ
-  transport: { shared_memory: { enabled: true } } // SHM
+  connect: { endpoints: ["quic/127.0.0.1:7447"] },   // local zenohd (QUIC)
+  scouting: { multicast: { enabled: false } },         // Wi-Fi へのマルチキャスト漏れ防止
+  transport: { shared_memory: { enabled: true } }       // SHM (同一マシン内高速転送)
 }

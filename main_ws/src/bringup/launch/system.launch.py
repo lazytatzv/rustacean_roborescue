@@ -15,6 +15,7 @@ from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 def generate_launch_description():
     bringup_dir = get_package_share_directory('bringup')
@@ -28,8 +29,27 @@ def generate_launch_description():
     use_nav2 = DeclareLaunchArgument('use_nav2', default_value='false',
                                       description='Nav2 自律走行を有効にする')
 
+    # Foxglove Bridge — Foxglove Studio が WebSocket (ws://robot_ip:8765) で接続
+    foxglove_bridge_node = Node(
+        package='foxglove_bridge',
+        executable='foxglove_bridge',
+        name='foxglove_bridge',
+        output='screen',
+        parameters=[{
+            'port': 8765,
+            'address': '0.0.0.0',
+            'send_buffer_limit': 10000000,       # 10 MB
+            'max_qos_depth': 10,
+            'num_threads': 0,                    # 0 = auto
+            'use_compression': False,
+        }],
+    )
+
     return LaunchDescription([
         use_nav2,
+
+        # 0. Foxglove Bridge (WebSocket :8765)
+        foxglove_bridge_node,
 
         # 1. ネットワーク（Zenoh）の起動
         IncludeLaunchDescription(

@@ -60,7 +60,10 @@ def generate_launch_description() -> LaunchDescription:
         executable="arm_controller",
         name="arm_controller",
         output="screen",
-        parameters=[LaunchConfiguration("arm_params")],
+        parameters=[
+            LaunchConfiguration("arm_params"),
+            {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
+        ],
     )
 
     sensor_gateway_node = Node(

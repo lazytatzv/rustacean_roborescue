@@ -130,6 +130,7 @@
           ros.urdf                    # URDF パーサ
           ros.urdf-parser-plugin      # robot_state_publisher が pluginlib で要求
           ros.joint-state-publisher   # joint_state_publisher
+          ros.joint-state-publisher-gui # GUI スライダでジョイント操作
           ros.ros-gz-sim              # Gazebo Harmonic シミュレータ
           ros.ros-gz-bridge           # ROS 2 ↔ Gazebo トピックブリッジ
           ros.ros-gz-image            # Gazebo カメラ画像 → ROS 2
@@ -158,6 +159,9 @@
           ros.rqt-graph
           ros.rqt-plot
           ros.rqt-console
+
+          # --- Foxglove Studio ブリッジ (WebSocket :8765) ---
+          ros.foxglove-bridge
         ];
 
         # C++ ライブラリ (ROS 外)

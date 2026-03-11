@@ -1,95 +1,166 @@
 graph LR
-  %% -------------------------------------
-  %% Styles
-  %% -------------------------------------
+  %% =============================================
+  %% Rustacean RoboRescue — System Topology
+  %% 全ノード・全トピック・TF 接続図
+  %% =============================================
+
   classDef node_style fill:#fff,stroke:#333,stroke-width:2px;
   classDef topic_style fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
   classDef tf_style fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+  classDef hw_style fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
 
-  %% -------------------------------------
-  %% Subgraphs for Logical Grouping
-  %% -------------------------------------
-  subgraph Operator["Operator Interface"]
+  %% =============================================
+  %% Operator Interface
+  %% =============================================
+  subgraph Operator["Operator PC"]
     joy[joy_node]:::node_style
-    op[joy_controller]:::node_style
-    T_joy{{/joy<br/>sensor_msgs/msg/Joy}}:::topic_style
-
-    joy --> T_joy --> op
   end
 
+  T_joy{{/joy<br/>sensor_msgs/Joy}}:::topic_style
+  joy --> T_joy
+
+  subgraph Control_Input["Control Input (NUC)"]
+    op[joy_controller]:::node_style
+    T_joy --> op
+  end
+
+  %% =============================================
+  %% Mobility — クローラ & フリッパ
+  %% =============================================
   subgraph Mobility["Mobility"]
     crawler[crawler_driver]:::node_style
     flipper[flipper_driver]:::node_style
 
     T_c_cmd{{/crawler_driver<br/>custom_interfaces/CrawlerVelocity}}:::topic_style
     T_f_cmd{{/flipper_driver<br/>custom_interfaces/FlipperVelocity}}:::topic_style
-    T_odom_w{{/odom_wheel<br/>nav_msgs/msg/Odometry}}:::topic_style
-    T_f_state{{/joint_states<br/>sensor_msgs/msg/JointState}}:::topic_style
+    T_f_state{{/joint_states<br/>sensor_msgs/JointState}}:::topic_style
 
     op --> T_c_cmd --> crawler
     op --> T_f_cmd --> flipper
-    crawler --> T_odom_w
     flipper --> T_f_state
+
+    HW_roboclaw[Roboclaw]:::hw_style
+    HW_dxl_f[Dynamixel<br/>Flippers]:::hw_style
+    crawler --> HW_roboclaw
+    flipper --> HW_dxl_f
   end
 
-  subgraph Arm_Vision["Arm & Vision"]
+  %% =============================================
+  %% Arm & Gripper
+  %% =============================================
+  subgraph Manipulation["Arm & Gripper"]
     arm[arm_controller]:::node_style
     gripper[gripper_driver]:::node_style
-    qr[qr_detector]:::node_style
 
-    T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
-    T_a_joint{{/arm_joint_commands<br/>sensor_msgs/msg/JointState}}:::topic_style
+    T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
+    T_a_joint{{/arm_joint_commands<br/>sensor_msgs/JointState}}:::topic_style
     T_g_cmd{{/gripper_cmd<br/>custom_interfaces/GripperCommand}}:::topic_style
     T_g_status{{/gripper_status<br/>custom_interfaces/GripperStatus}}:::topic_style
-    T_cam{{/camera/image_raw<br/>sensor_msgs/msg/Image}}:::topic_style
-    T_qr{{/qr_codes<br/>std_msgs/msg/String}}:::topic_style
-    T_img_c{{/image/compressed<br/>sensor_msgs/CompressedImage}}:::topic_style
 
     op --> T_a_cmd --> arm
     arm --> T_a_joint
-    op -.-> T_g_cmd --> gripper
+
+    T_g_cmd --> gripper
     gripper --> T_g_status
-    T_cam --> qr
+
+    HW_dxl_g[Dynamixel<br/>Gripper]:::hw_style
+    gripper --> HW_dxl_g
+  end
+
+  %% =============================================
+  %% Camera & QR Detection
+  %% =============================================
+  subgraph Camera["Camera & QR Detection"]
+    usb_cam[usb_cam]:::node_style
+    qr[qr_detector]:::node_style
+
+    T_cam{{/camera/image_raw<br/>sensor_msgs/Image}}:::topic_style
+    T_cam_info{{/camera/camera_info<br/>sensor_msgs/CameraInfo}}:::topic_style
+    T_qr{{/qr_codes<br/>std_msgs/String}}:::topic_style
+    T_img_c{{/image/compressed<br/>sensor_msgs/CompressedImage}}:::topic_style
+
+    HW_usbcam[USB Camera]:::hw_style
+    HW_usbcam --> usb_cam
+    usb_cam --> T_cam --> qr
+    usb_cam --> T_cam_info
     qr --> T_qr
     qr --> T_img_c
   end
 
+  %% =============================================
+  %% Perception & Localization
+  %% =============================================
   subgraph Perception["Perception & Localization"]
     gateway[sensor_gateway]:::node_style
     v_driver[velodyne_driver]:::node_style
-    v_pc[velodyne_pc]:::node_style
-    time_fix[time_fix]:::node_style
+    v_pc[velodyne_pointcloud]:::node_style
+    time_fix[fix_pointcloud_time]:::node_style
     spark_lio[spark_fast_lio]:::node_style
-    pc2ls[pc2laserscan]:::node_style
+    pc2ls[pointcloud_to_laserscan]:::node_style
     slam[slam_toolbox]:::node_style
+    stp[static_transform_publisher<br/>base_link→velodyne]:::node_style
 
-    T_imu{{/imu/data_raw<br/>sensor_msgs/msg/Imu}}:::topic_style
-    T_raw{{/velodyne_points<br/>sensor_msgs/msg/PointCloud2}}:::topic_style
-    T_scan{{/scan<br/>sensor_msgs/msg/LaserScan}}:::topic_style
-    T_odom{{/odom<br/>nav_msgs/msg/Odometry}}:::tf_style
-    T_map{{/map<br/>nav_msgs/msg/OccupancyGrid}}:::tf_style
+    T_imu{{/imu/data<br/>sensor_msgs/Imu}}:::topic_style
+    T_raw{{/velodyne_points<br/>sensor_msgs/PointCloud2}}:::topic_style
+    T_fixed{{/velodyne_points_fixed<br/>sensor_msgs/PointCloud2}}:::topic_style
+    T_scan{{/scan<br/>sensor_msgs/LaserScan}}:::topic_style
+    T_odom{{/odom<br/>nav_msgs/Odometry}}:::topic_style
+    T_map{{/map<br/>nav_msgs/OccupancyGrid}}:::topic_style
 
-    gateway --> T_imu --> spark_lio
-    v_driver --> v_pc --> T_raw
-    T_raw --> time_fix --> spark_lio
+    HW_stm32[STM32 + BNO055]:::hw_style
+    HW_vlp16[VLP-16 LiDAR]:::hw_style
+
+    HW_stm32 --> gateway --> T_imu --> spark_lio
+    HW_vlp16 --> v_driver --> v_pc --> T_raw
+    T_raw --> time_fix --> T_fixed --> spark_lio
     T_raw --> pc2ls --> T_scan --> slam
 
     spark_lio --> T_odom
-    spark_lio -.->|TF: odom->base_link| slam
-    slam -.->|TF: map->odom| spark_lio
     slam --> T_map
   end
 
-  subgraph Navigation["Autonomous Navigation (Nav2)"]
+  %% =============================================
+  %% TF Tree
+  %% =============================================
+  subgraph TF["TF Tree"]
+    TF_map_odom["map → odom<br/>(slam_toolbox)"]:::tf_style
+    TF_odom_base["odom → base_link<br/>(spark_fast_lio)"]:::tf_style
+    TF_base_vel["base_link → velodyne<br/>(static_tf_pub)"]:::tf_style
+    TF_base_imu["base_link → imu_link<br/>(URDF fixed)"]:::tf_style
+    TF_base_cam["base_link → camera_link<br/>(URDF fixed)"]:::tf_style
+    TF_flippers["base_link → flipper_*_link<br/>(URDF revolute)"]:::tf_style
+    TF_arm["arm_base → link1→…→link_tip<br/>(URDF chain)"]:::tf_style
+
+    TF_map_odom --- TF_odom_base --- TF_base_vel
+    TF_odom_base --- TF_base_imu
+    TF_odom_base --- TF_base_cam
+    TF_odom_base --- TF_flippers
+    TF_odom_base --- TF_arm
+  end
+
+  slam -.->|"TF: map→odom"| TF_map_odom
+  spark_lio -.->|"TF: odom→base_link"| TF_odom_base
+  stp -.->|"TF: base_link→velodyne"| TF_base_vel
+
+  %% =============================================
+  %% Autonomous Navigation (Nav2)
+  %% =============================================
+  subgraph Navigation["Autonomous Navigation — Nav2"]
+    lm[lifecycle_manager]:::node_style
     bt[bt_navigator]:::node_style
-    planner[planner_server]:::node_style
-    controller[controller_server]:::node_style
+    planner[planner_server<br/>SmacPlanner2D]:::node_style
+    controller[controller_server<br/>RegulatedPurePursuit]:::node_style
     behavior[behavior_server]:::node_style
     smoother[velocity_smoother]:::node_style
 
     T_goal{{/goal_pose<br/>geometry_msgs/PoseStamped}}:::topic_style
-    T_cmd_vel{{/cmd_vel<br/>geometry_msgs/msg/Twist}}:::topic_style
+    T_cmd_vel{{/cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
 
+    lm --> bt
+    lm --> planner
+    lm --> controller
+    lm --> behavior
+    lm --> smoother
     T_goal --> bt
     bt --> planner
     bt --> controller

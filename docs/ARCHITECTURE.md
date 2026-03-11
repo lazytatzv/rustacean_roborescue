@@ -58,7 +58,7 @@ rustacean_roborescue/
 │       │   └── sensor_gateway/     # Rust: STM32 IMU ブリッジ
 │       ├── perception/         # 認識系パッケージ
 │       │   ├── qr_detector/        # Python: QR コード検出
-│       │   └── vision_processor/   # Rust: QR デバッグツール
+│       │   └── vision_processor/   # Rust: QR デバッグツール (今のところいらない気がする)
 │       ├── external/           # Git サブモジュール
 │       └── patches/            # パッチファイル
 └── stm32_ws/                   # STM32 ベアメタルファームウェア
