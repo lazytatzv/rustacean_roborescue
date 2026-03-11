@@ -159,9 +159,10 @@ ros2 launch bringup system.launch.py
 
 | 順番 | ファイル | 内容 |
 |------|----------|------|
-| 1 | `network.launch.py` | Zenoh ルーター + RMW 環境変数 |
-| 2 | `perception.launch.py` | LiDAR, IMU, SLAM |
-| 3 | `control.launch.py` | モータドライバ, コントローラ, アーム, グリッパ |
+| 1 | (foxglove_bridge) | Foxglove Studio 向け WebSocket ゲートウェイ (:8765) |
+| 2 | `network.launch.py` | Zenoh ルーター (`--config zenoh_router.json5`) + RMW 環境変数 |
+| 3 | `perception.launch.py` | LiDAR, IMU, SLAM |
+| 4 | `control.launch.py` | モータドライバ, コントローラ (joy_controller 含む), アーム, グリッパ |
 
 ### 3.2 起動オプション
 
@@ -181,15 +182,31 @@ ros2 launch bringup perception.launch.py use_dummy_imu:=true
 
 ### 3.3 オペレータ側
 
-```bash
-# PS4 コントローラを USB/Bluetooth 接続後
-ros2 run joy joy_node
+オペレータ PC では **joy_node のみ** を起動する。joy_controller は NUC (ロボット) 側の `control.launch.py` で起動される。
+`/joy` トピックは Zenoh 経由で自動的に NUC に転送される。
 
-# Zenoh 経由でロボットに接続する場合、別ターミナルで:
+```bash
+# 1. Zenoh 経由でロボットに接続するための環境設定
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
-zenohd --connect quic/<ROBOT_IP>:7447 --no-multicast-scout
+export RMW_ZENOH_CONFIG_URI=$(pwd)/src/bringup/config/zenoh_ope.json5
+# ↑ zenoh_ope.json5 内の <ROBOT_IP> を実際の NUC の IP に書き換えておく
+
+# 2. PS4 コントローラを USB/Bluetooth 接続後
+ros2 run joy joy_node
 ```
+
+#### Foxglove Studio での監視
+
+Foxglove Studio をメインのオペレータ UI として使用する。
+NUC 側の `system.launch.py` が `foxglove_bridge` を自動起動するので、
+オペレータ PC で Foxglove Studio から接続するだけでよい。
+
+```
+接続先: ws://<ROBOT_IP>:8765
+```
+
+> RViz2 はシミュレーション時や開発時に Nix 環境で `nixGL rviz2` として使うことも可能。
 
 ### 3.4 個別サブシステム起動
 
@@ -197,7 +214,16 @@ zenohd --connect quic/<ROBOT_IP>:7447 --no-multicast-scout
 # カメラのみ
 ros2 launch bringup camera.launch.py
 
-# オペレータ側 (joy_node + joy_controller)
+# ロボットモデル表示 (robot_state_publisher + joint_state_publisher_gui + RViz)
+ros2 launch bringup display.launch.py
+
+# RViz なし (nixGL がない環境で)
+ros2 launch bringup display.launch.py use_rviz:=false
+
+# アーム単体の URDF でモデル確認
+ros2 launch bringup display.launch.py urdf:=sekirei.urdf
+
+# オペレータ側 (joy_node + joy_controller 開発用一括起動)
 ros2 launch joy_controller operator_launch.py
 ```
 
@@ -261,7 +287,7 @@ ros2 launch bringup simulation.launch.py world:=/path/to/custom.sdf
 | create (spawn) | ros_gz_sim | ロボットモデルを Gazebo に投入 |
 | parameter_bridge | ros_gz_bridge | Gazebo ↔ ROS 2 トピック変換 |
 | crawler_vel_bridge | bringup | CrawlerVelocity → Twist 変換 |
-| joy_controller | joy_controller | PS4 → 指令値 (コントローラ接続時) |
+| joy_controller | joy_controller | PS4 → 指令値 (シミュレーション時はローカル起動) |
 | pointcloud_to_laserscan | pointcloud_to_laserscan | 3D → 2D 変換 |
 | slam_toolbox | slam_toolbox | 2D SLAM (オプション) |
 | nav2 スタック | navigation2 | 自律走行 (オプション) |
@@ -468,19 +494,22 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 ### 8.2 接続構成
 
 ```
-[ロボット]                    [オペレータ PC]
-zenohd                        zenohd
-  listen: quic/0.0.0.0:7447     connect: quic/<ROBOT_IP>:7447
-  ↕                              ↕
-ROS 2 ノード群                 joy_node, rviz2 等
+[ロボット NUC]                         [オペレータ PC]
+zenohd (--config zenoh_router.json5)     ROS 2 ノード (zenoh_ope.json5)
+  listen: quic/0.0.0.0:7447               connect: quic/<ROBOT_IP>:7447
+  ↕                                       ↕
+ROS 2 ノード群                            joy_node
+  (zenoh_robot.json5)                    Foxglove Studio
+foxglove_bridge (:8765) ----WebSocket---→ ws://<ROBOT_IP>:8765
 ```
 
 ### 8.3 Zenoh 設定ファイル
 
 | ファイル | 用途 |
 |----------|------|
-| `bringup/config/zenoh_robot.json5` | ロボット側 (client, localhost:7447, SHM 有効) |
-| `bringup/config/zenoh_ope.json5` | オペレータ側 (client, QUIC でロボット IP に接続) |
+| `bringup/config/zenoh_router.json5` | zenohd ルーターデーモン (router, listen quic/0.0.0.0:7447, SHM 有効) |
+| `bringup/config/zenoh_robot.json5` | ロボット側 ROS 2 ノード (RMW_ZENOH_CONFIG_URI, client, quic/localhost:7447, SHM 有効) |
+| `bringup/config/zenoh_ope.json5` | オペレータ側 ROS 2 ノード (client, quic/\<ROBOT_IP\>:7447) |
 
 ---
 
@@ -499,12 +528,21 @@ ROS 2 ノード群                 joy_node, rviz2 等
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
-| `Could not initialize GLX` | Gazebo GUI に GPU がない | `headless:=true` で起動 |
+| `Could not initialize GLX` | Gazebo/RViz2 GUI に GPU がない | `headless:=true` で起動、または `nixGL rviz2` / `nixGL gz sim` を使用 |
 | `SensorsPrivate::WaitForInit` SEGV | レンダリングエンジン初期化失敗 | SDF の sensors-system plugin をコメントアウト |
 | `urdf_parser_plugin not found` | パッケージ不足 | `flake.nix` に `ros.urdf` + `ros.urdf-parser-plugin` 追加 |
 | Entity creation timeout | Gazebo が起動前にスポーン | Gazebo 起動を待ってから再実行 |
 
-### 9.3 実機
+### 9.3 Foxglove / ネットワーク
+
+| 症状 | 原因 | 対処 |
+|------|------|------|
+| Foxglove が接続できない | foxglove_bridge 未起動 | `system.launch.py` が正常起動しているか確認 |
+| Foxglove でトピックが見えない | WebSocket 接続先が違う | `ws://<ROBOT_IP>:8765` で接続しているか確認 |
+| Zenoh のトピックが対向に届かない | プロトコル不一致 | zenoh_ope.json5 / zenoh_robot.json5 が共に QUIC になっているか確認 |
+| nixGL がない環境で RViz2 が落ちる | OpenGL ドライバ不一致 | `nixGL rviz2` で起動、または `use_rviz:=false` で無効化 |
+
+### 9.4 実機
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
