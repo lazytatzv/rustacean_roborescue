@@ -22,6 +22,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -235,10 +236,45 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("use_slam")),
     )
 
+    # ── SLAM Toolbox Lifecycle Manager ──
+    # Jazzy では async_slam_toolbox_node がライフサイクルノードなので
+    # activate しないと /scan を購読しない
+    slam_lifecycle_manager = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_slam",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "autostart": True,
+            "node_names": ["slam_toolbox"],
+        }],
+        condition=IfCondition(LaunchConfiguration("use_slam")),
+    )
+
+    # ── map→odom 静的TF (headless センサなし時のフォールバック) ──
+    # SLAM が /scan データを受信すれば /tf で上書きされる
+    static_map_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="static_map_odom_tf",
+        output="screen",
+        arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
+        parameters=[{"use_sim_time": True}],
+        condition=IfCondition(LaunchConfiguration("use_slam")),
+    )
+
     # ── Nav2 (オプション) ──
+    # SLAM Toolbox が activate されて map→odom TF を出すまで待つ
     nav2_launch_file = os.path.join(bringup_dir, "launch", "nav2.launch.py")
-    nav2 = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(nav2_launch_file),
+    nav2 = TimerAction(
+        period=5.0,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(nav2_launch_file),
+                launch_arguments={"use_sim_time": "true"}.items(),
+            ),
+        ],
         condition=IfCondition(LaunchConfiguration("use_nav2")),
     )
 
@@ -278,6 +314,8 @@ def generate_launch_description() -> LaunchDescription:
         # Perception
         pointcloud_to_laserscan,
         slam_toolbox,
+        slam_lifecycle_manager,
+        static_map_tf,
         # Navigation
         nav2,
         # Visualization

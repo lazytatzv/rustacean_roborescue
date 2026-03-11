@@ -22,6 +22,7 @@ class OdomTfBridge(Node):
     def __init__(self) -> None:
         super().__init__("odom_tf_bridge")
         self.tf_broadcaster = TransformBroadcaster(self)
+        self.last_stamp_ns = 0  # 時刻順序保証用
 
         qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.sub_ = self.create_subscription(
@@ -32,6 +33,11 @@ class OdomTfBridge(Node):
         )
 
     def odom_cb(self, msg: Odometry) -> None:
+        stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
+        if stamp_ns <= self.last_stamp_ns:
+            return  # 古いメッセージをスキップ (time jump 防止)
+        self.last_stamp_ns = stamp_ns
+
         t = TransformStamped()
         t.header = msg.header
         t.child_frame_id = msg.child_frame_id or "base_footprint"

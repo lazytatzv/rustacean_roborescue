@@ -142,7 +142,22 @@
           ros.gz-sim-vendor           # Gazebo Harmonic 本体
 
           # --- Navigation (Nav2) ---
-          ros.navigation2             # Nav2 フルスタック
+          ros.navigation2             # Nav2 メタパッケージ
+          ros.nav2-common             # 共通ユーティリティ
+          ros.nav2-core               # プラグインインタフェース (pluginlib)
+          ros.nav2-util               # Nav2 ユーティリティ
+          ros.nav2-msgs               # Nav2 メッセージ型
+          ros.nav2-map-server         # map_server (static map)
+          ros.nav2-controller         # controller_server
+          ros.nav2-planner            # planner_server
+          ros.nav2-behaviors          # behavior_server (spin, backup, wait)
+          ros.nav2-bt-navigator       # BehaviorTree ナビゲータ
+          ros.nav2-velocity-smoother  # velocity_smoother
+          ros.nav2-lifecycle-manager  # lifecycle_manager
+          ros.nav2-costmap-2d         # costmap (obstacle/inflation/static)
+          ros.nav2-regulated-pure-pursuit-controller  # 経路追従コントローラ
+          ros.nav2-smac-planner       # SmacPlanner2D 経路計画
+          ros.nav2-rviz-plugins       # rviz2 用 Nav2 Goal ツール
 
           # --- ノード合成 (spark_fast_lio) ---
           ros.rclcpp-components

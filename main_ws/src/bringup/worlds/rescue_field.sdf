@@ -18,8 +18,8 @@
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster">
     </plugin>
-    <!-- NOTE: Sensors / Imu system plugins disabled for headless (no GPU).
-         Re-enable when running with GUI or nixGL:
+    <!-- Sensors/IMU system: GPU (nixGL) が必要。headless では無効。
+         GUI モード起動時は有効化すること:
     <plugin filename="gz-sim-sensors-system"
             name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
@@ -34,9 +34,9 @@
 
     <!-- ====== Physics ====== -->
     <physics name="default_physics" type="ode">
-      <max_step_size>0.002</max_step_size>
+      <max_step_size>0.004</max_step_size>
       <real_time_factor>1.0</real_time_factor>
-      <real_time_update_rate>500</real_time_update_rate>
+      <real_time_update_rate>250</real_time_update_rate>
     </physics>
 
     <!-- ====== Scene ====== -->

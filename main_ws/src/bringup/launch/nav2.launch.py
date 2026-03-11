@@ -23,8 +23,13 @@ def generate_launch_description() -> LaunchDescription:
         "autostart", default_value="true",
         description="lifecycle_manager が自動で activate する",
     )
+    use_sim_time_arg = DeclareLaunchArgument(
+        "use_sim_time", default_value="false",
+        description="シミュレーション時は true",
+    )
 
     params_file = LaunchConfiguration("nav2_params")
+    use_sim_time = LaunchConfiguration("use_sim_time")
 
     # ── Nav2 ノード群 ──
     controller_server = Node(
@@ -32,7 +37,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="controller_server",
         name="controller_server",
         output="screen",
-        parameters=[params_file],
+        parameters=[params_file, {"use_sim_time": use_sim_time}],
         remappings=[("cmd_vel", "cmd_vel_nav")],  # velocity_smoother 経由
     )
 
@@ -41,7 +46,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="planner_server",
         name="planner_server",
         output="screen",
-        parameters=[params_file],
+        parameters=[params_file, {"use_sim_time": use_sim_time}],
     )
 
     behavior_server = Node(
@@ -49,7 +54,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="behavior_server",
         name="behavior_server",
         output="screen",
-        parameters=[params_file],
+        parameters=[params_file, {"use_sim_time": use_sim_time}],
     )
 
     bt_navigator = Node(
@@ -57,7 +62,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="bt_navigator",
         name="bt_navigator",
         output="screen",
-        parameters=[params_file],
+        parameters=[params_file, {"use_sim_time": use_sim_time}],
     )
 
     velocity_smoother = Node(
@@ -65,7 +70,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="velocity_smoother",
         name="velocity_smoother",
         output="screen",
-        parameters=[params_file],
+        parameters=[params_file, {"use_sim_time": use_sim_time}],
         remappings=[
             ("cmd_vel", "cmd_vel_nav"),       # controller_server → smoother
             ("cmd_vel_smoothed", "cmd_vel"),   # smoother → crawler_driver
@@ -78,7 +83,7 @@ def generate_launch_description() -> LaunchDescription:
         name="lifecycle_manager_navigation",
         output="screen",
         parameters=[{
-            "use_sim_time": False,
+            "use_sim_time": use_sim_time,
             "autostart": LaunchConfiguration("autostart"),
             "node_names": [
                 "controller_server",
@@ -93,6 +98,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         nav2_params,
         autostart,
+        use_sim_time_arg,
         controller_server,
         planner_server,
         behavior_server,
