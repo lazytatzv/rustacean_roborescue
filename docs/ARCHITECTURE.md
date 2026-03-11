@@ -36,12 +36,21 @@
 
 ```
 rustacean_roborescue/
-├── flake.nix                   # Nix 開発環境 (全依存定義)
+├── flake.nix                   # Nix 開発環境 (全依存定義, NUC 本番兼用)
 ├── Justfile                    # ルートコマンド (nix, sync)
 ├── docs/
 │   ├── ARCHITECTURE.md         # 本ドキュメント
 │   ├── OPERATION.md            # ビルド・起動・操作マニュアル
 │   └── NIX.md                  # Nix セットアップ
+├── operator/                   # オペレータ PC 用 (joy_node + Zenoh のみ)
+│   ├── flake.nix               # 軽量 Nix 環境 (joy, rmw_zenoh)
+│   ├── zenoh_ope.json5         # Zenoh 設定 (<ROBOT_IP> を書き換え)
+│   └── README.md               # オペレータ セットアップ手順
+├── deploy/                     # NUC 本番デプロイ用
+│   ├── setup-nuc.sh            # ワンショットセットアップ
+│   ├── launch-robot.sh         # systemd 起動スクリプト
+│   ├── roborescue.service      # systemd ユニットファイル
+│   └── 99-robot.rules          # udev ルール
 ├── main_ws/                    # ROS 2 メインワークスペース
 │   ├── Cargo.toml              # Rust ワークスペース定義
 │   ├── Justfile                # ビルドコマンド (forge, reforge)

@@ -1,0 +1,46 @@
+# ============================================================
+# Rustacean RoboRescue — systemd サービス
+# NUC 起動時に自動で全ノードを立ち上げる
+#
+# インストール:
+#   deploy/setup-nuc.sh が自動で配置する
+#   または手動: sudo cp deploy/roborescue.service /etc/systemd/system/
+#               __REPO_DIR__ と __USER__ を実際の値に書き換え
+#               sudo systemctl daemon-reload
+#               sudo systemctl enable roborescue
+# ============================================================
+
+[Unit]
+Description=Rustacean RoboRescue Robot Nodes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=__USER__
+Group=__USER__
+
+# 起動スクリプト
+ExecStart=__REPO_DIR__/deploy/launch-robot.sh
+
+# グレースフルシャットダウン (SIGINT → ros2 launch が Ctrl+C と同じ処理)
+KillSignal=SIGINT
+TimeoutStopSec=15
+
+# クラッシュ時の自動再起動
+Restart=on-failure
+RestartSec=5
+
+# シリアルデバイスアクセス
+SupplementaryGroups=dialout
+
+# ロギング
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=roborescue
+
+# 環境変数 (Nix daemon ソケット)
+Environment=NIX_REMOTE=daemon
+
+[Install]
+WantedBy=multi-user.target

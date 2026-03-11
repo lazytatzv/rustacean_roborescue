@@ -1,0 +1,10 @@
+// オペレータ PC 用 Zenoh クライアント設定
+// <ROBOT_IP> をロボット NUC の IP アドレスに書き換えて使用すること
+//
+// 例: NUC の IP が 192.168.1.100 の場合:
+//   "quic/192.168.1.100:7447"
+{
+  mode: "client",
+  connect: { endpoints: ["quic/<ROBOT_IP>:7447"] },
+  scouting: { multicast: { enabled: false } }
+}
