@@ -4,7 +4,7 @@
   <name>sensor_gateway</name>
   <version>0.1.0</version>
   <description>STM32 IMU serial parser and ROS 2 publisher</description>
-  <maintainer email="user@example.com">User</maintainer>
+  <maintainer email="yano.tatsuki439@mail.kyutech.jp">lazytatzv</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cargo</buildtool_depend>

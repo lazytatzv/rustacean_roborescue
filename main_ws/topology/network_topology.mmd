@@ -35,6 +35,7 @@ graph LR
       N_spark[spark_fast_lio]:::ros_node
       N_slam[slam_toolbox]:::ros_node
       N_arm[arm_controller]:::ros_node
+      N_arm_drv[arm_driver]:::ros_node
       N_qr[qr_detector]:::ros_node
       N_nav2[Nav2 Stack]:::ros_node
       N_joyctrl[joy_controller]:::ros_node
@@ -53,6 +54,7 @@ graph LR
     USB_CAM -.-> N_cam
     N_crawler -.-> ROBOCLAW
     N_flipper -.-> DXL_F
+    N_arm_drv -.-> DXL_F
     N_gripper -.-> DXL_G
   end
 
@@ -92,6 +94,11 @@ graph LR
   N_joyctrl -.-> N_crawler
   N_joyctrl -.-> N_flipper
   N_joyctrl -.-> N_arm
+  N_joyctrl -. "/emergency_stop" .-> N_crawler
+  N_joyctrl -. "/emergency_stop" .-> N_flipper
+  N_joyctrl -. "/emergency_stop" .-> N_arm
+  N_joyctrl -. "/emergency_stop" .-> N_arm_drv
+  N_joyctrl -. "/emergency_stop" .-> N_gripper
 
   N_qr -.-> N_fgbridge
   N_spark -.-> N_fgbridge

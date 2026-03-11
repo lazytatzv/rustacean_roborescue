@@ -129,8 +129,8 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05
-      # ロボットのフットプリント（クローラ外形）
-      robot_radius: 0.35
+      # ロボットのフットプリント（クローラ外形: 0.60×0.35m）
+      footprint: "[[0.30, 0.175], [0.30, -0.175], [-0.30, -0.175], [-0.30, 0.175]]"
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -160,7 +160,7 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      robot_radius: 0.35
+      footprint: "[[0.30, 0.175], [0.30, -0.175], [-0.30, -0.175], [-0.30, 0.175]]"
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]

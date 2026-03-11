@@ -7,3 +7,12 @@ crawler_driver:
     pulley_ratio: 2
     watchdog_timeout_ms: 500
     track_width: 0.4  # クローラ間距離 [m] (Nav2 cmd_vel → 差動駆動用)
+    # Roboclaw PID tuning (要実測チューニング)
+    m1_kp: 0.464
+    m1_ki: 0.021
+    m1_kd: 0.0
+    m1_qpps: 53250   # M1 max quadrature pulses/sec
+    m2_kp: 0.438
+    m2_ki: 0.020
+    m2_kd: 0.0
+    m2_qpps: 50062   # M2 max quadrature pulses/sec

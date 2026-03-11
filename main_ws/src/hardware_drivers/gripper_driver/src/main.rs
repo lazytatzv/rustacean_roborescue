@@ -3,7 +3,7 @@
 /// - Subscribe: /gripper_cmd    (custom_interfaces/GripperCommand) — position + max_current
 /// - Publish:   /gripper_status (custom_interfaces/GripperStatus)  — state + pos + current + temp
 ///
-/// Uses the same dynamixel2 crate as flipper_driver_rust.
+/// Uses the same dynamixel2 crate as the other Rust hardware drivers.
 /// Operates in Current-Based Position Control mode (mode 5) which allows
 /// gripping force control via current limiting.
 ///
@@ -16,8 +16,9 @@
 use anyhow::{Context as AnyhowContext, Result};
 use dynamixel2::Bus;
 use dynamixel2::serial2::SerialPort;
-use rclrs::{Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions};
+use rclrs::{Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions};
 use custom_interfaces::msg::{GripperCommand as GripperCommandMsg, GripperStatus as GripperStatusMsg};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -46,6 +47,7 @@ const OVERLOAD_CURRENT: i16 = 800;       // mA — overload protection
 // State
 // ---------------------------------------------------------------------------
 #[derive(Clone, Copy, PartialEq)]
+#[allow(dead_code)] // Error variant reserved for future fault handling
 enum GripperState {
     Idle     = 0,
     Moving   = 1,
@@ -131,6 +133,11 @@ impl GripperDriver {
             .map_err(|e| anyhow::anyhow!("Read temperature failed: {e:?}"))?;
         Ok(val.data)
     }
+
+    /// Disable torque (safe shutdown)
+    fn torque_off(&mut self) {
+        let _ = self.bus.write_u8(self.id, ADDR_TORQUE_ENABLE, 0);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -199,9 +206,12 @@ fn run() -> Result<()> {
     let _sub = node.create_subscription::<GripperCommandMsg, _>(
         "/gripper_cmd",
         move |msg: GripperCommandMsg| {
-            let mut guard = shared_sub.lock().unwrap();
+            let mut guard = match shared_sub.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
             *guard = Some(GripperCommand {
-                position: msg.position as u32,
+                position: (msg.position.max(0) as u32).min(4095),
                 max_current: msg.max_current,
             });
         },
@@ -213,8 +223,12 @@ fn run() -> Result<()> {
     // ---- Hardware thread --------------------------------------------------
     let shared_hw = Arc::clone(&shared_cmd);
     let status_pub_clone = status_pub.clone();
+    let shutdown_flag = Arc::new(AtomicBool::new(false));
+    let shutdown_clone = Arc::clone(&shutdown_flag);
+    let estop_flag = Arc::new(AtomicBool::new(false));
+    let estop_clone = Arc::clone(&estop_flag);
 
-    std::thread::spawn(move || {
+    let hw_thread = std::thread::spawn(move || {
         let mut driver = match GripperDriver::new(&port_name, baud_rate as u32, motor_id as u8) {
             Ok(d) => d,
             Err(e) => {
@@ -229,12 +243,26 @@ fn run() -> Result<()> {
         }
 
         let mut current_goal: u32 = 2048; // center position
+        let mut consecutive_overloads: u32 = 0;
+        const MAX_OVERLOAD_COUNT: u32 = 3; // 3 consecutive reads (~150ms) before releasing
         println!("✅ Gripper hardware ready, polling started.");
 
-        loop {
+        while !shutdown_clone.load(Ordering::Relaxed) {
+            // E-Stop check
+            if estop_clone.load(Ordering::Relaxed) {
+                eprintln!("🛑 gripper_driver: E-Stop received — disabling torque!");
+                driver.torque_off();
+                while !shutdown_clone.load(Ordering::Relaxed) {
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                break;
+            }
             // 1. Check for new commands
             {
-                let mut guard = shared_hw.lock().unwrap();
+                let mut guard = match shared_hw.lock() {
+                    Ok(g) => g,
+                    Err(p) => p.into_inner(),
+                };
                 if let Some(cmd) = guard.take() {
                     current_goal = cmd.position;
                     if let Err(e) = driver.set_goal(cmd.position, cmd.max_current) {
@@ -260,19 +288,55 @@ fn run() -> Result<()> {
 
             // 4. Overload protection
             if state == GripperState::Overload {
-                eprintln!("🔥 OVERLOAD detected ({}mA)! Holding position.", current);
-                // Don't change goal — just let the current limiter handle it
+                consecutive_overloads += 1;
+                eprintln!("🔥 OVERLOAD detected ({}mA, {}/{})", current, consecutive_overloads, MAX_OVERLOAD_COUNT);
+                if consecutive_overloads >= MAX_OVERLOAD_COUNT {
+                    eprintln!("🛑 Sustained overload — writing current position as goal to release");
+                    // Write current position as goal to stop the motor from pushing further
+                    if let Ok(pos) = driver.read_present_position() {
+                        current_goal = pos as u32;
+                        let _ = driver.set_goal(current_goal, 200); // reduced current limit
+                    }
+                    consecutive_overloads = 0;
+                }
+            } else {
+                consecutive_overloads = 0;
             }
 
             std::thread::sleep(Duration::from_millis(50)); // 20Hz
         }
+
+        // ── Graceful shutdown: disable torque ──
+        println!("🛑 gripper_driver: shutting down — disabling torque");
+        driver.torque_off();
+        println!("✅ gripper_driver: torque disabled, hardware thread exited cleanly");
     });
 
+    // ---- Subscriber: /emergency_stop (std_msgs/Bool) --------------------
+    // QoS must match joy_controller publisher: transient_local + reliable
+    let estop_sub_flag = Arc::clone(&estop_flag);
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
+        "/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| {
+            if msg.data {
+                estop_sub_flag.store(true, Ordering::Relaxed);
+            }
+        },
+    )?;
+
     println!("🚀 gripper_driver started");
-    println!("   Subscribe: /gripper_cmd (custom_interfaces/GripperCommand)");
+    println!("   Subscribe: /gripper_cmd    (custom_interfaces/GripperCommand)");
+    println!("   Subscribe: /emergency_stop (std_msgs/Bool)");
     println!("   Publish:   /gripper_status (custom_interfaces/GripperStatus)");
 
     executor.spin(SpinOptions::default()).first_error()?;
+
+    // ── Signal hardware thread to stop and wait for clean shutdown ──
+    shutdown_flag.store(true, Ordering::Relaxed);
+    if hw_thread.join().is_err() {
+        eprintln!("⚠️  gripper_driver: hardware thread panicked during shutdown");
+    }
+
     Ok(())
 }
 

@@ -1,0 +1,3 @@
+# Clippy configuration
+# Allow crate-level attributes that are common in our codebase
+allow-dbg-in-tests = true

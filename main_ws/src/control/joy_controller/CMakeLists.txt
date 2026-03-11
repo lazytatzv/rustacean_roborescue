@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.14)
 project(joy_controller)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -13,11 +13,12 @@ find_package(ament_cmake REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(custom_interfaces REQUIRED)
 
 add_executable(joy_controller_node src/joy_controller.cpp)
-ament_target_dependencies(joy_controller_node rclcpp sensor_msgs geometry_msgs custom_interfaces)
+ament_target_dependencies(joy_controller_node rclcpp sensor_msgs std_msgs geometry_msgs custom_interfaces)
 
 install(TARGETS
 	joy_controller_node

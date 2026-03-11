@@ -159,10 +159,13 @@ ros2 launch bringup system.launch.py
 
 | 順番 | ファイル | 内容 |
 |------|----------|------|
-| 1 | (foxglove_bridge) | Foxglove Studio 向け WebSocket ゲートウェイ (:8765) |
-| 2 | `network.launch.py` | Zenoh ルーター (`--config zenoh_router.json5`) + RMW 環境変数 |
-| 3 | `perception.launch.py` | LiDAR, IMU, SLAM |
-| 4 | `control.launch.py` | モータドライバ, コントローラ (joy_controller 含む), アーム, グリッパ |
+| 1 | (robot_state_publisher) | URDF → TF 変換 |
+| 2 | (foxglove_bridge) | Foxglove Studio 向け WebSocket ゲートウェイ (:8765) |
+| 3 | `network.launch.py` | Zenoh ルーター (`--config zenoh_router.json5`) + RMW 環境変数 |
+| 4 | `perception.launch.py` | LiDAR, IMU, SLAM |
+| 5 | `camera.launch.py` | USB カメラ (usb_cam → /camera/image_raw) |
+| 6 | `control.launch.py` | モータドライバ, コントローラ (joy_controller 含む), アーム, グリッパ |
+| 7 | `nav2.launch.py` | 自律走行 (`use_nav2:=true` 時のみ) |
 
 ### 3.2 起動オプション
 
@@ -178,6 +181,9 @@ ros2 launch bringup perception.launch.py use_velodyne:=true
 
 # ダミー IMU（IMU なしでテストする場合）
 ros2 launch bringup perception.launch.py use_dummy_imu:=true
+
+# LiDAR deskew に問題がある場合 (Python 補正ノードを有効化)
+ros2 launch bringup perception.launch.py use_time_fix:=true lidar_topic:=/velodyne_points_fixed
 ```
 
 ### 3.3 オペレータ側
@@ -288,6 +294,8 @@ ros2 launch bringup simulation.launch.py world:=/path/to/custom.sdf
 | parameter_bridge | ros_gz_bridge | Gazebo ↔ ROS 2 トピック変換 |
 | crawler_vel_bridge | bringup | CrawlerVelocity → Twist 変換 |
 | joy_controller | joy_controller | PS4 → 指令値 (シミュレーション時はローカル起動) |
+| arm_controller | arm_controller | IK → 目標位置 |
+| arm_gz_bridge | bringup | JointState → per-joint cmd_pos (Gazebo 用) |
 | pointcloud_to_laserscan | pointcloud_to_laserscan | 3D → 2D 変換 |
 | slam_toolbox | slam_toolbox | 2D SLAM (オプション) |
 | nav2 スタック | navigation2 | 自律走行 (オプション) |
@@ -358,11 +366,12 @@ PS4 (DualShock 4) コントローラで操作する。
 
 | ボタン | モード | 説明 |
 |--------|--------|------|
-| **PS** | STOP | 全モータ停止（安全状態） |
+| **PS** | STOP | **緊急停止** (E-Stop): 全モータ停止、ラッチ式（ノード再起動まで解除不可） |
 | **OPTIONS** | DRIVE | クローラ＋フリッパ操作 |
 | **SHARE** | ARM | ロボットアーム操作 |
 
 > 起動直後は **STOP** モード。必ず OPTIONS を押して DRIVE に切り替えてから走行する。
+> モード切替ボタンはすべてエッジ検出 (押した瞬間のみ反応、長押し不要)。
 
 ### 5.2 DRIVE モード
 
@@ -386,11 +395,13 @@ PS4 (DualShock 4) コントローラで操作する。
 | × ボタン | 右後フリッパ | + |
 | □ ボタン | 右後フリッパ | − |
 | L1 | 左前フリッパ | + |
-| L2 | 左前フリッパ | − |
+| L2 (深く引く) | 左前フリッパ | − |
 | R1 | 右前フリッパ | + |
-| R2 | 右前フリッパ | − |
+| R2 (深く引く) | 右前フリッパ | − |
 
 フリッパ速度: **1000** (定数)
+
+> L2/R2 はアナログトリガー。90% 以上引き込んだ時点 (値 < -0.9) で入力として認識される。
 
 ### 5.3 ARM モード
 
@@ -400,6 +411,8 @@ PS4 (DualShock 4) コントローラで操作する。
 | 左スティック ←→ | 手先 左右 (Y) | 0.3 m/s |
 | 右スティック ↑↓ | 手先 上下 (Z) | 0.3 m/s |
 | 右スティック ←→ | 手先 Yaw 回転 | 0.5 rad/s |
+| L2 / R2 | Roll 回転 (R2で正, L2で負) | 0.5 rad/s (50%以上で反応) |
+| D-Pad ↑↓ | Pitch 回転 (↑で正, ↓で負) | 0.5 rad/s |
 
 > ARM モード中はクローラ・フリッパの指令はゼロになる（安全措置）。
 
@@ -462,6 +475,9 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="s
 
 # Dynamixel U2D2 (グリッパ/フリッパ)
 SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="dynamixel", MODE="0666"
+
+# Dynamixel U2D2 (アーム) — 複数 U2D2 がある場合はシリアル番号で区別
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{serial}=="<SERIAL>", SYMLINK+="ttyUSB_arm", MODE="0666"
 ```
 
 > **注意**: `idVendor` / `idProduct` は実機に合わせて `lsusb` で確認すること。
@@ -477,6 +493,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 |----------|----------------|--------|-----------|
 | Roboclaw | `/dev/roboclaw` | crawler_driver | 38400 |
 | STM32 (BNO055) | `/dev/stm32` | sensor_gateway | 115200 |
+| Dynamixel (アーム) | `/dev/ttyUSB_arm` | arm_driver | 115200 |
 | Dynamixel (グリッパ) | `/dev/ttyUSB1` | gripper_driver | 115200 |
 | Dynamixel (フリッパ) | `/dev/dynamixel` | flipper_driver | 115200 |
 
@@ -549,4 +566,21 @@ foxglove_bridge (:8765) ----WebSocket---→ ws://<ROBOT_IP>:8765
 | シリアルポートが開けない | 権限不足 | udev ルール設定 + `MODE="0666"` |
 | Dynamixel 通信エラー | ボーレート不一致 | `Dynamixel Wizard` でモータ設定確認 |
 | IMU データが来ない | STM32 未接続 / ファームウェア未書込 | `stm32_ws` のファームウェアを焼く |
+| LiDAR deskew が不正 (点群が歪む) | `timestamp_unit` 設定不正 | `spark_fast_lio_min.yaml` の `timestamp_unit: 0` (SEC) を確認。改善しない場合は `use_time_fix:=true lidar_topic:=/velodyne_points_fixed` で Python 補正ノードを有効化 |
 | コントローラが効かない | STOP モード | OPTIONS ボタンで DRIVE モードに切替 |
+| E-Stop 後に操作不能 | E-Stop はラッチ式（意図的仕様） | 全ノードを再起動する（下記参照） |
+
+### 9.5 E-Stop 復帰手順
+
+E-Stop（PS ボタン）は安全のため **ラッチ式** であり、ボタン操作では解除できない。
+以下の手順で全系統を再起動する:
+
+```bash
+# 1. system.launch.py を Ctrl+C で停止
+# 2. すべてのモータが停止していることを目視確認
+# 3. 再起動
+ros2 launch bringup system.launch.py
+# 4. OPTIONS ボタンで DRIVE モードに切替
+```
+
+> **重要**: 再起動前に E-Stop の原因を確認し、問題が解消していることを確認すること。

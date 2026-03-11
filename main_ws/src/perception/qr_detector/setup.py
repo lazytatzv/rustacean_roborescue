@@ -18,8 +18,8 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='User',
-    maintainer_email='user@example.com',
+    maintainer='lazytatzv',
+    maintainer_email='yano.tatsuki439@mail.kyutech.jp',
     description='QR code detector using OpenCV WeChatQRCode',
     license='Apache-2.0',
     entry_points={

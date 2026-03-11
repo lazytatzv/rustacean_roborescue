@@ -1,7 +1,9 @@
 # --- Rust (PC & STM32) ---
 target/
 **/*.rs.bk
-Cargo.lock
+# Note: Cargo.lock IS committed for reproducible builds (binary project, not library)
+# But per-package Cargo.lock (created by colcon) should be ignored
+main_ws/src/**/Cargo.lock
 
 # --- ROS 2 (colcon) ---
 install/

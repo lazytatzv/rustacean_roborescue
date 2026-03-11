@@ -3,7 +3,7 @@ members = [
     "src/control/arm_controller",
     "src/hardware_drivers/sensor_gateway",
     "src/hardware_drivers/gripper_driver",
-    "src/hardware_drivers/flipper_driver_rust",
+    "src/hardware_drivers/arm_driver",
     "src/perception/vision_processor",
 ]
 
@@ -14,7 +14,6 @@ resolver = "2"
 # rclrsはソースを参照させる
 # crates.ioからとってくるのは地雷なのでやらない！！！
 rclrs = { path = "src/external/ros2_rust/rclrs" }
-#rosidl_default_runtime = { version = "0.6.0", path = "src/external/rosidl_rust/rosidl_generator_rs" }
 
 # メッセージ型は「ビルド生成物 (installフォルダ)」を参照させる
 # これがないと "No such file" エラーになる
@@ -29,8 +28,6 @@ rosgraph_msgs = { path = "install/share/rosgraph_msgs/rust" }
 statistics_msgs = { path = "install/share/statistics_msgs/rust" }
 trajectory_msgs = { path = "install/share/trajectory_msgs/rust" }
 visualization_msgs = { path = "install/share/visualization_msgs/rust" }
-#tf2_msgs = { path = "install/share/tf2_msgs/rust" }
-# [patch.crates-io] セクションの中に追記してください
 
 service_msgs = { path = "install/share/service_msgs/rust" }
 unique_identifier_msgs = { path = "install/share/unique_identifier_msgs/rust" }

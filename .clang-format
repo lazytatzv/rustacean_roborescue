@@ -1,0 +1,13 @@
+# Clang-Format configuration for C++ code
+# Based on Google style with ROS 2 adaptations
+BasedOnStyle: Google
+ColumnLimit: 100
+IndentWidth: 2
+AccessModifierOffset: -1
+AlignAfterOpenBracket: Align
+AllowShortFunctionsOnASingleLine: Inline
+BreakBeforeBraces: Allman
+DerivePointerAlignment: false
+PointerAlignment: Right
+SortIncludes: true
+IncludeBlocks: Regroup

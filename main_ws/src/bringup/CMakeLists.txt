@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.14)
 project(bringup)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -25,6 +25,7 @@ install(PROGRAMS
   scripts/dummy_imu_node.py
   scripts/fix_pointcloud_time_node.py
   scripts/crawler_vel_bridge.py
+  scripts/arm_gz_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

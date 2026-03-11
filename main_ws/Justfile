@@ -42,6 +42,36 @@ reforge: clean forge
 launch:
   ros2 launch bringup launch.py
 
+# ── Code Quality ──
+
+# Run all checks (format + lint + test)
+check: fmt-check lint test
+
+# Format check (all languages)
+fmt-check:
+  cargo fmt --all -- --check
+  @echo "✅ Rust formatting OK"
+
+# Auto-format
+fmt:
+  cargo fmt --all
+  @echo "✅ Rust formatted"
+
+# Clippy lint
+lint:
+  source install/setup.bash && cargo clippy --workspace -- -D warnings
+  @echo "✅ Clippy OK"
+
+# Run all Rust tests
+test:
+  source install/setup.bash && cargo test --workspace
+  @echo "✅ Tests passed"
+
+# Quick compilation check (no codegen)
+check-compile:
+  source install/setup.bash && cargo check --workspace
+  @echo "✅ Compilation OK"
+
 # fishを使う際は自分でsourceする
 ready:
   @echo "RUN below command"

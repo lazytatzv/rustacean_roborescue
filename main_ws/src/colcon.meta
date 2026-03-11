@@ -37,7 +37,7 @@
                 "unique_identifier_msgs", "custom_interfaces"
             ]
         },
-        "flipper_driver_rust": {
+        "arm_driver": {
             "dependencies": [
                 "action_msgs", "geometry_msgs", "nav_msgs", "sensor_msgs",
                 "std_msgs", "builtin_interfaces", "rcl_interfaces",

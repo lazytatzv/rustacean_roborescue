@@ -10,10 +10,11 @@
 
 mod imu;
 
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::Result;
 use rclrs::{Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions};
 use sensor_msgs::msg::Imu as ImuMsg;
 use std::io::{BufRead, BufReader};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -35,7 +36,12 @@ const CALIB_LOG_INTERVAL: u32 = 50;
 // Serial reader thread
 // ---------------------------------------------------------------------------
 
-fn serial_reader_thread(port_name: String, baud_rate: u32, shared: Arc<Mutex<Option<ImuData>>>) {
+fn serial_reader_thread(
+    port_name: String,
+    baud_rate: u32,
+    shared: Arc<Mutex<Option<ImuData>>>,
+    shutdown_flag: Arc<AtomicBool>,
+) {
     // Configure the serial port using stty
     let stty_result = std::process::Command::new("stty")
         .args([
@@ -58,16 +64,20 @@ fn serial_reader_thread(port_name: String, baud_rate: u32, shared: Arc<Mutex<Opt
         }
     }
 
-    loop {
+    while !shutdown_flag.load(Ordering::Relaxed) {
         match std::fs::File::open(&port_name) {
             Ok(file) => {
                 let reader = BufReader::new(file);
                 for line_result in reader.lines() {
+                    if shutdown_flag.load(Ordering::Relaxed) {
+                        break;
+                    }
                     match line_result {
                         Ok(line) => {
                             if let Some(data) = parse_csv_line(&line) {
-                                let mut guard = shared.lock().unwrap();
-                                *guard = Some(data);
+                                if let Ok(mut guard) = shared.lock() {
+                                    *guard = Some(data);
+                                }
                             }
                         }
                         Err(e) => {
@@ -81,8 +91,17 @@ fn serial_reader_thread(port_name: String, baud_rate: u32, shared: Arc<Mutex<Opt
                 eprintln!("⚠️  Cannot open {port_name}: {e}, retrying in 2s...");
             }
         }
-        std::thread::sleep(Duration::from_secs(2));
+
+        // Sleep in small increments to check shutdown flag promptly
+        for _ in 0..20 {
+            if shutdown_flag.load(Ordering::Relaxed) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
     }
+
+    println!("🛑 sensor_gateway: serial reader thread exited cleanly");
 }
 
 // ---------------------------------------------------------------------------
@@ -108,16 +127,20 @@ fn run() -> Result<()> {
         .default(DEFAULT_BAUD as i64)
         .mandatory()
         .map_err(|e| anyhow::anyhow!("{e}"))?
-        .get();;
+        .get();
 
     // ---- Shared state -----------------------------------------------------
     let shared: Arc<Mutex<Option<ImuData>>> = Arc::new(Mutex::new(None));
 
+    // ---- Shutdown flag (shared with serial reader thread) -----------------
+    let shutdown_flag = Arc::new(AtomicBool::new(false));
+
     // ---- Serial reader thread ---------------------------------------------
     let shared_reader = Arc::clone(&shared);
     let port_clone = port_name.clone();
-    std::thread::spawn(move || {
-        serial_reader_thread(port_clone, baud_rate as u32, shared_reader);
+    let shutdown_clone = Arc::clone(&shutdown_flag);
+    let serial_thread = std::thread::spawn(move || {
+        serial_reader_thread(port_clone, baud_rate as u32, shared_reader, shutdown_clone);
     });
 
     // ---- Publisher --------------------------------------------------------
@@ -128,7 +151,10 @@ fn run() -> Result<()> {
     let mut msg_count: u32 = 0;
 
     let _timer = node.create_timer_repeating(Duration::from_millis(20), move || {
-        let mut guard = shared_timer.lock().unwrap();
+        let mut guard = match shared_timer.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Some(ref mut data) = *guard {
             if !data.fresh {
                 return;
@@ -154,6 +180,13 @@ fn run() -> Result<()> {
     println!("   Publish: /imu/data (sensor_msgs/Imu)");
 
     executor.spin(SpinOptions::default()).first_error()?;
+
+    // ── Signal serial thread to stop and wait for clean shutdown ──
+    shutdown_flag.store(true, Ordering::Relaxed);
+    if serial_thread.join().is_err() {
+        eprintln!("⚠️  sensor_gateway: serial thread panicked during shutdown");
+    }
+
     Ok(())
 }
 

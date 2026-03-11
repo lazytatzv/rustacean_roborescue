@@ -14,7 +14,9 @@ def generate_launch_description() -> LaunchDescription:
         default_value=PathJoinSubstitution([bringup_share, "config", "spark_fast_lio_min.yaml"]),
     )
     lidar_topic_raw = DeclareLaunchArgument("lidar_topic_raw", default_value="/velodyne_points")
-    lidar_topic = DeclareLaunchArgument("lidar_topic", default_value="/velodyne_points_fixed")
+    # timestamp_unit=0 (SEC) により fix ノード不要。戻す場合は
+    # use_time_fix:=true lidar_topic:=/velodyne_points_fixed
+    lidar_topic = DeclareLaunchArgument("lidar_topic", default_value="/velodyne_points")
     imu_topic = DeclareLaunchArgument("imu_topic", default_value="/imu/data")
     map_frame = DeclareLaunchArgument("map_frame", default_value="odom")
     base_frame = DeclareLaunchArgument("base_frame", default_value="base_link")
@@ -49,7 +51,7 @@ def generate_launch_description() -> LaunchDescription:
         default_value=PathJoinSubstitution([bringup_share, "config", "pointcloud_to_laserscan.yaml"]),
     )
 
-    use_time_fix = DeclareLaunchArgument("use_time_fix", default_value="true")
+    use_time_fix = DeclareLaunchArgument("use_time_fix", default_value="false")
     time_fix_params = DeclareLaunchArgument(
         "time_fix_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "fix_pointcloud_time.yaml"]),
@@ -79,6 +81,7 @@ def generate_launch_description() -> LaunchDescription:
         remappings=[
             ("lidar", LaunchConfiguration("lidar_topic")),
             ("imu", LaunchConfiguration("imu_topic")),
+            ("odometry", "/odom"),   # Nav2 は /odom を期待
         ],
         parameters=[
             LaunchConfiguration("config_path"),

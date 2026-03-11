@@ -14,8 +14,9 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.descriptions import ParameterValue
 
 def generate_launch_description():
     bringup_dir = get_package_share_directory('bringup')
@@ -24,10 +25,28 @@ def generate_launch_description():
     network_launch = os.path.join(bringup_dir, 'launch', 'network.launch.py')
     perception_launch = os.path.join(bringup_dir, 'launch', 'perception.launch.py')
     control_launch = os.path.join(bringup_dir, 'launch', 'control.launch.py')
+    camera_launch = os.path.join(bringup_dir, 'launch', 'camera.launch.py')
     nav2_launch = os.path.join(bringup_dir, 'launch', 'nav2.launch.py')
 
     use_nav2 = DeclareLaunchArgument('use_nav2', default_value='false',
                                       description='Nav2 自律走行を有効にする')
+
+    # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
+    urdf_file = os.path.join(bringup_dir, 'urdf', 'robot.urdf.xacro')
+    robot_description = ParameterValue(
+        Command(['xacro ', urdf_file]),
+        value_type=str,
+    )
+    robot_state_publisher_node = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[{
+            'robot_description': robot_description,
+            'use_sim_time': False,
+        }],
+    )
 
     # Foxglove Bridge — Foxglove Studio が WebSocket (ws://robot_ip:8765) で接続
     foxglove_bridge_node = Node(
@@ -48,26 +67,34 @@ def generate_launch_description():
     return LaunchDescription([
         use_nav2,
 
-        # 0. Foxglove Bridge (WebSocket :8765)
+        # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
+        robot_state_publisher_node,
+
+        # 1. Foxglove Bridge (WebSocket :8765)
         foxglove_bridge_node,
 
-        # 1. ネットワーク（Zenoh）の起動
+        # 2. ネットワーク（Zenoh）の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(network_launch),
         ),
 
-        # 2. 認識・SLAM系の起動
+        # 3. 認識・SLAM系の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(perception_launch),
             launch_arguments={'use_slam': 'true', 'use_rviz': 'false'}.items()
         ),
 
-        # 3. 制御系の起動
+        # 4. カメラの起動 (qr_detector が /camera/image_raw を必要とする)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(camera_launch),
+        ),
+
+        # 5. 制御系の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(control_launch),
         ),
 
-        # 4. Nav2 自律走行（オプション）
+        # 6. Nav2 自律走行（オプション）
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(nav2_launch),
             condition=IfCondition(LaunchConfiguration('use_nav2')),

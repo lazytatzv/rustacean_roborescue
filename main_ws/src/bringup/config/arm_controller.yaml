@@ -9,3 +9,19 @@ arm_controller:
     end_link: "link_tip"
     # Watchdog timeout (ms) — arm stops if no command received within this period
     watchdog_timeout_ms: 500
+
+    # ── IK tuning parameters ──
+    # Base DLS damping factor (λ₀)
+    dls_lambda_base: 0.01
+    # Maximum DLS damping factor near singularity
+    dls_lambda_max: 0.15
+    # Manipulability threshold below which damping ramps up
+    manipulability_threshold: 0.005
+    # Manipulability below which we refuse to move (singularity lockout)
+    manipulability_lockout: 0.0005
+    # Joint velocity limit [rad/s]
+    joint_vel_limit: 1.0
+    # Safety margin from joint limits [rad] (~5.7°)
+    joint_limit_margin: 0.10
+    # Null-space repulsion gain for joint-limit avoidance
+    null_space_repulsion_gain: 0.5

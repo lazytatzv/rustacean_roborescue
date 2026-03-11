@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <vector>
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
 
@@ -15,6 +16,7 @@ class FlipperDriver : public rclcpp::Node
     declare_parameter("baud_rate", 115200);
     declare_parameter("dynamixel_ids", std::vector<int>({1, 2, 3, 4}));
     declare_parameter("watchdog_timeout_ms", 500);
+    declare_parameter("velocity_limit", 1023);
 
     initParams();
 
@@ -32,6 +34,27 @@ class FlipperDriver : public rclcpp::Node
     watchdog_timer_ = create_wall_timer(
         std::chrono::milliseconds(watchdog_timeout_ms_),
         std::bind(&FlipperDriver::watchdog_callback, this));
+
+    // Emergency stop subscriber (transient_local to catch latched msg)
+    auto estop_qos = rclcpp::QoS(1)
+        .transient_local()
+        .reliable();
+    estop_sub_ = create_subscription<std_msgs::msg::Bool>(
+        "/emergency_stop", estop_qos,
+        [this](const std_msgs::msg::Bool::SharedPtr msg) {
+          if (msg->data) {
+            estop_active_ = true;
+            stopMotors();
+            RCLCPP_FATAL(get_logger(), "EMERGENCY STOP activated — motors halted");
+          }
+        });
+  }
+
+  /// Graceful shutdown: ensure motors are stopped when the node is destroyed
+  ~FlipperDriver() override
+  {
+    RCLCPP_INFO(get_logger(), "Shutting down — stopping motors");
+    stopMotors();
   }
 
  private:
@@ -40,10 +63,13 @@ class FlipperDriver : public rclcpp::Node
   int                   baud_rate_;
   std::vector<long int> dynamixel_ids_;
   int                   watchdog_timeout_ms_;
+  int                   velocity_limit_;
 
   rclcpp::Subscription<custom_interfaces::msg::FlipperVelocity>::SharedPtr subscription_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   rclcpp::TimerBase::SharedPtr watchdog_timer_;
   rclcpp::Time last_cmd_time_;
+  bool estop_active_ = false;
 
   void initParams()
   {
@@ -51,6 +77,7 @@ class FlipperDriver : public rclcpp::Node
     baud_rate_           = get_parameter("baud_rate").as_int();
     dynamixel_ids_       = get_parameter("dynamixel_ids").as_integer_array();
     watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
+    velocity_limit_      = get_parameter("velocity_limit").as_int();
     last_cmd_time_       = now();
   }
 
@@ -70,8 +97,17 @@ class FlipperDriver : public rclcpp::Node
         return false;
       }
 
-      dxl_wb_.wheelMode(id, 0);
-      dxl_wb_.itemWrite(id, "Velocity_Limit", 1023);
+      if (!dxl_wb_.wheelMode(id, 0))
+      {
+        RCLCPP_ERROR(this->get_logger(), "Failed to set wheel mode for ID %ld", id);
+        return false;
+      }
+
+      if (!dxl_wb_.itemWrite(id, "Velocity_Limit", velocity_limit_))
+      {
+        RCLCPP_ERROR(this->get_logger(), "Failed to set velocity limit for ID %ld", id);
+        return false;
+      }
     }
 
     RCLCPP_INFO(this->get_logger(), "Dynamixel Workbench initialized successfully");
@@ -81,11 +117,18 @@ class FlipperDriver : public rclcpp::Node
   void stopMotors()
   {
     for (const auto &id : dynamixel_ids_)
-      dxl_wb_.goalVelocity(id, 0);
+    {
+      if (!dxl_wb_.goalVelocity(id, 0))
+      {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Failed to stop Dynamixel motor ID %ld", id);
+      }
+    }
   }
 
   void driver_callback(const custom_interfaces::msg::FlipperVelocity &msg)
   {
+    if (estop_active_) return;
     last_cmd_time_ = now();
 
     if (msg.flipper_vel.size() < dynamixel_ids_.size())

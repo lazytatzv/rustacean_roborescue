@@ -30,69 +30,103 @@ def generate_launch_description() -> LaunchDescription:
         "gripper_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "gripper_driver.yaml"]),
     )
+    arm_driver_params = DeclareLaunchArgument(
+        "arm_driver_params",
+        default_value=PathJoinSubstitution([bringup_share, "config", "arm_driver.yaml"]),
+    )
+    joy_params = DeclareLaunchArgument(
+        "joy_params",
+        default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
+    )
 
-    # ── Nodes ──
+    # ── Shared respawn config for hardware drivers ──
+    # Hardware drivers automatically restart on crash (e.g., USB disconnect).
+    # respawn_delay prevents rapid restart loops.
+    hw_respawn = {"respawn": True, "respawn_delay": 3.0}
+
+    # ── Hardware driver nodes (with respawn) ──
     crawler_driver_node = Node(
         package="crawler_driver",
         executable="crawler_driver_node",
         name="crawler_driver",
-        output="screen",
+        output="both",
         parameters=[LaunchConfiguration("crawler_params")],
+        **hw_respawn,
     )
 
     flipper_driver_node = Node(
         package="flipper_driver",
         executable="flipper_driver_node",
         name="flipper_driver",
-        output="screen",
+        output="both",
         parameters=[LaunchConfiguration("flipper_params")],
-    )
-
-    joy_controller_node = Node(
-        package="joy_controller",
-        executable="joy_controller_node",
-        name="joy_controller",
-        output="screen",
-    )
-
-    arm_controller_node = Node(
-        package="arm_controller",
-        executable="arm_controller",
-        name="arm_controller",
-        output="screen",
-        parameters=[
-            LaunchConfiguration("arm_params"),
-            {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
-        ],
+        **hw_respawn,
     )
 
     sensor_gateway_node = Node(
         package="sensor_gateway",
         executable="sensor_gateway",
         name="sensor_gateway",
-        output="screen",
+        output="both",
         parameters=[LaunchConfiguration("sensor_gw_params")],
+        **hw_respawn,
     )
 
     gripper_driver_node = Node(
         package="gripper_driver",
         executable="gripper_driver",
         name="gripper_driver",
-        output="screen",
+        output="both",
         parameters=[LaunchConfiguration("gripper_params")],
+        **hw_respawn,
     )
 
+    arm_driver_node = Node(
+        package="arm_driver",
+        executable="arm_driver",
+        name="arm_driver",
+        output="both",
+        parameters=[LaunchConfiguration("arm_driver_params")],
+        **hw_respawn,
+    )
+
+    # ── Control nodes (with respawn) ──
+    ctrl_respawn = {"respawn": True, "respawn_delay": 2.0}
+
+    joy_controller_node = Node(
+        package="joy_controller",
+        executable="joy_controller_node",
+        name="joy_controller",
+        output="both",
+        parameters=[LaunchConfiguration("joy_params")],
+        **ctrl_respawn,
+    )
+
+    arm_controller_node = Node(
+        package="arm_controller",
+        executable="arm_controller",
+        name="arm_controller",
+        output="both",
+        parameters=[
+            LaunchConfiguration("arm_params"),
+            {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
+        ],
+        **ctrl_respawn,
+    )
+
+    # ── Perception nodes (with respawn) ──
     qr_detector_node = Node(
         package="qr_detector",
         executable="qr_detector_node",
         name="qr_detector",
-        output="screen",
+        output="both",
         parameters=[{
             "model_dir": PathJoinSubstitution([qr_share, "models"]),
             "publish_compressed": True,
             "jpeg_quality": 60,
             "detection_interval": 1,
         }],
+        **ctrl_respawn,
     )
 
     return LaunchDescription([
@@ -101,14 +135,17 @@ def generate_launch_description() -> LaunchDescription:
         arm_params,
         sensor_gw_params,
         gripper_params,
-        # Hardware drivers
+        arm_driver_params,
+        joy_params,
+        # Hardware drivers (with respawn)
         crawler_driver_node,
         flipper_driver_node,
         sensor_gateway_node,
         gripper_driver_node,
+        arm_driver_node,
         # Control
         joy_controller_node,
         arm_controller_node,
-        # Vision
+        # Perception
         qr_detector_node,
     ])

@@ -25,6 +25,12 @@ graph LR
   end
 
   %% =============================================
+  %% E-Stop (緊急停止)
+  %% =============================================
+  T_estop{{/emergency_stop<br/>std_msgs/Bool}}:::topic_style
+  op --> T_estop
+
+  %% =============================================
   %% Mobility — クローラ & フリッパ
   %% =============================================
   subgraph Mobility["Mobility"]
@@ -39,6 +45,9 @@ graph LR
     op --> T_f_cmd --> flipper
     flipper --> T_f_state
 
+    T_estop --> crawler
+    T_estop --> flipper
+
     HW_roboclaw[Roboclaw]:::hw_style
     HW_dxl_f[Dynamixel<br/>Flippers]:::hw_style
     crawler --> HW_roboclaw
@@ -50,6 +59,7 @@ graph LR
   %% =============================================
   subgraph Manipulation["Arm & Gripper"]
     arm[arm_controller]:::node_style
+    arm_drv[arm_driver]:::node_style
     gripper[gripper_driver]:::node_style
 
     T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
@@ -58,12 +68,20 @@ graph LR
     T_g_status{{/gripper_status<br/>custom_interfaces/GripperStatus}}:::topic_style
 
     op --> T_a_cmd --> arm
-    arm --> T_a_joint
+    arm --> T_a_joint --> arm_drv
+    T_f_state --> arm
 
     T_g_cmd --> gripper
     gripper --> T_g_status
 
+    T_estop --> arm
+    T_estop --> arm_drv
+    T_estop --> gripper
+
+    HW_dxl_a[Dynamixel<br/>Arm ×6]:::hw_style
     HW_dxl_g[Dynamixel<br/>Gripper]:::hw_style
+    arm_drv --> HW_dxl_a
+    arm_drv --> T_f_state
     gripper --> HW_dxl_g
   end
 

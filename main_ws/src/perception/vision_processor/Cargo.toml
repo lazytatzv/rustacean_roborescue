@@ -4,7 +4,4 @@ version = "0.1.0"
 edition = "2021" # 2024だと新しすぎる
 
 [dependencies]
-# Docs.rsを確認すること
-#opencv = "0.98.1"
-opencv = { version = "0.92", features = ["clang-runtime", "objdetect"]}
-rclrs = "0.7.0"
+opencv = { version = "0.92", features = ["clang-runtime", "objdetect"] }

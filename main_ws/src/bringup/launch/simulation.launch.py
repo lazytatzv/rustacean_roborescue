@@ -131,6 +131,13 @@ def generate_launch_description() -> LaunchDescription:
             "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model",
             # Clock: Gazebo → ROS 2
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            # Arm joint position commands: ROS 2 → Gazebo
+            "/arm_joint1/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
+            "/arm_joint2/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
+            "/arm_joint3/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
+            "/arm_joint4/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
+            "/arm_joint5/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
+            "/arm_joint6/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
         ],
     )
 
@@ -144,6 +151,27 @@ def generate_launch_description() -> LaunchDescription:
             "track_width": 0.4,
             "use_sim_time": True,
         }],
+    )
+
+    # ── Arm Gazebo Bridge: JointState → per-joint cmd_pos for Gazebo ──
+    arm_gz_bridge = Node(
+        package="bringup",
+        executable="arm_gz_bridge.py",
+        name="arm_gz_bridge",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
+    # ── Arm Controller (IK → target positions) ──
+    arm_controller = Node(
+        package="arm_controller",
+        executable="arm_controller",
+        name="arm_controller",
+        output="screen",
+        parameters=[
+            {"use_sim_time": True},
+            {"urdf_path": os.path.join(bringup_dir, "urdf", "sekirei.urdf")},
+        ],
     )
 
     # ── Joy Controller (teleop、シミュレーションでも使える) ──
@@ -199,11 +227,13 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # ── RViz ──
+    rviz_config = os.path.join(bringup_dir, "rviz", "simulation.rviz")
     rviz = Node(
         package="rviz2",
         executable="rviz2",
         name="rviz2",
         output="screen",
+        arguments=["-d", rviz_config],
         parameters=[{"use_sim_time": True}],
         condition=IfCondition(LaunchConfiguration("use_rviz")),
     )
@@ -224,6 +254,9 @@ def generate_launch_description() -> LaunchDescription:
         # Bridge + Teleop
         crawler_bridge,
         joy_controller,
+        # Arm control (IK + Gazebo bridge)
+        arm_controller,
+        arm_gz_bridge,
         # Perception
         pointcloud_to_laserscan,
         slam_toolbox,

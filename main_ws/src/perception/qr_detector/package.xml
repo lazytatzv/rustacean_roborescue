@@ -4,7 +4,7 @@
   <name>qr_detector</name>
   <version>0.1.0</version>
   <description>QR code detector using OpenCV WeChatQRCode</description>
-  <maintainer email="user@example.com">User</maintainer>
+  <maintainer email="yano.tatsuki439@mail.kyutech.jp">lazytatzv</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_python</buildtool_depend>

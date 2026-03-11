@@ -2,7 +2,12 @@
 ///
 /// - Subscribe: /arm_cmd_vel  (geometry_msgs/Twist)     — end-effector velocity from joystick
 /// - Subscribe: /joint_states (sensor_msgs/JointState)  — actual joint positions (feedback)
-/// - Publish:   /arm_joint_commands (sensor_msgs/JointState) — joint velocities to servo driver
+/// - Publish:   /arm_joint_commands (sensor_msgs/JointState) — target positions + velocities
+///
+/// Output: JointState with both .position (target) and .velocity (informational).
+/// The downstream driver (arm_driver for real HW, arm_gz_bridge for Gazebo) consumes
+/// the .position field. Velocity IK is integrated internally:
+///   q_target += dq * dt, then clamped to joint limits.
 ///
 /// Safety features:
 ///   1. Joint position feedback — uses actual encoder values, not open-loop integration
@@ -11,32 +16,53 @@
 ///   4. Manipulability monitor  — logs warnings and scales speed near singular configs
 ///   5. Watchdog                — zero velocities if no command within timeout
 ///   6. Startup safety          — waits for first /joint_states before accepting commands
+///   7. Position integration    — outputs bounded target positions (no velocity drift)
 
 use anyhow::{Context as AnyhowContext, Result};
 use k::{Chain, SerialChain};
 use k::nalgebra as na;
-use rclrs::{Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions};
+use rclrs::{Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions};
 use sensor_msgs::msg::JointState;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+/// Acquire a Mutex lock, recovering from poison.
+fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+/// 現在時刻を builtin_interfaces/Time に変換
+fn now_stamp() -> builtin_interfaces::msg::Time {
+    let dur = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    builtin_interfaces::msg::Time {
+        sec: dur.as_secs() as i32,
+        nanosec: dur.subsec_nanos(),
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Constants
+//  Default constants (overridable via ROS parameters)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Base DLS damping factor (λ₀). Adaptive: λ = λ₀ + λ_max * (1 - w/w₀)
-const DLS_LAMBDA_BASE: f64 = 0.01;
+const DEFAULT_DLS_LAMBDA_BASE: f64 = 0.01;
 
 /// Maximum DLS damping factor near singularity
-const DLS_LAMBDA_MAX: f64 = 0.15;
+const DEFAULT_DLS_LAMBDA_MAX: f64 = 0.15;
 
 /// Manipulability threshold below which damping ramps up.
 /// w = sqrt(det(J J^T)).  Typical healthy value for this arm ≈ 0.01–0.1.
-const MANIPULABILITY_THRESHOLD: f64 = 0.005;
+const DEFAULT_MANIPULABILITY_THRESHOLD: f64 = 0.005;
 
 /// Manipulability below which we refuse to move (near-singular lockout)
-const MANIPULABILITY_LOCKOUT: f64 = 0.0005;
+const DEFAULT_MANIPULABILITY_LOCKOUT: f64 = 0.0005;
 
 /// Default watchdog timeout [ms]
 const DEFAULT_WATCHDOG_MS: u64 = 500;
@@ -45,14 +71,29 @@ const DEFAULT_WATCHDOG_MS: u64 = 500;
 const CONTROL_PERIOD_MS: u64 = 20;
 
 /// Joint velocity limit [rad/s] — hard clamp on output
-const JOINT_VEL_LIMIT: f64 = 1.0;
+const DEFAULT_JOINT_VEL_LIMIT: f64 = 1.0;
 
 /// Safety margin from joint limits [rad].
 /// Velocity is smoothly scaled to zero within this margin.
-const JOINT_LIMIT_MARGIN: f64 = 0.10; // ~5.7°
+const DEFAULT_JOINT_LIMIT_MARGIN: f64 = 0.10; // ~5.7°
 
 /// Null-space repulsion gain for joint-limit avoidance
-const NULL_SPACE_REPULSION_GAIN: f64 = 0.5;
+const DEFAULT_NULL_SPACE_REPULSION_GAIN: f64 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  IK Configuration (loaded from ROS parameters)
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[derive(Clone)]
+struct IkConfig {
+    dls_lambda_base: f64,
+    dls_lambda_max: f64,
+    manipulability_threshold: f64,
+    manipulability_lockout: f64,
+    joint_vel_limit: f64,
+    joint_limit_margin: f64,
+    null_space_repulsion_gain: f64,
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Joint Limits (loaded from URDF by `k` crate)
@@ -88,7 +129,7 @@ impl JointLimits {
     ///
     /// Returns 1.0 when far from limits, tapers to 0.0 at the limit boundary.
     /// Also blocks motion *toward* the limit (directional).
-    fn velocity_scale(&self, positions: &[f64], velocities: &[f64]) -> Vec<f64> {
+    fn velocity_scale(&self, positions: &[f64], velocities: &[f64], margin: f64) -> Vec<f64> {
         positions
             .iter()
             .zip(velocities.iter())
@@ -105,12 +146,12 @@ impl JointLimits {
                 let dist_hi = hi - q;
 
                 // If moving toward lower limit and close
-                if dq < 0.0 && dist_lo < JOINT_LIMIT_MARGIN {
-                    return (dist_lo / JOINT_LIMIT_MARGIN).clamp(0.0, 1.0);
+                if dq < 0.0 && dist_lo < margin {
+                    return (dist_lo / margin).clamp(0.0, 1.0);
                 }
                 // If moving toward upper limit and close
-                if dq > 0.0 && dist_hi < JOINT_LIMIT_MARGIN {
-                    return (dist_hi / JOINT_LIMIT_MARGIN).clamp(0.0, 1.0);
+                if dq > 0.0 && dist_hi < margin {
+                    return (dist_hi / margin).clamp(0.0, 1.0);
                 }
 
                 1.0
@@ -155,6 +196,8 @@ struct SharedState {
     joint_positions: HashMap<String, f64>,
     /// Whether we've received at least one /joint_states message
     has_joint_feedback: bool,
+    /// Integrated target positions (initialized from first /joint_states)
+    target_positions: Option<Vec<f64>>,
 }
 
 impl SharedState {
@@ -164,6 +207,7 @@ impl SharedState {
             last_cmd_time: Instant::now(),
             joint_positions: HashMap::new(),
             has_joint_feedback: false,
+            target_positions: None,
         }
     }
 }
@@ -191,6 +235,7 @@ fn solve_velocity_ik(
     twist: &na::DVector<f64>,
     limits: &JointLimits,
     joint_positions: &[f64],
+    cfg: &IkConfig,
 ) -> IkResult {
     let jacobian = k::jacobian(chain);
     let jt = jacobian.transpose();
@@ -204,7 +249,7 @@ fn solve_velocity_ik(
     let manipulability = if det > 0.0 { det.sqrt() } else { 0.0 };
 
     // ── Singularity lockout ──
-    if manipulability < MANIPULABILITY_LOCKOUT {
+    if manipulability < cfg.manipulability_lockout {
         return IkResult {
             joint_velocities: na::DVector::zeros(dof),
             manipulability,
@@ -212,11 +257,11 @@ fn solve_velocity_ik(
     }
 
     // ── Adaptive damping (Nakamura–Hanafusa) ──
-    let lambda = if manipulability < MANIPULABILITY_THRESHOLD {
-        let ratio = manipulability / MANIPULABILITY_THRESHOLD;
-        DLS_LAMBDA_BASE + DLS_LAMBDA_MAX * (1.0 - ratio)
+    let lambda = if manipulability < cfg.manipulability_threshold {
+        let ratio = manipulability / cfg.manipulability_threshold;
+        cfg.dls_lambda_base + cfg.dls_lambda_max * (1.0 - ratio)
     } else {
-        DLS_LAMBDA_BASE
+        cfg.dls_lambda_base
     };
 
     let damping = na::DMatrix::<f64>::identity(n, n) * (lambda * lambda);
@@ -235,16 +280,13 @@ fn solve_velocity_ik(
     };
 
     // ── Null-space joint limit avoidance ──
-    // Pseudo-inverse: J^+ = J^T (J J^T + λ²I)^{-1}
-    // Null-space projector: N = I - J^+ J
     let j_pinv = match jjt_damped.lu().solve(&jacobian) {
-        Some(inv_jjt_j) => &jt * inv_jjt_j, // J^T · (J J^T + λ²I)^{-1} · J  ... but that's J^+ · J
+        Some(inv_jjt_j) => &jt * inv_jjt_j,
         None => na::DMatrix::zeros(dof, dof),
     };
-    // j_pinv is already J^+ J (dof×dof), so null projector is I - j_pinv
     let null_projector = na::DMatrix::<f64>::identity(dof, dof) - j_pinv;
 
-    let repulsion = limits.repulsion_gradient(joint_positions) * NULL_SPACE_REPULSION_GAIN;
+    let repulsion = limits.repulsion_gradient(joint_positions) * cfg.null_space_repulsion_gain;
     let dq_null = &null_projector * &repulsion;
 
     let dq = dq_task + dq_null;
@@ -289,6 +331,27 @@ fn run() -> Result<()> {
         .get();
     let watchdog_timeout = Duration::from_millis(watchdog_ms as u64);
 
+    // ── IK tuning parameters (all overridable at launch) ──
+    macro_rules! declare_f64 {
+        ($name:expr, $default:expr) => {
+            node.declare_parameter($name)
+                .default($default)
+                .mandatory()
+                .map_err(|e| anyhow::anyhow!("Failed to declare {}: {e}", $name))?
+                .get()
+        };
+    }
+
+    let ik_config = IkConfig {
+        dls_lambda_base:          declare_f64!("dls_lambda_base",          DEFAULT_DLS_LAMBDA_BASE),
+        dls_lambda_max:           declare_f64!("dls_lambda_max",           DEFAULT_DLS_LAMBDA_MAX),
+        manipulability_threshold: declare_f64!("manipulability_threshold", DEFAULT_MANIPULABILITY_THRESHOLD),
+        manipulability_lockout:   declare_f64!("manipulability_lockout",   DEFAULT_MANIPULABILITY_LOCKOUT),
+        joint_vel_limit:          declare_f64!("joint_vel_limit",          DEFAULT_JOINT_VEL_LIMIT),
+        joint_limit_margin:       declare_f64!("joint_limit_margin",       DEFAULT_JOINT_LIMIT_MARGIN),
+        null_space_repulsion_gain: declare_f64!("null_space_repulsion_gain", DEFAULT_NULL_SPACE_REPULSION_GAIN),
+    };
+
     // ── Load kinematic chain from URDF ──
     if urdf_path.is_empty() {
         anyhow::bail!("Parameter 'urdf_path' is required but was empty");
@@ -319,6 +382,9 @@ fn run() -> Result<()> {
         );
     }
 
+    // ── E-Stop flag ──
+    let estop_flag = Arc::new(AtomicBool::new(false));
+
     // ── Shared state ──
     let state = Arc::new(Mutex::new(SharedState::new()));
 
@@ -327,7 +393,7 @@ fn run() -> Result<()> {
     let _sub = node.create_subscription::<geometry_msgs::msg::Twist, _>(
         "/arm_cmd_vel",
         move |msg: geometry_msgs::msg::Twist| {
-            let mut s = state_sub.lock().unwrap();
+            let mut s = lock_or_recover(&state_sub);
             s.target_twist = [
                 msg.linear.x,
                 msg.linear.y,
@@ -342,18 +408,35 @@ fn run() -> Result<()> {
 
     // ── Subscriber: /joint_states (feedback from servo driver / Gazebo) ──
     let state_js = Arc::clone(&state);
+    let arm_names_for_check = joint_names.clone();
     let _sub_js = node.create_subscription::<JointState, _>(
         "/joint_states",
         move |msg: JointState| {
-            let mut s = state_js.lock().unwrap();
+            let mut s = lock_or_recover(&state_js);
             for (i, name) in msg.name.iter().enumerate() {
                 if i < msg.position.len() {
                     s.joint_positions.insert(name.clone(), msg.position[i]);
                 }
             }
-            if !s.has_joint_feedback {
+            // Only arm once ALL expected arm joints have been received
+            if !s.has_joint_feedback
+                && arm_names_for_check
+                    .iter()
+                    .all(|n| s.joint_positions.contains_key(n))
+            {
                 s.has_joint_feedback = true;
-                println!("✅ First /joint_states received — arm controller armed");
+                println!("✅ All arm joints received in /joint_states — arm controller armed");
+            }
+        },
+    )?;
+
+    // ── Subscriber: /emergency_stop (std_msgs/Bool) ──
+    let estop_sub_flag = Arc::clone(&estop_flag);
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
+        "/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| {
+            if msg.data {
+                estop_sub_flag.store(true, Ordering::Relaxed);
             }
         },
     )?;
@@ -363,16 +446,24 @@ fn run() -> Result<()> {
         node.create_publisher("/arm_joint_commands")?;
 
     // ── Control loop (50 Hz timer) ──
+    let dt = CONTROL_PERIOD_MS as f64 / 1000.0; // integration timestep [s]
     let state_timer = Arc::clone(&state);
     let serial_chain = serial.clone();
     let names_clone = joint_names.clone();
     let mut last_manipulability_warn = Instant::now();
     let mut prev_locked_out = false;
+    let cfg = ik_config.clone();
+    let estop_timer = Arc::clone(&estop_flag);
 
     let _timer = node.create_timer_repeating(
         Duration::from_millis(CONTROL_PERIOD_MS),
         move || {
-            let s = state_timer.lock().unwrap();
+            // ── E-Stop: refuse to publish any commands ──
+            if estop_timer.load(Ordering::Relaxed) {
+                return;
+            }
+
+            let mut s = lock_or_recover(&state_timer);
 
             // ── Safety: wait for joint feedback before moving ──
             if !s.has_joint_feedback {
@@ -392,6 +483,13 @@ fn run() -> Result<()> {
                 .map(|name| s.joint_positions.get(name).copied().unwrap_or(0.0))
                 .collect();
 
+            // ── Initialize target positions from first feedback ──
+            if s.target_positions.is_none() {
+                s.target_positions = Some(current_positions.clone());
+                println!("✅ Target positions initialized from feedback");
+            }
+
+            let target_positions = s.target_positions.clone().unwrap();
             drop(s); // release lock before computation
 
             // ── Update chain with actual joint positions ──
@@ -407,20 +505,21 @@ fn run() -> Result<()> {
                 &twist_vec,
                 &limits,
                 &current_positions,
+                &cfg,
             );
 
             // ── Manipulability diagnostics ──
-            if result.manipulability < MANIPULABILITY_LOCKOUT {
+            if result.manipulability < cfg.manipulability_lockout {
                 if !prev_locked_out {
                     eprintln!(
                         "⛔ Singularity lockout! manipulability={:.6} < {:.6}",
-                        result.manipulability, MANIPULABILITY_LOCKOUT
+                        result.manipulability, cfg.manipulability_lockout
                     );
                     prev_locked_out = true;
                 }
             } else {
                 prev_locked_out = false;
-                if result.manipulability < MANIPULABILITY_THRESHOLD
+                if result.manipulability < cfg.manipulability_threshold
                     && last_manipulability_warn.elapsed() > Duration::from_secs(2)
                 {
                     eprintln!(
@@ -433,28 +532,50 @@ fn run() -> Result<()> {
 
             // ── Apply joint-limit velocity scaling ──
             let raw_vel: Vec<f64> = result.joint_velocities.iter().copied().collect();
-            let scale_factors = limits.velocity_scale(&current_positions, &raw_vel);
+            let scale_factors = limits.velocity_scale(&current_positions, &raw_vel, cfg.joint_limit_margin);
 
             let final_vel: Vec<f64> = raw_vel
                 .iter()
                 .zip(scale_factors.iter())
-                .map(|(&v, &s)| (v * s).clamp(-JOINT_VEL_LIMIT, JOINT_VEL_LIMIT))
+                .map(|(&v, &s)| (v * s).clamp(-cfg.joint_vel_limit, cfg.joint_vel_limit))
                 .collect();
 
-            // ── Publish ──
+            // ── Integrate velocities → target positions ──
+            let new_targets: Vec<f64> = target_positions
+                .iter()
+                .zip(final_vel.iter())
+                .enumerate()
+                .map(|(i, (&q, &dq))| {
+                    let q_new = q + dq * dt;
+                    // Hard clamp to joint limits
+                    q_new.clamp(limits.lower[i], limits.upper[i])
+                })
+                .collect();
+
+            // ── Store updated targets ──
+            {
+                let mut s = lock_or_recover(&state_timer);
+                s.target_positions = Some(new_targets.clone());
+            }
+
+            // ── Publish (position + velocity) ──
             let mut msg = JointState::default();
+            msg.header.stamp = now_stamp();
+            msg.header.frame_id = "base_link".to_string();
             msg.name = names_clone.clone();
-            msg.velocity = final_vel;
+            msg.position = new_targets;    // ← target positions for driver
+            msg.velocity = final_vel;      // ← informational (computed velocities)
 
             let _ = publisher.publish(&msg);
         },
     )?;
 
-    println!("🚀 arm_controller started (watchdog={watchdog_ms}ms, loop={}Hz)",
+    println!("🚀 arm_controller started (watchdog={watchdog_ms}ms, loop={}Hz, dt={dt:.3}s)",
              1000 / CONTROL_PERIOD_MS);
     println!("   Subscribe: /arm_cmd_vel (geometry_msgs/Twist)");
     println!("   Subscribe: /joint_states (sensor_msgs/JointState) ← feedback");
-    println!("   Publish:   /arm_joint_commands (sensor_msgs/JointState)");
+    println!("   Publish:   /arm_joint_commands (JointState.position + .velocity)");
+    println!("   Output:    integrated target positions (clamped to joint limits)");
     println!("   Safety: joint-limit avoidance, adaptive DLS, manipulability monitor");
     println!("   ⏳ Waiting for /joint_states before accepting commands...");
 

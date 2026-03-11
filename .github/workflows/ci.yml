@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── Rust: format, lint, test ──
+  rust:
+    name: Rust (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v10
+
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v4
+
+      # Build message bindings first (required by Rust crates)
+      - name: Build ROS 2 message bindings
+        run: |
+          nix develop --impure -c bash -c "
+            cd main_ws
+            colcon build --merge-install --symlink-install \
+              --packages-up-to rosidl_generator_rs \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
+              2>&1 | grep -v 'local_setup' || true
+            source install/setup.bash
+            colcon build --merge-install --symlink-install \
+              --packages-select custom_interfaces \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
+              2>&1 | grep -v 'local_setup' || true
+          "
+
+      - name: cargo fmt --check
+        run: |
+          nix develop --impure -c bash -c "
+            cd main_ws && cargo fmt --all -- --check
+          "
+
+      - name: cargo clippy
+        run: |
+          nix develop --impure -c bash -c "
+            cd main_ws && source install/setup.bash && \
+            cargo clippy --workspace -- -D warnings
+          "
+
+      - name: cargo test
+        run: |
+          nix develop --impure -c bash -c "
+            cd main_ws && source install/setup.bash && \
+            cargo test --workspace
+          "
+
+  # ── C++: build + lint ──
+  cpp:
+    name: C++ (colcon build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v10
+
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v4
+
+      - name: colcon build (C++ packages)
+        run: |
+          nix develop --impure -c bash -c "
+            cd main_ws
+            colcon build --merge-install --symlink-install \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
+              --packages-ignore kiss_icp \
+              2>&1 | grep -v 'local_setup' || true
+          "
