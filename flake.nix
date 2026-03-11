@@ -99,6 +99,8 @@
           ros.tf2                     # core tf2 library
           ros.tf2-msgs                # tf2 message types
           ros.tf2-ros                 # static_transform_publisher
+          ros.tf2-ros-py              # Python bindings for tf2_ros (TransformBroadcaster etc.)
+          ros.tf2-py                  # tf2_py C extension (required by tf2_ros_py)
           ros.tf2-eigen
           ros.tf2-sensor-msgs
           ros.tf2-geometry-msgs
