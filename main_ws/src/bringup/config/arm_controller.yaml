@@ -3,8 +3,6 @@ arm_controller:
     # URDF file path for the arm kinematic model
     # k crate reads the file directly (not via ament), so the launch file
     # resolves the absolute path from bringup's share directory.
-    # urdf_path is set by control.launch.py → bringup/urdf/sekirei.urdf
-    urdf_path: ""
     # Name of the end-effector link in the URDF
     end_link: "link_tip"
     # Watchdog timeout (ms) — arm stops if no command received within this period

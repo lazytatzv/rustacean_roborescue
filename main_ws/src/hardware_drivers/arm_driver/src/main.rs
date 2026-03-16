@@ -67,12 +67,12 @@ const DEFAULT_PROFILE_VELOCITY: u32 = 100;
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ARM_JOINTS: &[(&str, u8)] = &[
-    ("arm_joint1", 11),
-    ("arm_joint2", 12),
-    ("arm_joint3", 13),
-    ("arm_joint4", 14),
-    ("arm_joint5", 15),
-    ("arm_joint6", 16),
+    ("arm_joint1", 21),
+    ("arm_joint2", 22),
+    ("arm_joint3", 23),
+    ("arm_joint4", 24),
+    ("arm_joint5", 25),
+    ("arm_joint6", 26),
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -108,6 +108,7 @@ fn hardware_thread(
     let ids: Vec<u8> = ARM_JOINTS.iter().map(|(_, id)| *id).collect();
 
     // ── Initialize driver ──
+    println!("🔍 arm_driver: Opening port {} at {} bps...", port_name, baud_rate);
     let mut driver = match ArmDynamixelDriver::new(&port_name, baud_rate, ids.clone()) {
         Ok(d) => d,
         Err(e) => {
@@ -117,14 +118,25 @@ fn hardware_thread(
         }
     };
 
-    // Ping all motors
+    // --- QUICK SCAN (Developer Mode) ---
+    println!("🔍 arm_driver: Scanning for all active IDs (1-30)...");
+    for id in 1..31 {
+        if driver.ping(id).is_ok() {
+            println!("   ✨ Found Dynamixel ID: {}", id);
+        }
+    }
+
+    // Ping all configured motors
+    println!("🔍 arm_driver: Pinging configured motors {:?}...", ids);
     if let Err(e) = driver.ping_all() {
         eprintln!("🔥 arm_driver: ping failed: {e:#}");
         *lock_or_recover(&error_flag) = true;
         return;
     }
+    println!("✅ arm_driver: All motors responded to ping.");
 
     // Initialize position control mode
+    println!("🔍 arm_driver: Setting motors to position control mode...");
     if let Err(e) = driver.init_position_mode(profile_velocity) {
         eprintln!("🔥 arm_driver: mode init failed: {e:#}");
         *lock_or_recover(&error_flag) = true;
@@ -152,6 +164,7 @@ fn hardware_thread(
     let loop_period = Duration::from_millis(1000 / HW_LOOP_HZ);
     let mut last_cmd_time = Instant::now();
     let mut last_temp_check = Instant::now();
+    let mut last_log_time = Instant::now();
     let mut _last_positions = init_positions;
     let mut consecutive_errors: u32 = 0;
 
@@ -195,9 +208,6 @@ fn hardware_thread(
                     }
                 }
             }
-        } else if last_cmd_time.elapsed() > Duration::from_millis(WATCHDOG_TIMEOUT_MS) {
-            // Watchdog: no new command, servos hold their last written position
-            // (Position mode inherently holds — no action needed)
         }
 
         // ── 3. Read joint states and publish ──
@@ -212,6 +222,16 @@ fn hardware_thread(
                 msg.position = positions.clone();
 
                 let _ = joint_state_pub.publish(&msg);
+
+                // Periodic status log (every 1s)
+                if last_log_time.elapsed() > Duration::from_secs(1) {
+                    print!("📊 Arm Positions: ");
+                    for p in &positions {
+                        print!("{:>7.3} ", p);
+                    }
+                    println!();
+                    last_log_time = Instant::now();
+                }
             }
             Err(e) => {
                 consecutive_errors += 1;

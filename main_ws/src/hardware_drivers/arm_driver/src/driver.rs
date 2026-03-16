@@ -87,12 +87,19 @@ impl ArmDynamixelDriver {
 
     /// Ping all motors and confirm communication
     pub fn ping_all(&mut self) -> Result<()> {
-        for &id in &self.ids {
-            self.bus
-                .ping(id)
-                .map_err(|e| anyhow::anyhow!("Ping motor ID {} failed: {:?}", id, e))?;
+        let ids = self.ids.clone();
+        for id in ids {
+            self.ping(id)?;
         }
         Ok(())
+    }
+
+    /// Ping a single ID and confirm communication
+    pub fn ping(&mut self, id: u8) -> Result<()> {
+        self.bus
+            .ping(id)
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Ping ID {} failed: {:?}", id, e))
     }
 
     /// Initialize all motors in Position Control Mode.

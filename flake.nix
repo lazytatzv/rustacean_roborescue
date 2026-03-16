@@ -55,6 +55,7 @@
 
           # --- Zenoh (RMW ミドルウェア) ---
           zenoh
+          ros.rmw-zenoh-cpp
 
           # --- Python ---
           python3
@@ -112,7 +113,9 @@
           ros.message-filters         # spark_fast_lio dep
 
           # --- Perception ---
-          ros.velodyne                # VLP-16 LiDAR ドライバ
+          ros.velodyne                # VLP-16 LiDAR ドライバ (メタパッケージ)
+          ros.velodyne-driver
+          ros.velodyne-pointcloud
           ros.pointcloud-to-laserscan # 3D → 2D LaserScan
           ros.slam-toolbox            # 2D SLAM
           ros.pcl-ros
