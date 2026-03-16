@@ -78,6 +78,9 @@
           # --- ROS 2 ビルドインフラ (buildTools 側に置く) ---
           ros.ros-core
           ros.ament-cmake
+
+          vtk
+          pcl
         ];
 
         # ── ROS 2 パッケージ群 ──────────────────────────────
@@ -118,6 +121,9 @@
           ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
           ros.image-transport
           ros.compressed-image-transport
+
+
+          #ros.pcl
 
           # --- Hardware ---
           ros.joy                     # PS4 コントローラ
@@ -183,7 +189,7 @@
         ];
 
         # C++ ライブラリ (ROS 外)
-        cppLibs = with pkgs; [ eigen vtk orocos-kdl pcl ];
+        cppLibs = with pkgs; [ eigen orocos-kdl ];
 
         # ROS + C++ ライブラリを1ディレクトリに圧縮
         roboRescueEnv = pkgs.symlinkJoin {
@@ -229,7 +235,8 @@
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${roboRescueEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-            export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
+            #export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
+            export CMAKE_PREFIX_PATH="${roboRescueEnv}:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
 
             # --- Gazebo Harmonic (gz sim) リソースパス ---

@@ -1,84 +1,79 @@
 set shell := ["bash", "-c"]
-# 各Rustパッケージのpackage.xmlでcolconが依存順序を解決する
 
 # 環境変数
 export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
-# export RMW_IMPLEMENTATION := "rmw_zenoh_cpp"
 
 # Nix環境下ではgccのcollect2が "Argument list too long" で死ぬので clang+mold を使う
-# CARGO_TARGET_*_LINKER は最優先。CC=gcc を上書きする
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER := "clang"
 export CARGO_BUILD_RUSTFLAGS := "-C link-arg=-fuse-ld=mold"
 
+# Nix環境でのパス見失い対策 (絶対パスで固定)
+install_dir := shell("pwd") + "/install"
+py_path := install_dir + "/lib/python3.12/site-packages"
+gen_cmake := install_dir + "/share/rosidl_generator_rs/cmake"
+
 # configs
 distro := "jazzy"
-common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja"
+# CMakeにジェネレーターの場所を強制指定
+common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=" + gen_cmake + " -G Ninja"
 
 # ignore
-# pkgをスペース区切りで並べる
 ignore_list := "kiss_icp"
-
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
-# nix特有のpathに関連したwarnによってログが埋め尽くされてしまうので標準出力に出さない
+# nix特有のwarnフィルター
 filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
 
-# just -> just forge
+
 default: forge
 
 clean:
-  @echo "Clean..."
-  rm -rf build/ install/ log/
+	@echo "Clean..."
+	rm -rf build/ install/ log/
 
+# ジェネレーター単体を先にビルド (ここでは不要なWarningを避けるためRust=ONを外しています)
 forge-bindings:
-  colcon build --packages-up-to rosidl_generator_rs {{common_args}} {{filter}}
+	colcon build --packages-up-to rosidl_generator_rs --merge-install --symlink-install --cmake-args -G Ninja {{filter}}
 
+# 依存パスを強制エクスポートした状態で全体をビルド
 forge: forge-bindings
-  source install/setup.bash && colcon build {{common_args}} {{ignore_args}} {{filter}}
+	export AMENT_PREFIX_PATH="{{install_dir}}:$AMENT_PREFIX_PATH"; \
+	export PYTHONPATH="{{py_path}}:$PYTHONPATH"; \
+	export PATH="{{install_dir}}/lib/rosidl_generator_rs:$PATH"; \
+	colcon build {{common_args}} {{ignore_args}} {{filter}}
 
-# clean build
 reforge: clean forge
 
 launch:
-  ros2 launch bringup launch.py
+	ros2 launch bringup launch.py
 
 # ── Code Quality ──
 
-# Run all checks (format + lint + test)
 check: fmt-check lint test
 
-# Format check (all languages)
 fmt-check:
-  cargo fmt --all -- --check
-  @echo "✅ Rust formatting OK"
+	cargo fmt --all -- --check
+	@echo "✅ Rust formatting OK"
 
-# Auto-format
 fmt:
-  cargo fmt --all
-  @echo "✅ Rust formatted"
+	cargo fmt --all
+	@echo "✅ Rust formatted"
 
-# Clippy lint
 lint:
-  source install/setup.bash && cargo clippy --workspace -- -D warnings
-  @echo "✅ Clippy OK"
+	source install/setup.bash && cargo clippy --workspace -- -D warnings
+	@echo "✅ Clippy OK"
 
-# Run all Rust tests
 test:
-  source install/setup.bash && cargo test --workspace
-  @echo "✅ Tests passed"
+	source install/setup.bash && cargo test --workspace
+	@echo "✅ Tests passed"
 
-# Quick compilation check (no codegen)
 check-compile:
-  source install/setup.bash && cargo check --workspace
-  @echo "✅ Compilation OK"
+	source install/setup.bash && cargo check --workspace
+	@echo "✅ Compilation OK"
 
-# fishを使う際は自分でsourceする
 ready:
-  @echo "RUN below command"
-  @echo "bass . install/setup.bash"
+	@echo "RUN below command"
+	@echo "bass . install/setup.bash"
 
-# Mermaid utilities
 mm:
-  mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
-
-
+	mmdc -i topology/system_topology.mmd -o system_topology.png -s 3

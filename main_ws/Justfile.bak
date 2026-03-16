@@ -1,0 +1,84 @@
+set shell := ["bash", "-c"]
+# 各Rustパッケージのpackage.xmlでcolconが依存順序を解決する
+
+# 環境変数
+export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
+# export RMW_IMPLEMENTATION := "rmw_zenoh_cpp"
+
+# Nix環境下ではgccのcollect2が "Argument list too long" で死ぬので clang+mold を使う
+# CARGO_TARGET_*_LINKER は最優先。CC=gcc を上書きする
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER := "clang"
+export CARGO_BUILD_RUSTFLAGS := "-C link-arg=-fuse-ld=mold"
+
+# configs
+distro := "jazzy"
+common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja"
+
+# ignore
+# pkgをスペース区切りで並べる
+ignore_list := "kiss_icp"
+
+ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
+
+# nix特有のpathに関連したwarnによってログが埋め尽くされてしまうので標準出力に出さない
+filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
+
+# just -> just forge
+default: forge
+
+clean:
+  @echo "Clean..."
+  rm -rf build/ install/ log/
+
+forge-bindings:
+  colcon build --packages-up-to rosidl_generator_rs {{common_args}} {{filter}}
+
+forge: forge-bindings
+  source install/setup.bash && colcon build {{common_args}} {{ignore_args}} {{filter}}
+
+# clean build
+reforge: clean forge
+
+launch:
+  ros2 launch bringup launch.py
+
+# ── Code Quality ──
+
+# Run all checks (format + lint + test)
+check: fmt-check lint test
+
+# Format check (all languages)
+fmt-check:
+  cargo fmt --all -- --check
+  @echo "✅ Rust formatting OK"
+
+# Auto-format
+fmt:
+  cargo fmt --all
+  @echo "✅ Rust formatted"
+
+# Clippy lint
+lint:
+  source install/setup.bash && cargo clippy --workspace -- -D warnings
+  @echo "✅ Clippy OK"
+
+# Run all Rust tests
+test:
+  source install/setup.bash && cargo test --workspace
+  @echo "✅ Tests passed"
+
+# Quick compilation check (no codegen)
+check-compile:
+  source install/setup.bash && cargo check --workspace
+  @echo "✅ Compilation OK"
+
+# fishを使う際は自分でsourceする
+ready:
+  @echo "RUN below command"
+  @echo "bass . install/setup.bash"
+
+# Mermaid utilities
+mm:
+  mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
+
+
