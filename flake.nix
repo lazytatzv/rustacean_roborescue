@@ -124,6 +124,10 @@
           ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
           ros.image-transport
           ros.compressed-image-transport
+          ros.ffmpeg-image-transport  # H.264 compression support
+          ros.v4l2-camera             # Optimized camera driver
+          ros.camera-info-manager
+          ros.rclcpp-components
 
 
           #ros.pcl
@@ -135,6 +139,28 @@
           ros.usb-cam                 # USB カメラ
           ros.dynamixel-workbench-toolbox  # フリッパ / gripper_driver
           ros.dynamixel-sdk
+          ros.dynamixel-interfaces
+          ros.hardware-interface      # dynamixel_hardware_interface
+          ros.pluginlib               # dynamixel_hardware_interface / nav2
+          ros.realtime-tools          # dynamixel_hardware_interface
+          ros.control-msgs
+          ros.generate-parameter-library
+          ros.urdfdom
+          ros.urdfdom-headers
+          ros.control-toolbox
+          ros.angles
+          ros.filters
+          ros.tinyxml2-vendor
+          ros.console-bridge-vendor
+          ros.diagnostic-updater
+          ros.backward-ros
+          ros.kdl-parser
+          ros.pal-statistics
+          ros.pal-statistics-msgs
+          ros.controller-interface
+          ros.controller-manager
+          ros.transmission-interface
+          ros.joint-limits
 
           # --- Simulation (Gazebo Harmonic via ros-gz) ---
           ros.xacro                   # URDF xacro 処理

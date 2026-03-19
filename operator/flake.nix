@@ -22,6 +22,8 @@
           ros.ros-core           # rclcpp, rmw, etc.
           ros.joy                # joy_node (PS4 / Xbox コントローラ)
           ros.joy-linux          # Linux joystick backend
+          ros.foxglove-bridge    # Foxglove Bridge for visualization
+          ros.ros2cli-common-extensions
         ];
 
         operatorEnv = pkgs.symlinkJoin {

@@ -29,3 +29,7 @@
 [submodule "main_ws/src/external/spark-fast-lio"]
 	path = main_ws/src/external/spark-fast-lio
 	url = https://github.com/MIT-SPARK/spark-fast-lio
+[submodule "main_ws/src/external/dynamixel_hardware_interface"]
+	path = main_ws/src/external/dynamixel_hardware_interface
+	url = https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface.git
+	branch = jazzy

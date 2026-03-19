@@ -7,7 +7,6 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description() -> LaunchDescription:
     bringup_share = FindPackageShare("bringup")
-    qr_share = FindPackageShare("qr_detector")
 
     # ── Launch arguments ──
     crawler_params = DeclareLaunchArgument(
@@ -114,20 +113,7 @@ def generate_launch_description() -> LaunchDescription:
         **ctrl_respawn,
     )
 
-    # ── Perception nodes (with respawn) ──
-    qr_detector_node = Node(
-        package="qr_detector",
-        executable="qr_detector_node",
-        name="qr_detector",
-        output="both",
-        parameters=[{
-            "model_dir": PathJoinSubstitution([qr_share, "models"]),
-            "publish_compressed": True,
-            "jpeg_quality": 60,
-            "detection_interval": 1,
-        }],
-        **ctrl_respawn,
-    )
+    # Perception (Note: qr_detector is moved to camera.launch.py with composition)
 
     return LaunchDescription([
         crawler_params,
@@ -146,6 +132,4 @@ def generate_launch_description() -> LaunchDescription:
         # Control
         joy_controller_node,
         arm_controller_node,
-        # Perception
-        qr_detector_node,
     ])

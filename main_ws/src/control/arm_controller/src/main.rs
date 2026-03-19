@@ -44,10 +44,10 @@ fn now_stamp() -> builtin_interfaces::msg::Time {
 const DEFAULT_DLS_LAMBDA_BASE: f64 = 0.01;
 const DEFAULT_DLS_LAMBDA_MAX: f64 = 0.15;
 const DEFAULT_MANIPULABILITY_THRESHOLD: f64 = 0.005;
-const DEFAULT_MANIPULABILITY_LOCKOUT: f64 = 0.0001; // Relaxed
+const DEFAULT_MANIPULABILITY_LOCKOUT: f64 = 0.0001;
 const DEFAULT_WATCHDOG_MS: u64 = 500;
 const CONTROL_PERIOD_MS: u64 = 20;
-const DEFAULT_JOINT_VEL_LIMIT: f64 = 1.5; // Slightly increased
+const DEFAULT_JOINT_VEL_LIMIT: f64 = 1.5;
 const DEFAULT_JOINT_LIMIT_MARGIN: f64 = 0.10;
 const DEFAULT_NULL_SPACE_REPULSION_GAIN: f64 = 0.5;
 
@@ -230,7 +230,7 @@ fn run() -> Result<()> {
     let js_counter = Arc::new(AtomicU64::new(0));
 
     let state_tw = Arc::clone(&state);
-    let _sub_tw = node.create_subscription::<Twist, rclrs::NodeSubscriptionCallbackArgs>("/arm_cmd_vel", move |msg: Twist, _: rclrs::NodeSubscriptionCallbackArgs| {
+    let _sub_tw = node.create_subscription::<Twist, _>("/arm_cmd_vel", move |msg: Twist| {
         let mut s = lock_or_recover(&state_tw);
         s.target_twist = [msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z];
         s.is_ik_mode = true;
@@ -239,7 +239,7 @@ fn run() -> Result<()> {
 
     let state_jv = Arc::clone(&state);
     let names_for_jv = joint_names.clone();
-    let _sub_jv = node.create_subscription::<JointState, rclrs::NodeSubscriptionCallbackArgs>("/arm_joint_cmd_vel", move |msg: JointState, _: rclrs::NodeSubscriptionCallbackArgs| {
+    let _sub_jv = node.create_subscription::<JointState, _>("/arm_joint_cmd_vel", move |msg: JointState| {
         let mut s = lock_or_recover(&state_jv);
         s.is_ik_mode = false;
         s.last_cmd_time = Instant::now();
@@ -251,7 +251,7 @@ fn run() -> Result<()> {
     let state_js = Arc::clone(&state);
     let arm_names_for_check = joint_names.clone();
     let js_count_clone = Arc::clone(&js_counter);
-    let _sub_js = node.create_subscription::<JointState, rclrs::NodeSubscriptionCallbackArgs>("/joint_states", move |msg: JointState, _: rclrs::NodeSubscriptionCallbackArgs| {
+    let _sub_js = node.create_subscription::<JointState, _>("/joint_states", move |msg: JointState| {
         let mut s = lock_or_recover(&state_js);
         for (i, name) in msg.name.iter().enumerate() { if i < msg.position.len() { s.joint_positions.insert(name.clone(), msg.position[i]); } }
         if !s.has_joint_feedback && arm_names_for_check.iter().all(|n| s.joint_positions.contains_key(n)) {
@@ -262,8 +262,8 @@ fn run() -> Result<()> {
     })?;
 
     let estop_sub_flag = Arc::clone(&estop_flag);
-    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, rclrs::NodeSubscriptionCallbackArgs>("/emergency_stop".reliable().transient_local().keep_last(1),
-        move |msg: std_msgs::msg::Bool, _: rclrs::NodeSubscriptionCallbackArgs| { if msg.data { estop_sub_flag.store(true, Ordering::Relaxed); } }
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>("/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| { if msg.data { estop_sub_flag.store(true, Ordering::Relaxed); } }
     )?;
 
     let publisher: Publisher<JointState> = node.create_publisher("/arm_joint_commands")?;
@@ -281,10 +281,19 @@ fn run() -> Result<()> {
         loop_count += 1;
         if estop_timer.load(Ordering::Relaxed) { return; }
         let mut s = lock_or_recover(&state_timer);
-        if !s.has_joint_feedback { return; }
-
+        
         let current_positions: Vec<f64> = names_clone.iter().map(|n| s.joint_positions.get(n).copied().unwrap_or(0.0)).collect();
-        if s.target_positions.is_none() { s.target_positions = Some(current_positions.clone()); }
+
+        // --- FEEDBACK CHECK ---
+        if !s.has_joint_feedback {
+            if loop_count % 50 == 0 { println!("⏳ Waiting for joint feedback..."); }
+            return;
+        }
+
+        // --- INITIALIZE TARGET FROM FEEDBACK ---
+        if s.target_positions.is_none() {
+            s.target_positions = Some(current_positions.clone());
+        }
         let target_positions = s.target_positions.clone().unwrap();
 
         serial_chain.set_joint_positions_clamped(&current_positions);
@@ -311,7 +320,7 @@ fn run() -> Result<()> {
         let mut joint_velocities: na::DVector<f64>;
         if s.last_cmd_time.elapsed() > watchdog_timeout {
             joint_velocities = na::DVector::zeros(dof);
-            // Sync target to feedback when stationary to prevent drift
+            // Sync target to feedback when stationary to prevent drift buildup
             s.target_positions = Some(current_positions.clone());
         } else if s.is_ik_mode {
             let twist_vec = na::DVector::from_column_slice(&s.target_twist);
