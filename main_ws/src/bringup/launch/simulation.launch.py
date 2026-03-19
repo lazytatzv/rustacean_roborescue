@@ -69,8 +69,6 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # ── Gazebo Harmonic (gz sim) ──
-    # headless=true  → server only + EGL
-    # headless=false → GUI, ogre レンダラ (Nix 環境で ogre2/Vulkan が動かないため)
     gz_args = PythonExpression([
         "'-s -r --headless-rendering ' + '",
         LaunchConfiguration("world"),
@@ -124,22 +122,14 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
         parameters=[{"use_sim_time": True}],
         arguments=[
-            # cmd_vel: ROS 2 → Gazebo
             "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
-            # odom: Gazebo → ROS 2
             "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-            # LiDAR: Gazebo → ROS 2
             "/velodyne_points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked",
-            # IMU: Gazebo → ROS 2
             "/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU",
-            # Camera: Gazebo → ROS 2
             "/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
             "/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
-            # Joint states: Gazebo → ROS 2
             "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model",
-            # Clock: Gazebo → ROS 2
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-            # Arm joint position commands: ROS 2 → Gazebo
             "/arm_joint1/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
             "/arm_joint2/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
             "/arm_joint3/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double",
@@ -149,28 +139,7 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ── CrawlerVelocity → Twist ブリッジ (teleop 用) ──
-    crawler_bridge = Node(
-        package="bringup",
-        executable="crawler_vel_bridge.py",
-        name="crawler_vel_bridge",
-        output="screen",
-        parameters=[{
-            "track_width": 0.4,
-            "use_sim_time": True,
-        }],
-    )
-
-    # ── Arm Gazebo Bridge: JointState → per-joint cmd_pos for Gazebo ──
-    arm_gz_bridge = Node(
-        package="bringup",
-        executable="arm_gz_bridge.py",
-        name="arm_gz_bridge",
-        output="screen",
-        parameters=[{"use_sim_time": True}],
-    )
-
-    # ── Odom → TF Bridge: /odom → odom→base_footprint TF ──
+    # ── Odom → TF Bridge ──
     odom_tf_bridge = Node(
         package="bringup",
         executable="odom_tf_bridge.py",
@@ -179,7 +148,23 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{"use_sim_time": True}],
     )
 
-    # ── Arm Controller (IK → target positions) ──
+    # ── CrawlerVelocity → Twist ブリッジ ──
+    crawler_bridge = Node(
+        package="bringup",
+        executable="crawler_vel_bridge.py",
+        name="crawler_vel_bridge",
+        output="screen",
+        parameters=[{"track_width": 0.4, "use_sim_time": True}],
+    )
+
+    # ── Arm Controller & Bridge ──
+    arm_gz_bridge = Node(
+        package="bringup",
+        executable="arm_gz_bridge.py",
+        name="arm_gz_bridge",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
     arm_controller = Node(
         package="arm_controller",
         executable="arm_controller",
@@ -191,7 +176,7 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ── Joy Controller (teleop、シミュレーションでも使える) ──
+    # ── Joy Controller ──
     joy_controller = Node(
         package="joy_controller",
         executable="joy_controller_node",
@@ -201,44 +186,38 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # ── PointCloud → LaserScan ──
-    scan_params_file = os.path.join(bringup_dir, "config", "pointcloud_to_laserscan.yaml")
     pointcloud_to_laserscan = Node(
         package="pointcloud_to_laserscan",
         executable="pointcloud_to_laserscan_node",
         name="pointcloud_to_laserscan",
         output="screen",
-        remappings=[
-            ("cloud_in", "/velodyne_points"),
-            ("scan", "/scan"),
-        ],
+        remappings=[("cloud_in", "/velodyne_points"), ("scan", "/scan")],
         parameters=[
-            scan_params_file,
+            os.path.join(bringup_dir, "config", "pointcloud_to_laserscan.yaml"),
             {"use_sim_time": True},
         ],
     )
 
-    # ── SLAM Toolbox (オプション) ──
-    slam_params_file = os.path.join(bringup_dir, "config", "slam_toolbox_async.yaml")
+    # ── SLAM Toolbox (Async) ──
     slam_toolbox = Node(
         package="slam_toolbox",
         executable="async_slam_toolbox_node",
         name="slam_toolbox",
         output="screen",
         parameters=[
-            slam_params_file,
+            os.path.join(bringup_dir, "config", "slam_toolbox_async.yaml"),
             {
                 "use_sim_time": True,
                 "map_frame": "map",
                 "odom_frame": "odom",
                 "base_frame": "base_footprint",
+                "scan_topic": "/scan",
             },
         ],
         condition=IfCondition(LaunchConfiguration("use_slam")),
     )
 
     # ── SLAM Toolbox Lifecycle Manager ──
-    # Jazzy では async_slam_toolbox_node がライフサイクルノードなので
-    # activate しないと /scan を購読しない
     slam_lifecycle_manager = Node(
         package="nav2_lifecycle_manager",
         executable="lifecycle_manager",
@@ -252,72 +231,42 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("use_slam")),
     )
 
-    # ── map→odom 静的TF (headless センサなし時のフォールバック) ──
-    # SLAM が /scan データを受信すれば /tf で上書きされる
+    # ── static map→odom (Fallback) ──
     static_map_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_map_odom_tf",
-        output="screen",
         arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
-        parameters=[{"use_sim_time": True}],
         condition=IfCondition(LaunchConfiguration("use_slam")),
     )
 
-    # ── Nav2 (オプション) ──
-    # SLAM Toolbox が activate されて map→odom TF を出すまで待つ
-    nav2_launch_file = os.path.join(bringup_dir, "launch", "nav2.launch.py")
+    # ── Nav2 ──
     nav2 = TimerAction(
         period=5.0,
         actions=[
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(nav2_launch_file),
-                launch_arguments={"use_sim_time": "true"}.items(),
+                PythonLaunchDescriptionSource(os.path.join(bringup_dir, "launch", "nav2.launch.py")),
+                launch_arguments={"use_sim_time": "true", "autostart": "true"}.items(),
             ),
         ],
         condition=IfCondition(LaunchConfiguration("use_nav2")),
     )
 
     # ── RViz ──
-    rviz_config = os.path.join(bringup_dir, "rviz", "simulation.rviz")
     rviz = Node(
         package="rviz2",
         executable="rviz2",
         name="rviz2",
-        output="screen",
-        arguments=["-d", rviz_config],
+        arguments=["-d", os.path.join(bringup_dir, "rviz", "simulation.rviz")],
         parameters=[{"use_sim_time": True}],
         condition=IfCondition(LaunchConfiguration("use_rviz")),
     )
 
     return LaunchDescription([
-        world_file,
-        use_slam_arg,
-        use_nav2_arg,
-        use_rviz_arg,
-        headless_arg,
-        use_sim_time,
-        gz_resource_path,
-        # Gazebo Harmonic
-        gz_sim,
-        robot_state_publisher,
-        spawn_entity,
-        # gz ↔ ROS 2 Bridge
-        bridge,
-        odom_tf_bridge,
-        # Bridge + Teleop
-        crawler_bridge,
-        joy_controller,
-        # Arm control (IK + Gazebo bridge)
-        arm_controller,
-        arm_gz_bridge,
-        # Perception
-        pointcloud_to_laserscan,
-        slam_toolbox,
-        slam_lifecycle_manager,
-        static_map_tf,
-        # Navigation
-        nav2,
-        # Visualization
-        rviz,
+        world_file, use_slam_arg, use_nav2_arg, use_rviz_arg, headless_arg,
+        use_sim_time, gz_resource_path,
+        gz_sim, robot_state_publisher, spawn_entity, bridge, odom_tf_bridge,
+        crawler_bridge, joy_controller, arm_controller, arm_gz_bridge,
+        pointcloud_to_laserscan, slam_toolbox, slam_lifecycle_manager, static_map_tf,
+        nav2, rviz
     ])

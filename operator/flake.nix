@@ -20,6 +20,7 @@
 
         operatorDeps = [
           ros.ros-core           # rclcpp, rmw, etc.
+          ros.rmw-zenoh-cpp      # Zenoh RMW implementation
           ros.joy                # joy_node (PS4 / Xbox コントローラ)
           ros.joy-linux          # Linux joystick backend
           ros.foxglove-bridge    # Foxglove Bridge for visualization

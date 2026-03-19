@@ -1794,12 +1794,24 @@ name = "actionlib_msgs"
 version = "5.3.6"
 
 [[patch.unused]]
+name = "arm_controller"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "arm_driver"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "composition_interfaces"
 version = "2.0.3"
 
 [[patch.unused]]
 name = "diagnostic_msgs"
 version = "5.3.6"
+
+[[patch.unused]]
+name = "gripper_driver"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "lifecycle_msgs"
@@ -1816,6 +1828,10 @@ version = "2.0.3"
 [[patch.unused]]
 name = "rosgraph_msgs"
 version = "2.0.3"
+
+[[patch.unused]]
+name = "sensor_gateway"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "shape_msgs"
@@ -1848,6 +1864,10 @@ version = "2.0.3"
 [[patch.unused]]
 name = "unique_identifier_msgs"
 version = "2.5.0"
+
+[[patch.unused]]
+name = "vision_processor"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "visualization_msgs"
