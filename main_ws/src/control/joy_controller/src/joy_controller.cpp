@@ -67,26 +67,58 @@ class JoyController : public rclcpp::Node
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_publisher_;
 
-  static float apply_deadzone(float val, float threshold) { return (std::abs(val) < threshold) ? 0.0f : val; }
+  static float apply_deadzone(float val, float threshold) {return (std::abs(val) < threshold) ? 0.0f : val; }
   static int button(const sensor_msgs::msg::Joy &msg, size_t idx) { return (idx < msg.buttons.size()) ? msg.buttons[idx] : 0; }
   static float axis(const sensor_msgs::msg::Joy &msg, size_t idx) { return (idx < msg.axes.size()) ? msg.axes[idx] : 0.0f; }
 
   void update_mode(const sensor_msgs::msg::Joy &msg)
   {
-    int ps = button(msg, BUTTON_PS), options = button(msg, BUTTON_OPTIONS), share = button(msg, BUTTON_SHARE);
-    if (ps == 1 && prev_ps_ == 0) {
-      estop_latched_ = true; mode_ = Mode::STOP;
+    const int ps = button(msg, BUTTON_PS);
+    const int options = button(msg, BUTTON_OPTIONS);
+    const int share = button(msg, BUTTON_SHARE);
+
+    // Detect button press events
+    const bool ps_pressed = (ps == 1 && prev_ps_ == 0);
+    const bool options_pressed = (options == 1 && prev_options_ == 0);
+    const bool share_pressed = (share == 1 && prev_share_ == 0);
+    const bool unlock_estop_latched = (options == 1 && share == 1);
+    const bool unlock_combo_pressed = unlock_estop_latched && !(prev_options_ == 1 && prev_share_ == 1);
+
+    // PS is a dedicated hard-stop trigger.
+    if (ps_pressed) {
+      estop_latched_ = true;
+      mode_ = Mode::STOP;
+      auto estop_msg = std_msgs::msg::Bool();
+      estop_msg.data = true;
+      estop_publisher_->publish(estop_msg);
       RCLCPP_WARN(this->get_logger(), "⛔ EMERGENCY STOP");
-      auto estop_msg = std_msgs::msg::Bool(); estop_msg.data = true; estop_publisher_->publish(estop_msg);
-    } else if (!estop_latched_) {
-      if (options == 1 && prev_options_ == 0) {
-        mode_ = Mode::DRIVE; RCLCPP_INFO(this->get_logger(), "Mode: DRIVE");
-      } else if (share == 1 && prev_share_ == 0) {
-        if (mode_ == Mode::ARM) { mode_ = Mode::JOINT; RCLCPP_INFO(this->get_logger(), "Mode: JOINT (Direct Control)"); }
-        else { mode_ = Mode::ARM; RCLCPP_INFO(this->get_logger(), "Mode: ARM (IK Control)"); }
+    } else if (estop_latched_) {
+      // Clear requires OPTIONS+SHARE combo to avoid accidental release.
+      if (unlock_combo_pressed) {
+        estop_latched_ = false;
+        auto estop_msg = std_msgs::msg::Bool();
+        estop_msg.data = false;
+        estop_publisher_->publish(estop_msg);
+        RCLCPP_INFO(this->get_logger(), "✅ E-STOP CLEARED (OPTIONS+SHARE)");
+      }
+    } else {
+      if (options_pressed) {
+        mode_ = Mode::DRIVE;
+        RCLCPP_INFO(this->get_logger(), "Mode: DRIVE");
+      } else if (share_pressed) {
+        if (mode_ == Mode::ARM) {
+          mode_ = Mode::JOINT;
+          RCLCPP_INFO(this->get_logger(), "Mode: JOINT (Direct Control)");
+        } else {
+          mode_ = Mode::ARM;
+          RCLCPP_INFO(this->get_logger(), "Mode: ARM (IK Control)");
+        }
       }
     }
-    prev_ps_ = ps; prev_options_ = options; prev_share_ = share;
+
+    prev_ps_ = ps;
+    prev_options_ = options;
+    prev_share_ = share;
   }
 
   void joy_callback(const sensor_msgs::msg::Joy &msg)
@@ -143,4 +175,10 @@ class JoyController : public rclcpp::Node
   }
 };
 
-int main(int argc, char *argv[]) { rclcpp::init(argc, argv); rclcpp::spin(std::make_shared<JoyController>()); rclcpp::shutdown(); return 0; }
+int main(int argc, char *argv[])
+{
+   rclcpp::init(argc, argv);
+   rclcpp::spin(std::make_shared<JoyController>());
+   rclcpp::shutdown();
+   return 0;
+}
