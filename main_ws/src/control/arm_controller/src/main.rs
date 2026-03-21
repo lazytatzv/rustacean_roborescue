@@ -14,6 +14,7 @@ use sensor_msgs::msg::JointState;
 use geometry_msgs::msg::{PoseStamped, Twist};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc::{sync_channel, SyncSender, Receiver};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -46,7 +47,7 @@ const DEFAULT_DLS_LAMBDA_MAX: f64 = 0.15;
 const DEFAULT_MANIPULABILITY_THRESHOLD: f64 = 0.005;
 const DEFAULT_MANIPULABILITY_LOCKOUT: f64 = 0.0001;
 const DEFAULT_WATCHDOG_MS: u64 = 500;
-const CONTROL_PERIOD_MS: u64 = 20;
+const DEFAULT_CONTROL_PERIOD_MS: u64 = 20;
 const DEFAULT_JOINT_VEL_LIMIT: f64 = 1.5;
 const DEFAULT_JOINT_LIMIT_MARGIN: f64 = 0.10;
 const DEFAULT_NULL_SPACE_REPULSION_GAIN: f64 = 0.5;
@@ -66,6 +67,7 @@ struct IkConfig {
     null_space_repulsion_gain: f64,
 }
 
+#[derive(Clone)]
 struct JointLimits {
     lower: Vec<f64>,
     upper: Vec<f64>,
@@ -158,9 +160,10 @@ fn solve_velocity_ik(
     let n = jacobian.nrows();
     let dof = jacobian.ncols();
 
-    let jjt = &jacobian * &jt;
-    let det = jjt.determinant();
-    let manipulability = if det > 0.0 { det.sqrt() } else { 0.0 };
+    // Use SVD for a numerically robust manipulability measure (product of singular values)
+    let svd = jacobian.svd(true, true);
+    let svals = svd.singular_values;
+    let manipulability = svals.iter().fold(1.0_f64, |acc, &x| acc * x.max(0.0));
 
     if manipulability < cfg.manipulability_lockout {
         return IkResult { joint_velocities: na::DVector::zeros(dof), manipulability };
@@ -174,6 +177,7 @@ fn solve_velocity_ik(
     };
 
     let damping = na::DMatrix::<f64>::identity(n, n) * (lambda * lambda);
+    let jjt = &jacobian * &jt;
     let jjt_damped = &jjt + damping;
 
     let dq_task = match jjt_damped.clone().lu().solve(twist) {
@@ -269,7 +273,10 @@ fn run() -> Result<()> {
     let publisher: Publisher<JointState> = node.create_publisher("/arm_joint_commands")?;
     let pose_pub: Publisher<PoseStamped> = node.create_publisher("/arm_ee_pose")?;
 
-    let dt = CONTROL_PERIOD_MS as f64 / 1000.0;
+    // control period parameter (ms)
+    let control_period_ms: i64 = node.declare_parameter("control_period_ms").default(DEFAULT_CONTROL_PERIOD_MS as i64).mandatory()?.get();
+    let control_period = Duration::from_millis(control_period_ms as u64);
+    let dt = control_period_ms as f64 / 1000.0;
     let state_timer = Arc::clone(&state);
     let serial_chain = serial.clone();
     let names_clone = joint_names.clone();
@@ -277,7 +284,29 @@ fn run() -> Result<()> {
     let estop_timer = Arc::clone(&estop_flag);
     let mut loop_count = 0;
 
-    let _timer = node.create_timer_repeating(Duration::from_millis(CONTROL_PERIOD_MS), move || {
+    // Setup a background worker for IK to avoid blocking the timer callback
+    let (req_tx, req_rx): (SyncSender<(na::DVector<f64>, Vec<f64>)>, Receiver<(na::DVector<f64>, Vec<f64>)>) = sync_channel(1);
+    let (res_tx, res_rx): (SyncSender<(Vec<f64>, f64)>, Receiver<(Vec<f64>, f64)>) = sync_channel(1);
+
+    let serial_for_worker = serial_chain.clone();
+    let limits_for_worker = limits.clone();
+    let cfg_for_worker = cfg.clone();
+    std::thread::spawn(move || {
+        loop {
+            match req_rx.recv() {
+                Ok((twist_vec, positions)) => {
+                    let res = solve_velocity_ik(&serial_for_worker, &twist_vec, &limits_for_worker, &positions, &cfg_for_worker);
+                    let vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
+                    let _ = res_tx.send((vel, res.manipulability));
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let mut last_worker_result: Option<(Vec<f64>, f64)> = None;
+
+    let _timer = node.create_timer_repeating(control_period, move || {
         loop_count += 1;
         if estop_timer.load(Ordering::Relaxed) { return; }
         let mut s = lock_or_recover(&state_timer);
@@ -324,10 +353,20 @@ fn run() -> Result<()> {
             s.target_positions = Some(current_positions.clone());
         } else if s.is_ik_mode {
             let twist_vec = na::DVector::from_column_slice(&s.target_twist);
-            let res = solve_velocity_ik(&serial_chain, &twist_vec, &limits, &current_positions, &cfg);
-            joint_velocities = res.joint_velocities;
-            if loop_count % 50 == 0 && res.manipulability < 0.001 {
-                println!("⚠️ Low manipulability: {:.6}", res.manipulability);
+            // Try to enqueue a request for the worker (non-blocking)
+            let _ = req_tx.try_send((twist_vec.clone(), current_positions.clone()));
+            // Try to collect a worker result if available
+            if let Ok(res) = res_rx.try_recv() {
+                last_worker_result = Some(res);
+            }
+            if let Some((ref vel_vec, manipulability)) = last_worker_result {
+                joint_velocities = na::DVector::from_vec(vel_vec.clone());
+                if loop_count % 50 == 0 && manipulability < 0.001 {
+                    println!("⚠️ Low manipulability: {:.6}", manipulability);
+                }
+            } else {
+                // no worker result yet: fallback to zeros to avoid blocking
+                joint_velocities = na::DVector::zeros(dof);
             }
         } else {
             joint_velocities = na::DVector::from_vec(s.target_joint_vel.clone());
