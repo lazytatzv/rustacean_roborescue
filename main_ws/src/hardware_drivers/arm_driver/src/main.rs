@@ -37,11 +37,11 @@ fn hardware_thread(
 ) {
     let mut driver = match ArmDynamixelDriver::new(&port_name, baud_rate, arm_ids.clone(), gripper_id) {
         Ok(d) => d,
-        Err(e) => { eprintln!("🔥 arm_driver: init failed: {e:#}"); return; }
+        Err(e) => { eprintln!("🔥 arm_gripper_driver: init failed: {e:#}"); return; }
     };
 
     if let Err(e) = driver.init_motors(profile_velocity, gripper_max_current) {
-        eprintln!("🔥 arm_driver: motor init failed: {e:#}"); return;
+        eprintln!("🔥 arm_gripper_driver: motor init failed: {e:#}"); return;
     }
 
     let loop_period = Duration::from_millis(1000 / HW_LOOP_HZ);
@@ -84,7 +84,8 @@ fn hardware_thread(
 fn run() -> Result<()> {
     let context = Context::default_from_env()?;
     let mut executor = context.create_basic_executor();
-    let node = executor.create_node("dynamixel_driver")?;
+    // ノード名を変更
+    let node = executor.create_node("arm_gripper_driver")?;
 
     let port_name: String = node.declare_parameter("port_name").default("/dev/ttyUSB0").mandatory()?.get();
     let baud_rate: i64 = node.declare_parameter("baud_rate").default(1000000_i64).mandatory()?.get();

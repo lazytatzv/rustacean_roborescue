@@ -25,10 +25,10 @@ def generate_launch_description() -> LaunchDescription:
         "sensor_gw_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "sensor_gateway.yaml"]),
     )
-    # 統合版ドライバのパラメータ
-    dynamixel_driver_params = DeclareLaunchArgument(
-        "dynamixel_driver_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "dynamixel_driver.yaml"]),
+    # 修正: 明確な名前に変更
+    arm_gripper_driver_params = DeclareLaunchArgument(
+        "arm_gripper_driver_params",
+        default_value=PathJoinSubstitution([bringup_share, "config", "arm_gripper_driver.yaml"]),
     )
     joy_params = DeclareLaunchArgument(
         "joy_params",
@@ -65,13 +65,13 @@ def generate_launch_description() -> LaunchDescription:
         **hw_respawn,
     )
 
-    # 統合版ドライバ (Arm + Gripper)
-    dynamixel_driver_node = Node(
+    # 統合版ドライバ (Arm + Gripper) - ノード名を分かりやすく
+    arm_gripper_driver_node = Node(
         package="arm_driver",
         executable="arm_driver",
-        name="dynamixel_driver",
+        name="arm_gripper_driver",
         output="both",
-        parameters=[LaunchConfiguration("dynamixel_driver_params")],
+        parameters=[LaunchConfiguration("arm_gripper_driver_params")],
         **hw_respawn,
     )
 
@@ -104,12 +104,12 @@ def generate_launch_description() -> LaunchDescription:
         flipper_params,
         arm_params,
         sensor_gw_params,
-        dynamixel_driver_params,
+        arm_gripper_driver_params,
         joy_params,
         crawler_driver_node,
         flipper_driver_node,
         sensor_gateway_node,
-        dynamixel_driver_node,
+        arm_gripper_driver_node,
         joy_controller_node,
         arm_controller_node,
     ])
