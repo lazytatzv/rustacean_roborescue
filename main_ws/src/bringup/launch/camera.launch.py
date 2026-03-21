@@ -21,9 +21,15 @@ def generate_launch_description():
             'camera_frame_id': 'camera_link',
             # ffmpeg_image_transport params (published as /camera/image_raw/ffmpeg)
             'ffmpeg_image_transport.encoding': 'h264',
-            'ffmpeg_image_transport.profile': 'main',
+            # Foxglove-compatible encoder settings:
+            # - use BASELINE (no B-frames)
+            # - low-latency preset/tune
+            # - enforce no B-frames via x264 opts and set an explicit bitrate
+            'ffmpeg_image_transport.profile': 'baseline',
             'ffmpeg_image_transport.preset': 'ultrafast',
             'ffmpeg_image_transport.tune': 'zerolatency',
+            'ffmpeg_image_transport.x264opts': 'bframes=0',
+            'ffmpeg_image_transport.bitrate': 2000000,  # 2 Mbps default; tune as needed
         }],
         extra_arguments=[{'use_intra_process_comms': True}],
     )

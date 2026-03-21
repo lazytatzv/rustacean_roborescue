@@ -161,7 +161,7 @@ fn solve_velocity_ik(
     let dof = jacobian.ncols();
 
     // Use SVD for a numerically robust manipulability measure (product of singular values)
-    let svd = jacobian.svd(true, true);
+    let svd = jacobian.clone().svd(true, true);
     let svals = svd.singular_values;
     let manipulability = svals.iter().fold(1.0_f64, |acc, &x| acc * x.max(0.0));
 
@@ -273,9 +273,9 @@ fn run() -> Result<()> {
     let publisher: Publisher<JointState> = node.create_publisher("/arm_joint_commands")?;
     let pose_pub: Publisher<PoseStamped> = node.create_publisher("/arm_ee_pose")?;
     // Diagnostics publishers
-    let diag_loop_pub = node.create_publisher<std_msgs::msg::Float64>("/arm_controller/diagnostics/loop_time_ms")?;
-    let diag_manip_pub = node.create_publisher<std_msgs::msg::Float64>("/arm_controller/diagnostics/manipulability")?;
-    let diag_js_rate_pub = node.create_publisher<std_msgs::msg::Float64>("/arm_controller/diagnostics/joint_state_rate_hz")?;
+    let diag_loop_pub = node.create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/loop_time_ms")?;
+    let diag_manip_pub = node.create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/manipulability")?;
+    let diag_js_rate_pub = node.create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/joint_state_rate_hz")?;
 
     // control period parameter (ms)
     let control_period_ms: i64 = node.declare_parameter("control_period_ms").default(DEFAULT_CONTROL_PERIOD_MS as i64).mandatory()?.get();

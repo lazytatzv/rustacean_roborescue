@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(h264_republisher)
 
 if(NOT CMAKE_CXX_STANDARD)
@@ -16,11 +16,15 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBAVFORMAT REQUIRED libavformat)
 pkg_check_modules(LIBAVCODEC REQUIRED libavcodec)
 pkg_check_modules(LIBSWSCALE REQUIRED libswscale)
+pkg_check_modules(LIBAVUTIL REQUIRED libavutil)
 
 include_directories(
   ${LIBAVFORMAT_INCLUDE_DIRS}
   ${LIBAVCODEC_INCLUDE_DIRS}
   ${LIBSWSCALE_INCLUDE_DIRS}
+  ${LIBAVUTIL_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  ${cv_bridge_INCLUDE_DIRS}
 )
 
 add_executable(h264_republisher src/h264_republisher.cpp)
@@ -30,6 +34,8 @@ target_link_libraries(h264_republisher
   ${LIBAVFORMAT_LIBRARIES}
   ${LIBAVCODEC_LIBRARIES}
   ${LIBSWSCALE_LIBRARIES}
+  ${LIBAVUTIL_LIBRARIES}
+  ${OpenCV_LIBS}
 )
 
 ament_target_dependencies(h264_republisher

@@ -64,6 +64,8 @@
           python3Packages.black
           python3Packages.isort
           python3Packages.ipdb
+          pkg-config
+          ffmpeg
 
           # --- colcon ---
           colcon
