@@ -71,6 +71,7 @@ struct GripperCommand {
     max_current: u16,
 }
 
+// Clamp position to valid Dynamixel range
 fn clamp_dxl_position(pos: i32) -> u32 {
     pos.clamp(DXL_POS_MIN as i32, DXL_POS_MAX as i32) as u32
 }
