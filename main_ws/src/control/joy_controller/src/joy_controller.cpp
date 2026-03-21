@@ -67,8 +67,10 @@ class JoyController : public rclcpp::Node
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_publisher_;
 
+// Normalized command space shared by ARM(IK) and JOINT(direct) modes.
   struct ArmInput
   {
+    
     float linear_x;
     float linear_y;
     float linear_z;
@@ -83,8 +85,11 @@ class JoyController : public rclcpp::Node
 
   ArmInput compute_arm_input(const sensor_msgs::msg::Joy &msg) const
   {
+    // PS trigger axes [-1, 1] -> [0, 1]
     const float l2 = (1.0f - axis(msg, AXIS_L2)) / 2.0f;
     const float r2 = (1.0f - axis(msg, AXIS_R2)) / 2.0f;
+
+    // Apply deadzone
     return ArmInput{
       -apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_),
       apply_deadzone(axis(msg, AXIS_LEFT_X), deadzone_),
@@ -101,7 +106,7 @@ class JoyController : public rclcpp::Node
     const int options = button(msg, BUTTON_OPTIONS);
     const int share = button(msg, BUTTON_SHARE);
 
-    // Detect button press events
+    // Use rising-edge detection to avoid repeated toggles while holding buttons.
     const bool ps_pressed = (ps == 1 && prev_ps_ == 0);
     const bool options_pressed = (options == 1 && prev_options_ == 0);
     const bool share_pressed = (share == 1 && prev_share_ == 0);
@@ -172,9 +177,11 @@ class JoyController : public rclcpp::Node
 
   void publish_arm(const sensor_msgs::msg::Joy &msg)
   {
+    // Compute once, then map into each output message format.
     const auto input = compute_arm_input(msg);
 
     if (mode_ == Mode::ARM) {
+      // IK mode: send end-effector velocity command.
       geometry_msgs::msg::Twist twist;
       twist.linear.x = input.linear_x * arm_lin_scale_;
       twist.linear.y = input.linear_y * arm_lin_scale_;
@@ -184,6 +191,7 @@ class JoyController : public rclcpp::Node
       twist.angular.z = input.angular_z * arm_ang_scale_;
       arm_publisher_->publish(twist);
     } else if (mode_ == Mode::JOINT) {
+      // Direct mode: send per-joint velocity command.
       auto j_msg = sensor_msgs::msg::JointState();
       j_msg.name = {"arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"};
       j_msg.velocity = {
