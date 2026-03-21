@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>h264_republisher</name>
+  <version>0.1.0</version>
+  <description>H.264 -> sensor_msgs::Image republisher using FFmpeg (libav)</description>
+  <maintainer email="devnull@example.com">robot dev</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+  <depend>opencv4</depend>
+
+  <export>
+  </export>
+</package>
