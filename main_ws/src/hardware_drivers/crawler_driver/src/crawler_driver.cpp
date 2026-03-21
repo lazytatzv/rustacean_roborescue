@@ -17,6 +17,7 @@ using namespace std::chrono_literals;
 // ──────────────────────────────────────────────
 // Roboclaw protocol constants
 // ──────────────────────────────────────────────
+// TODO: ros parametersにするべきかもしれない
 constexpr uint8_t ROBOCLAW_ADDRESS             = 0x80;
 constexpr uint8_t M1_MOTOR_COMMAND             = 35;
 constexpr uint8_t M2_MOTOR_COMMAND             = 36;

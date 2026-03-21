@@ -1,3 +1,5 @@
+# 今のところ使わない
+
 /**:
   ros__parameters:
     input_topic: /velodyne_points

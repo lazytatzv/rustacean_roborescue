@@ -1,0 +1,15 @@
+# アームとグリッパーの統合設定 (同じRS485バスに接続)
+dynamixel_driver:
+  ros__parameters:
+    port_name: "/dev/ttyUSB0"
+    baud_rate: 1000000 # アーム側の高速通信に合わせるのが一般的
+
+    # 腕ジョイント設定: 名称とIDの対応
+    arm_joints: ["arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"]
+    arm_ids: [21, 22, 23, 24, 25, 26]
+    profile_velocity: 100
+
+    # グリッパー設定
+    gripper_joint: "gripper_joint"
+    gripper_id: 10
+    gripper_max_current: 500 # 握力制限 [mA]

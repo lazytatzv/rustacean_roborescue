@@ -1,4 +1,5 @@
 [workspace]
+# ビルド対象のパッケージを指定
 members = [
     "src/control/arm_controller",
     "src/hardware_drivers/sensor_gateway",

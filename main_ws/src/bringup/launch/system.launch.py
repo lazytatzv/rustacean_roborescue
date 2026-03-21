@@ -48,21 +48,22 @@ def generate_launch_description():
         }],
     )
 
-    # Foxglove Bridge — Foxglove Studio が WebSocket (ws://robot_ip:8765) で接続
-    foxglove_bridge_node = Node(
-        package='foxglove_bridge',
-        executable='foxglove_bridge',
-        name='foxglove_bridge',
-        output='screen',
-        parameters=[{
-            'port': 8765,
-            'address': '0.0.0.0',
-            'send_buffer_limit': 10000000,       # 10 MB
-            'max_qos_depth': 10,
-            'num_threads': 0,                    # 0 = auto
-            'use_compression': False,
-        }],
-    )
+    # foxglove bridgeはOperator側で立ち上げる想定
+    # # Foxglove Bridge — Foxglove Studio が WebSocket (ws://robot_ip:8765) で接続
+    # foxglove_bridge_node = Node(
+    #     package='foxglove_bridge',
+    #     executable='foxglove_bridge',
+    #     name='foxglove_bridge',
+    #     output='screen',
+    #     parameters=[{
+    #         'port': 8765,
+    #         'address': '0.0.0.0',
+    #         'send_buffer_limit': 10000000,       # 10 MB
+    #         'max_qos_depth': 10,
+    #         'num_threads': 0,                    # 0 = auto
+    #         'use_compression': False,
+    #     }],
+    # )
 
     return LaunchDescription([
         use_nav2,
@@ -71,30 +72,30 @@ def generate_launch_description():
         robot_state_publisher_node,
 
         # 1. Foxglove Bridge (WebSocket :8765)
-        foxglove_bridge_node,
+        #foxglove_bridge_node,
 
-        # 2. ネットワーク（Zenoh）の起動
+        # ネットワーク（Zenoh）の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(network_launch),
         ),
 
-        # 3. 認識・SLAM系の起動
+        # 認識・SLAM系の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(perception_launch),
             launch_arguments={'use_slam': 'true', 'use_rviz': 'false'}.items()
         ),
 
-        # 4. カメラの起動 (qr_detector が /camera/image_raw を必要とする)
+        # カメラの起動 (qr_detector が /camera/image_raw を必要とする)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(camera_launch),
         ),
 
-        # 5. 制御系の起動
+        # 制御系の起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(control_launch),
         ),
 
-        # 6. Nav2 自律走行（オプション）
+        # Nav2 自律走行（オプション）
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(nav2_launch),
             condition=IfCondition(LaunchConfiguration('use_nav2')),

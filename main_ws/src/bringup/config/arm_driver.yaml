@@ -1,9 +1,0 @@
-# arm_driver parameters
-arm_driver:
-  ros__parameters:
-    port_name: "/dev/ttyUSB0"
-    baud_rate: 1000000
-    # Profile velocity: limits max servo speed during position moves
-    # Unit: 0.229 rev/min per LSB. 100 ≈ 22.9 RPM ≈ 2.4 rad/s
-    profile_velocity: 100
-

@@ -1,6 +1,6 @@
 flipper_driver:
   ros__parameters:
     port_name: "/dev/dynamixel" # udevで縛る
-    baud_rate: 115200
+    baud_rate: 1000000 # 通信速度。要check
     dynamixel_ids: [1, 2, 3, 4]
     watchdog_timeout_ms: 500

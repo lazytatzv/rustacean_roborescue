@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 """odom_tf_bridge: /odom → odom→base_footprint TF broadcaster.
-
-Gazebo Harmonic の DiffDrive プラグインは odom メッセージを gz topic に publish
-するが、odom→base_footprint の TF は ECM 内部に留まり ROS 2 側へ自動で流れない。
-ros_gz_bridge が /odom を nav_msgs/Odometry として ROS 2 に転送するので、
-このノードがそれを受け取って TF を broadcast する。
-
-  /odom (nav_msgs/Odometry)
-      │
-      └→ /tf  odom → base_footprint (geometry_msgs/TransformStamped)
 """
 import rclpy
 from rclpy.node import Node
@@ -22,7 +13,7 @@ class OdomTfBridge(Node):
     def __init__(self) -> None:
         super().__init__("odom_tf_bridge")
         self.tf_broadcaster = TransformBroadcaster(self)
-        self.last_stamp_ns = 0  # 時刻順序保証用
+        self.last_stamp_ns = 0
 
         qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.sub_ = self.create_subscription(
@@ -31,11 +22,16 @@ class OdomTfBridge(Node):
         self.get_logger().info(
             "odom_tf_bridge started: /odom → TF odom→base_footprint"
         )
+        self.received_first = False
 
     def odom_cb(self, msg: Odometry) -> None:
+        if not self.received_first:
+            self.get_logger().info("Received first odom message!")
+            self.received_first = True
+
         stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
         if stamp_ns <= self.last_stamp_ns:
-            return  # 古いメッセージをスキップ (time jump 防止)
+            return
         self.last_stamp_ns = stamp_ns
 
         t = TransformStamped()

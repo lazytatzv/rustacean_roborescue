@@ -1,3 +1,6 @@
+# usb_camノードは一旦使わず、v4l2を使う予定
+# h264でエンコードするため
+
 usb_cam:
   ros__parameters:
     video_device: "/dev/video0"

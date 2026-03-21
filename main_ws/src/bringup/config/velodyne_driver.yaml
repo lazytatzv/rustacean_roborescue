@@ -1,7 +1,10 @@
 velodyne_driver:
   ros__parameters:
-    device_ip: "10.42.0.242"
-    port: 2368
+    # IPアドレスは開発時はDHCPでも良いが、運用時は必ず静的IPにすること
+    # PCとサブネットが同じであることを確認すること
+    device_ip: "10.42.0.242" # 要注意
+
+    port: 2368 # 固定UDPポート
     frame_id: "velodyne"
     model: "VLP16"
     rpm: 900.0

@@ -3,6 +3,8 @@ Panels:
     Name: Displays
   - Class: rviz_common/Views
     Name: Views
+  - Class: nav2_rviz_plugins/Navigation 2
+    Name: Navigation 2
 Visualization Manager:
   Class: ""
   Displays:
@@ -39,7 +41,7 @@ Visualization Manager:
       Value: true
       Topic:
         Value: /scan
-        Reliability: Best Effort
+        Reliability: Reliable
         Durability: Volatile
       Size (m): 0.05
       Color Transformer: Intensity
@@ -94,7 +96,7 @@ Visualization Manager:
 
     - Class: rviz_default_plugins/Map
       Name: GlobalCostmap
-      Value: false
+      Value: true
       Topic:
         Value: /global_costmap/costmap
       Alpha: 0.3
