@@ -263,7 +263,7 @@ fn run() -> Result<()> {
 
     let estop_sub_flag = Arc::clone(&estop_flag);
     let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>("/emergency_stop".reliable().transient_local().keep_last(1),
-        move |msg: std_msgs::msg::Bool| { if msg.data { estop_sub_flag.store(true, Ordering::Relaxed); } }
+        move |msg: std_msgs::msg::Bool| { estop_sub_flag.store(msg.data, Ordering::Relaxed); }
     )?;
 
     let publisher: Publisher<JointState> = node.create_publisher("/arm_joint_commands")?;

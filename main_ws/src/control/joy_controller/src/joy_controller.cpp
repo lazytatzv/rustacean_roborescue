@@ -57,6 +57,7 @@ class JoyController : public rclcpp::Node
   static constexpr size_t BUTTON_CROSS = 0, BUTTON_SQUARE = 2, BUTTON_L1 = 4, BUTTON_R1 = 5;
 
   Mode mode_;
+  Mode prev_mode_ = Mode::STOP;  // Track previous mode to send zero on transition
   bool estop_latched_ = false;
   int prev_ps_ = 0, prev_options_ = 0, prev_share_ = 0;
 
@@ -177,6 +178,21 @@ class JoyController : public rclcpp::Node
 
   void publish_arm(const sensor_msgs::msg::Joy &msg)
   {
+    // Send zero command when transitioning OUT of ARM/JOINT modes to prevent motor creep.
+    // This ensures the last command doesn't persist until watchdog timeout (500ms).
+    if (prev_mode_ != mode_ && (prev_mode_ == Mode::ARM || prev_mode_ == Mode::JOINT)) {
+      if (prev_mode_ == Mode::ARM) {
+        geometry_msgs::msg::Twist zero_twist;  // All fields default to 0.0
+        arm_publisher_->publish(zero_twist);
+      } else {  // prev_mode_ == Mode::JOINT
+        auto zero_joint = sensor_msgs::msg::JointState();
+        zero_joint.name = {"arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"};
+        zero_joint.velocity = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        joint_publisher_->publish(zero_joint);
+      }
+    }
+    prev_mode_ = mode_;
+
     // Compute once, then map into each output message format.
     const auto input = compute_arm_input(msg);
 
