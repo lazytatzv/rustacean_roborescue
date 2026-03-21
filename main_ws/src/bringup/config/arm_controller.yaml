@@ -23,3 +23,5 @@ arm_controller:
     joint_limit_margin: 0.10
     # Null-space repulsion gain for joint-limit avoidance
     null_space_repulsion_gain: 0.5
+    # Control loop period (ms)
+    control_period_ms: 20

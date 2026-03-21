@@ -272,6 +272,10 @@ fn run() -> Result<()> {
 
     let publisher: Publisher<JointState> = node.create_publisher("/arm_joint_commands")?;
     let pose_pub: Publisher<PoseStamped> = node.create_publisher("/arm_ee_pose")?;
+    // Diagnostics publishers
+    let diag_loop_pub = node.create_publisher<std_msgs::msg::Float64>("/arm_controller/diagnostics/loop_time_ms")?;
+    let diag_manip_pub = node.create_publisher<std_msgs::msg::Float64>("/arm_controller/diagnostics/manipulability")?;
+    let diag_js_rate_pub = node.create_publisher<std_msgs::msg::Float64>("/arm_controller/diagnostics/joint_state_rate_hz")?;
 
     // control period parameter (ms)
     let control_period_ms: i64 = node.declare_parameter("control_period_ms").default(DEFAULT_CONTROL_PERIOD_MS as i64).mandatory()?.get();
@@ -283,6 +287,8 @@ fn run() -> Result<()> {
     let cfg = ik_config.clone();
     let estop_timer = Arc::clone(&estop_flag);
     let mut loop_count = 0;
+    let mut last_js_count: u64 = 0;
+    let mut last_diag_instant = Instant::now();
 
     // Setup a background worker for IK to avoid blocking the timer callback
     let (req_tx, req_rx): (SyncSender<(na::DVector<f64>, Vec<f64>)>, Receiver<(na::DVector<f64>, Vec<f64>)>) = sync_channel(1);
@@ -364,6 +370,12 @@ fn run() -> Result<()> {
                 if loop_count % 50 == 0 && manipulability < 0.001 {
                     println!("⚠️ Low manipulability: {:.6}", manipulability);
                 }
+                // publish manipulability occasionally
+                if loop_count % 5 == 0 {
+                    let mut mmsg = std_msgs::msg::Float64::default();
+                    mmsg.data = manipulability;
+                    let _ = diag_manip_pub.publish(&mmsg);
+                }
             } else {
                 // no worker result yet: fallback to zeros to avoid blocking
                 joint_velocities = na::DVector::zeros(dof);
@@ -396,6 +408,25 @@ fn run() -> Result<()> {
         msg.position = new_targets;
         msg.velocity = final_vel;
         let _ = publisher.publish(&msg);
+
+        // diagnostics: loop time and joint_state rate
+        let now = Instant::now();
+        let loop_dur = now.duration_since(last_diag_instant).as_secs_f64() * 1000.0 / (if loop_count % 1 == 0 { 1.0 } else { 1.0 });
+        let mut lmsg = std_msgs::msg::Float64::default();
+        lmsg.data = loop_dur;
+        let _ = diag_loop_pub.publish(&lmsg);
+
+        let js_now = js_counter.load(Ordering::Relaxed);
+        let delta = js_now.saturating_sub(last_js_count) as f64;
+        let elapsed = now.duration_since(last_diag_instant).as_secs_f64();
+        if elapsed > 0.0 {
+            let rate = delta / elapsed;
+            let mut rmsg = std_msgs::msg::Float64::default();
+            rmsg.data = rate;
+            let _ = diag_js_rate_pub.publish(&rmsg);
+        }
+        last_js_count = js_now;
+        last_diag_instant = now;
     })?;
 
     println!("🚀 arm_controller started");
