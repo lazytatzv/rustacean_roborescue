@@ -18,8 +18,7 @@ Rust (rclrs) + C++ (rclcpp) + Python (rclpy) のマルチ言語構成。
 |-----------|------|------|
 | `crawler_driver` | C++ | Roboclaw モータドライバ (差動駆動 + PID + `/cmd_vel` 対応) |
 | `flipper_driver` | C++ | Dynamixel フリッパ (Wheel Mode + WatchDog 安全機構) |
-| `arm_driver` | Rust | Dynamixel 6-DOF アームサーボ (Position Mode + E-Stop + 自動再接続) |
-| `gripper_driver` | Rust | Dynamixel グリッパ (電流位置制御 + 把持状態マシン) |
+| `arm_driver` | Rust | Dynamixel 6-DOF アーム + グリッパ (SyncWrite/Read + 自動再接続) |
 | `sensor_gateway` | Rust | STM32 → BNO055 IMU パーサー (CSV → sensor_msgs/Imu + 自動再接続) |
 
 ### 認識系 (`src/perception/`)
@@ -100,7 +99,7 @@ ros2 launch bringup simulation.launch.py use_nav2:=true
 
 ## 設計方針
 
-- **低レイヤーは Rust**: ハードウェアドライバ (arm_driver, gripper_driver, sensor_gateway) は Rust (rclrs) で型安全・メモリ安全に実装
+- **低レイヤーは Rust**: ハードウェアドライバ (arm_driver, sensor_gateway) は Rust (rclrs) で型安全・メモリ安全に実装
 - **リアルタイム制御は C++**: クローラ/フリッパドライバ、コントローラは C++ (rclcpp) で実装
 - **認識系は Python**: QR 検出は OpenCV + Python で実用性重視
 - **SLAM/オドメトリは C++ 既存ライブラリ**: spark_fast_lio (FAST-LIO2), slam_toolbox

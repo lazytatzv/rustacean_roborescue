@@ -92,14 +92,15 @@ fn run() -> Result<()> {
     let port_name_arc: Arc<str> = node.declare_parameter("port_name").default(Arc::from("/dev/ttyUSB0")).mandatory()?.get();
     let port_name: String = port_name_arc.to_string();
     let baud_rate: i64 = node.declare_parameter("baud_rate").default(1000000_i64).mandatory()?.get();
-    let arm_joints_arr: Arc<[Arc<str>]> = node.declare_parameter("arm_joints").default(Arc::from(vec![Arc::from("arm_joint1")].into_boxed_slice())).mandatory()?.get();
+    let arm_joints_arr: Arc<[Arc<str>]> = node.declare_parameter("arm_joints").default(Arc::from(vec![Arc::from("arm_joint1"), Arc::from("arm_joint2"), Arc::from("arm_joint3"), Arc::from("arm_joint4"), Arc::from("arm_joint5"), Arc::from("arm_joint6")].into_boxed_slice())).mandatory()?.get();
     let arm_joints: Vec<String> = arm_joints_arr.iter().map(|s| s.to_string()).collect();
-    let arm_ids_arr: Arc<[i64]> = node.declare_parameter("arm_ids").default(Arc::from(vec![21_i64].into_boxed_slice())).mandatory()?.get();
+    let arm_ids_arr: Arc<[i64]> = node.declare_parameter("arm_ids").default(Arc::from(vec![1_i64,2_i64,3_i64,4_i64,5_i64,6_i64].into_boxed_slice())).mandatory()?.get();
     let arm_ids: Vec<u8> = arm_ids_arr.iter().copied().map(|id| id as u8).collect();
     let gripper_id: i64 = node.declare_parameter("gripper_id").default(10_i64).mandatory()?.get();
     let gripper_max_current: i64 = node.declare_parameter("gripper_max_current").default(500_i64).mandatory()?.get();
     let profile_velocity: i64 = node.declare_parameter("profile_velocity").default(100_i64).mandatory()?.get();
 
+    
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
     let (tx_cmd, rx_cmd) = channel::<HwCommand>();

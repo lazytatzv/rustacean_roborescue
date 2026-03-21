@@ -62,6 +62,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "builtin_interfaces",
+ "custom_interfaces",
  "dynamixel2",
  "rclrs",
  "sensor_msgs",
@@ -547,18 +548,6 @@ dependencies = [
  "futures-core",
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "gripper_driver"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "custom_interfaces",
- "dynamixel2",
- "rclrs",
- "sensor_msgs",
- "std_msgs",
 ]
 
 [[package]]
@@ -1808,10 +1797,6 @@ version = "2.0.3"
 [[patch.unused]]
 name = "diagnostic_msgs"
 version = "5.3.6"
-
-[[patch.unused]]
-name = "gripper_driver"
-version = "0.1.0"
 
 [[patch.unused]]
 name = "lifecycle_msgs"

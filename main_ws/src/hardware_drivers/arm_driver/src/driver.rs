@@ -115,7 +115,9 @@ impl ArmDynamixelDriver {
     }
 
     pub fn write_gripper_position(&mut self, rad: f64) -> Result<()> {
-        self.bus.write_u32(self.gripper_id, ADDR_GOAL_POSITION, rad_to_ticks(rad)).map_err(|e| anyhow::anyhow!("{:?}", e))
+        self.bus.write_u32(self.gripper_id, ADDR_GOAL_POSITION, rad_to_ticks(rad))
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("{:?}", e))
     }
 
     pub fn read_arm_positions(&mut self) -> Result<Vec<f64>> {

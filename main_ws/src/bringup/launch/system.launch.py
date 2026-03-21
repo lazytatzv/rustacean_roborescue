@@ -1,8 +1,7 @@
 # ここから他のlaunchファイルを呼び出し、
 # このスクリプトでロボットのシステムを起動する
 
-# joy_nodeはロボット側ではなくoperator側で、特に複雑な設定もいらないので、
-# 今のところはros2 run joy joy_nodeで起動する方向性で考え中
+# operator側でfoxglove_bridgeとjoy_nodeを立ち上げる
 
 # systemdに便り過ぎるのもまた複雑性が増し、
 # Justfileで頑張るのもまた大変なので、なるべくlaunchから

@@ -3,7 +3,6 @@
 members = [
     "src/control/arm_controller",
     "src/hardware_drivers/sensor_gateway",
-    "src/hardware_drivers/gripper_driver",
     "src/hardware_drivers/arm_driver",
     "src/perception/vision_processor",
 ]
