@@ -50,8 +50,21 @@ fn hardware_thread(
 
         if estop_flag.load(Ordering::Relaxed) {
             driver.emergency_stop();
-            while !shutdown_flag.load(Ordering::Relaxed) { thread::sleep(Duration::from_millis(100)); }
-            break;
+            while estop_flag.load(Ordering::Relaxed) && !shutdown_flag.load(Ordering::Relaxed) {
+                thread::sleep(Duration::from_millis(100));
+            }
+            if shutdown_flag.load(Ordering::Relaxed) {
+                break;
+            }
+
+            if let Err(e) = driver.init_motors(profile_velocity, gripper_max_current) {
+                eprintln!("🔥 arm_gripper_driver: recovery init failed: {e:#}");
+                break;
+            }
+
+            // Drop stale queued commands after E-STOP clear.
+            while rx_cmd.try_recv().is_ok() {}
+            continue;
         }
 
         while let Ok(cmd) = rx_cmd.try_recv() {
@@ -115,6 +128,14 @@ fn run() -> Result<()> {
     let _gripper_sub = node.create_subscription::<GripperCommand, _>("/gripper_cmd", move |msg: GripperCommand| {
         let _ = tx_gripper.send(HwCommand { arm_positions: None, gripper_position: Some(msg.position as f64) });
     })?;
+
+    let estop_sub_flag = Arc::clone(&estop_flag);
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
+        "/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| {
+            estop_sub_flag.store(msg.data, Ordering::Relaxed);
+        },
+    )?;
 
     let shutdown_c = Arc::clone(&shutdown_flag);
     let estop_c = Arc::clone(&estop_flag);
