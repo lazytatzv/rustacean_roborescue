@@ -1,7 +1,0 @@
-// オペレータ PC 用 Zenoh クライアント設定
-// connect.endpoints のIPをロボット実機のIPに書き換えて使用すること
-{
-  mode: "client",
-  connect: { endpoints: ["quic/<ROBOT_IP>:7447"] },    // ← ロボットの実機 IP に変更！
-  scouting: { multicast: { enabled: false } }
-}

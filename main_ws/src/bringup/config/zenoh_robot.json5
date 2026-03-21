@@ -1,9 +1,0 @@
-// これは基本的に使わない
-// 本番はrouterモードでzenohを使う予定
-
-{
-  mode: "peer",
-  listen: { endpoints: ["quic/0.0.0.0:7447"] },   // Listen on all interfaces
-  scouting: { multicast: { enabled: false } },
-  transport: { shared_memory: { enabled: true } }
-}

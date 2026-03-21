@@ -52,7 +52,7 @@
               echo "✅ Zenoh config: $ZENOH_CFG"
             else
               echo "⚠️  zenoh_ope.json5 が見つかりません。以下を作成してください:"
-              echo "   cp ../main_ws/src/bringup/config/zenoh_ope.json5 ."
+              echo "   cp ../operator/zenoh_ope.json5 ."
               echo "   # <ROBOT_IP> をロボットの IP アドレスに書き換える"
             fi
 
