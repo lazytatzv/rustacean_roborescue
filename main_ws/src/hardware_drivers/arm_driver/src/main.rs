@@ -3,13 +3,13 @@ mod driver;
 
 use anyhow::Result;
 use driver::ArmDynamixelDriver;
-use rclrs::{Context, IntoPrimitiveOptions, Publisher, RclrsErrorFilter};
+use rclrs::{Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions};
 use sensor_msgs::msg::JointState;
 use custom_interfaces::msg::{GripperCommand, GripperStatus};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{channel, Receiver};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -69,9 +69,9 @@ fn hardware_thread(
 
         if let Ok(s) = driver.read_gripper_status() {
             let mut msg = GripperStatus::default();
-            msg.position = s.position_rad as f32;
-            msg.current = s.current_a as f32;
-            msg.temperature = s.temperature_c as f32;
+            msg.position = s.position_rad as i32;
+            msg.current = s.current_a as i16;
+            msg.temperature = s.temperature_c as u8;
             let _ = gripper_status_pub.publish(&msg);
         }
 
@@ -87,11 +87,15 @@ fn run() -> Result<()> {
     // ノード名を変更
     let node = executor.create_node("arm_gripper_driver")?;
 
-    let port_name: String = node.declare_parameter("port_name").default("/dev/ttyUSB0").mandatory()?.get();
+    // ros2 parametersの宣言と取得
+    // arm_gripper_driver.yamlで管理することができる
+    let port_name_arc: Arc<str> = node.declare_parameter("port_name").default(Arc::from("/dev/ttyUSB0")).mandatory()?.get();
+    let port_name: String = port_name_arc.to_string();
     let baud_rate: i64 = node.declare_parameter("baud_rate").default(1000000_i64).mandatory()?.get();
-    let arm_joints: Vec<String> = node.declare_parameter("arm_joints").default(vec!["arm_joint1".to_string()]).mandatory()?.get();
-    let arm_ids_i64: Vec<i64> = node.declare_parameter("arm_ids").default(vec![21_i64]).mandatory()?.get();
-    let arm_ids: Vec<u8> = arm_ids_i64.into_iter().map(|id| id as u8).collect();
+    let arm_joints_arr: Arc<[Arc<str>]> = node.declare_parameter("arm_joints").default(Arc::from(vec![Arc::from("arm_joint1")].into_boxed_slice())).mandatory()?.get();
+    let arm_joints: Vec<String> = arm_joints_arr.iter().map(|s| s.to_string()).collect();
+    let arm_ids_arr: Arc<[i64]> = node.declare_parameter("arm_ids").default(Arc::from(vec![21_i64].into_boxed_slice())).mandatory()?.get();
+    let arm_ids: Vec<u8> = arm_ids_arr.iter().copied().map(|id| id as u8).collect();
     let gripper_id: i64 = node.declare_parameter("gripper_id").default(10_i64).mandatory()?.get();
     let gripper_max_current: i64 = node.declare_parameter("gripper_max_current").default(500_i64).mandatory()?.get();
     let profile_velocity: i64 = node.declare_parameter("profile_velocity").default(100_i64).mandatory()?.get();
@@ -122,7 +126,7 @@ fn run() -> Result<()> {
         hardware_thread(port_name, baud_rate as u32, profile_velocity as u32, arm_ids, gripper_id as u8, gripper_max_current as u16, rx_cmd, joint_state_pub, gripper_status_pub, arm_joints, shutdown_c, estop_c);
     });
 
-    executor.spin().first_error()?;
+    executor.spin(SpinOptions::default()).first_error()?;
     shutdown_flag.store(true, Ordering::Relaxed);
     let _ = hw_thread.join();
     Ok(())

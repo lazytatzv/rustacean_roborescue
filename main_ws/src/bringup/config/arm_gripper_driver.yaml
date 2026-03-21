@@ -1,5 +1,5 @@
 # アームとグリッパーの統合設定 (同じRS485バスに接続)
-dynamixel_driver:
+arm_gripper_driver:
   ros__parameters:
     port_name: "/dev/ttyUSB0"
     baud_rate: 1000000 # アーム側の高速通信に合わせるのが一般的
