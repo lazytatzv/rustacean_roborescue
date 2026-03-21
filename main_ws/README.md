@@ -38,7 +38,7 @@ Rust (rclrs) + C++ (rclcpp) + Python (rclpy) のマルチ言語構成。
 | Gazebo SDF | `rescue_field.sdf` (10×10m レスキューフィールド) |
 | RViz Config | `simulation.rviz` (Nav2 + SLAM 表示), `display.rviz` (モデル表示) |
 | ブリッジスクリプト | `arm_gz_bridge.py`, `odom_tf_bridge.py`, `crawler_vel_bridge.py`, `dummy_imu_node.py`, `fix_pointcloud_time_node.py` |
-| Zenoh 設定 | `zenoh_router.json5`, `zenoh_robot.json5`, `zenoh_ope.json5` |
+| Zenoh 設定 | `zenoh_router.json5`, `zenoh_ope.json5` |
 
 ### カスタムメッセージ (`src/custom_interfaces/`)
 

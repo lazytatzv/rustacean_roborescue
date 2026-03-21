@@ -6,7 +6,8 @@ from launch.actions import ExecuteProcess, SetEnvironmentVariable
 def generate_launch_description():
     # bringupパッケージのshareディレクトリから設定ファイルの絶対パスを動的に取得
     bringup_dir = get_package_share_directory('bringup')
-    zenoh_client_config = os.path.join(bringup_dir, 'config', 'zenoh_robot.json5')
+    # Use the router config for both zenohd and as a local RMW config
+    # (previously zenoh_robot.json5 was used here; that file was removed)
     zenoh_router_config = os.path.join(bringup_dir, 'config', 'zenoh_router.json5')
 
     return LaunchDescription([
@@ -16,7 +17,7 @@ def generate_launch_description():
         # このLaunchファイル（およびこれをincludeした親Launch）から
         # 起動されるすべてのROS 2ノードは、強制的にZenohプロトコルで通信します。
         SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_zenoh_cpp'),
-        SetEnvironmentVariable('RMW_ZENOH_CONFIG_URI', f'file://{zenoh_client_config}'),
+        SetEnvironmentVariable('RMW_ZENOH_CONFIG_URI', f'file://{zenoh_router_config}'),
 
         # ==========================================
         # 2. Zenohルーター (zenohd) のデーモン起動

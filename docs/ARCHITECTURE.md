@@ -832,7 +832,7 @@ display.launch.py             … ロボットモデル表示
 | `usb_cam_params.yaml` | usb_cam | /dev/video0, 640×480, 30fps, MJPEG |
 | `velodyne_driver.yaml` | velodyne_driver | IP: 10.42.0.242, port: 2368, VLP16, 900 RPM |
 | `velodyne_pointcloud.yaml` | velodyne_pointcloud | organized cloud, range: 0.9–130m |
-| `zenoh_robot.json5` | ROS 2 ノード (ロボット) | RMW_ZENOH_CONFIG_URI 用, client, quic/localhost:7447, SHM 有効, no multicast |
+| `zenoh_router.json5` | ROS 2 ノード (ロボット) | RMW_ZENOH_CONFIG_URI 用, client, quic/localhost:7447, SHM 有効, no multicast |
 | `zenoh_router.json5` | zenohd ルーター (ロボット) | router, listen quic/0.0.0.0:7447, SHM 有効, no multicast |
 | `zenoh_ope.json5` | ROS 2 ノード (オペレータ) | client, quic/\<ROBOT_IP\>:7447, no multicast |
 

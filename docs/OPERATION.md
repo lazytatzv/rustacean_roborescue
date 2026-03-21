@@ -50,7 +50,7 @@ just forge
 ## 3. 実機起動 (ロボット側)
 
 ### 3.1 Zenoh 設定の確認
-`main_ws/src/bringup/config/zenoh_robot.json5` が `mode: "peer"` であることを確認。
+`main_ws/src/bringup/config/zenoh_router.json5` が `mode: "router"` であることを確認。
 
 ### 3.2 起動
 ```bash

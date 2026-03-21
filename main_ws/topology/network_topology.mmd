@@ -62,7 +62,7 @@ graph LR
   %% ネットワーク (Zenoh / QUIC)
   %% =============================================
   subgraph Network["通信ミドルウェア — Zenoh (rmw_zenoh_cpp)"]
-    ZENOH_R{{zenohd<br/>ロボット側ルーター<br/>QUIC :7447<br/>SHM 有効<br/>zenoh_robot.json5}}:::proto
+    ZENOH_R{{zenohd<br/>ロボット側ルーター<br/>QUIC :7447<br/>SHM 有効<br/>zenoh_router.json5}}:::proto
     ZENOH_O{{zenohd<br/>オペレータ側ルーター<br/>QUIC connect<br/>zenoh_ope.json5}}:::proto
     ZENOH_R <== "Wi-Fi / Ethernet<br/>QUIC (UDP :7447)" ==> ZENOH_O
   end
