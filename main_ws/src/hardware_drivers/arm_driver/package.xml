@@ -14,8 +14,10 @@
   <depend>sensor_msgs</depend>
   <depend>builtin_interfaces</depend>
   <depend>visualization_msgs</depend>
+  <depend>custom_interfaces</depend>
 
   <export>
     <build_type>ament_cargo</build_type>
   </export>
+  <url type="doc">README.md</url>
 </package>
