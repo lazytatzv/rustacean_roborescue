@@ -92,6 +92,25 @@ cd operator
 - `operator/check_zenoh_network.sh` — UDP 到達性チェック
 - `operator/test_zenoh_ros.sh` — ROS2 ベースの疎通テスト
 - `operator/local_zenoh_test.md` — ローカルテスト手順
+ - `operator/republish_h264.py` — Operator 側で H.264 ストリームをデコードして `sensor_msgs/Image` として再発行する小さなノード
+
+## H.264 デコード（Operator側）
+
+Foxglove での確実な再生を目的として、Operator 側で H.264 をデコードして再発行するユーティリティを追加しました。
+
+依存（Operator マシンにインストールしてください）:
+
+ - `python3 -m pip install av opencv-python`
+ - ROS2 の `cv_bridge`（通常は apt / rosdep で用意）
+
+実行例:
+
+```bash
+# ROS2 環境をソースしたターミナルで
+python3 operator/republish_h264.py --in-topic /camera/image_raw/ffmpeg --out-topic /camera/image_raw
+```
+
+このノードは `CompressedImage` トピック（H.264 生ストリーム）を受け、デコードしたフレームを `sensor_msgs/Image` で再発行します。Foxglove はこの再発行された生画像を確実に表示できます。
 
 ## 運用上の注意点
 
