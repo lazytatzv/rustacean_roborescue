@@ -50,29 +50,102 @@ fn hardware_thread(
 
         if estop_flag.load(Ordering::Relaxed) {
             driver.emergency_stop();
-            while !shutdown_flag.load(Ordering::Relaxed) { thread::sleep(Duration::from_millis(100)); }
-            break;
+            // Wait until E-STOP is cleared or shutdown is requested.
+            while estop_flag.load(Ordering::Relaxed) && !shutdown_flag.load(Ordering::Relaxed) {
+                thread::sleep(Duration::from_millis(100));
+            }
+            if shutdown_flag.load(Ordering::Relaxed) {
+                break;
+            }
+
+            eprintln!("✅ arm_driver: E-Stop cleared — reinitializing position mode");
+            if let Err(e) = driver.init_position_mode(profile_velocity) {
+                eprintln!("🔥 arm_driver: recovery failed during mode init: {e:#}");
+                *lock_or_recover(&error_flag) = true;
+                break;
+            }
+
+            match driver.read_positions() {
+                Ok(positions) => {
+                    _last_positions = positions;
+                    last_cmd_time = Instant::now();
+                    consecutive_errors = 0;
+                    // Drop stale queued commands after E-STOP clear.
+                    while rx_cmd.try_recv().is_ok() {}
+                    eprintln!("✅ arm_driver: recovery complete, loop resumed");
+                }
+                Err(e) => {
+                    eprintln!("🔥 arm_driver: recovery failed to read positions: {e:#}");
+                    *lock_or_recover(&error_flag) = true;
+                    break;
+                }
+            }
+            continue;
         }
 
         while let Ok(cmd) = rx_cmd.try_recv() {
-            if let Some(p) = cmd.arm_positions { let _ = driver.write_arm_positions(&p); }
-            if let Some(p) = cmd.gripper_position { let _ = driver.write_gripper_position(p); }
+            if let Some(p) = cmd.arm_positions {
+                match driver.write_arm_positions(&p) {
+                    Ok(()) => { consecutive_errors = 0; }
+                    Err(e) => {
+                        consecutive_errors += 1;
+                        eprintln!("⚠️  arm_driver: arm write error ({consecutive_errors}/{MAX_COMM_RETRIES}): {e}");
+                        if consecutive_errors >= MAX_COMM_RETRIES {
+                            eprintln!("🔥 arm_driver: too many arm write errors, emergency stop");
+                            driver.emergency_stop();
+                            return;
+                        }
+                    }
+                }
+            }
+            if let Some(p) = cmd.gripper_position {
+                match driver.write_gripper_position(p) {
+                    Ok(()) => { consecutive_errors = 0; }
+                    Err(e) => {
+                        consecutive_errors += 1;
+                        eprintln!("⚠️  arm_driver: gripper write error ({consecutive_errors}/{MAX_COMM_RETRIES}): {e}");
+                        if consecutive_errors >= MAX_COMM_RETRIES {
+                            eprintln!("🔥 arm_driver: too many gripper write errors, emergency stop");
+                            driver.emergency_stop();
+                            return;
+                        }
+                    }
+                }
+            }
         }
 
         if let Ok(p) = driver.read_arm_positions() {
+            consecutive_errors = 0;
             let mut msg = JointState::default();
             msg.header.stamp = now_stamp();
             msg.name = arm_joint_names.clone();
             msg.position = p;
             let _ = joint_state_pub.publish(&msg);
+        } else {
+            consecutive_errors += 1;
+            eprintln!("⚠️  arm_driver: read arm error ({consecutive_errors}/{MAX_COMM_RETRIES})");
+            if consecutive_errors >= MAX_COMM_RETRIES {
+                eprintln!("🔥 arm_driver: too many read errors, emergency stop");
+                driver.emergency_stop();
+                return;
+            }
         }
 
         if let Ok(s) = driver.read_gripper_status() {
+            consecutive_errors = 0;
             let mut msg = GripperStatus::default();
             msg.position = s.position_rad as f32;
             msg.current = s.current_a as f32;
             msg.temperature = s.temperature_c as f32;
             let _ = gripper_status_pub.publish(&msg);
+        } else {
+            consecutive_errors += 1;
+            eprintln!("⚠️  arm_driver: read gripper error ({consecutive_errors}/{MAX_COMM_RETRIES})");
+            if consecutive_errors >= MAX_COMM_RETRIES {
+                eprintln!("🔥 arm_driver: too many gripper read errors, emergency stop");
+                driver.emergency_stop();
+                return;
+            }
         }
 
         let elapsed = loop_start.elapsed();
