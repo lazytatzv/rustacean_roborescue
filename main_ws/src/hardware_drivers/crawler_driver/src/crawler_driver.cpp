@@ -194,10 +194,14 @@ class CrawlerDriver : public rclcpp::Node
     estop_sub_ = create_subscription<std_msgs::msg::Bool>(
         "/emergency_stop", estop_qos,
         [this](const std_msgs::msg::Bool::SharedPtr msg) {
-          if (msg->data) {
-            estop_active_ = true;
+          const bool was_estop = estop_active_;
+          estop_active_ = msg->data;
+
+          if (estop_active_ && !was_estop) {
             stopMotors();
             RCLCPP_FATAL(get_logger(), "EMERGENCY STOP activated — motors halted");
+          } else if (!estop_active_ && was_estop) {
+            RCLCPP_WARN(get_logger(), "EMERGENCY STOP cleared — command acceptance resumed");
           }
         });
   }
