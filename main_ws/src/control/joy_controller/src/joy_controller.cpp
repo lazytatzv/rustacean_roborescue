@@ -67,9 +67,33 @@ class JoyController : public rclcpp::Node
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_publisher_;
 
+  struct ArmInput
+  {
+    float linear_x;
+    float linear_y;
+    float linear_z;
+    float angular_x;
+    float angular_y;
+    float angular_z;
+  };
+
   static float apply_deadzone(float val, float threshold) {return (std::abs(val) < threshold) ? 0.0f : val; }
   static int button(const sensor_msgs::msg::Joy &msg, size_t idx) { return (idx < msg.buttons.size()) ? msg.buttons[idx] : 0; }
   static float axis(const sensor_msgs::msg::Joy &msg, size_t idx) { return (idx < msg.axes.size()) ? msg.axes[idx] : 0.0f; }
+
+  ArmInput compute_arm_input(const sensor_msgs::msg::Joy &msg) const
+  {
+    const float l2 = (1.0f - axis(msg, AXIS_L2)) / 2.0f;
+    const float r2 = (1.0f - axis(msg, AXIS_R2)) / 2.0f;
+    return ArmInput{
+      -apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_),
+      apply_deadzone(axis(msg, AXIS_LEFT_X), deadzone_),
+      apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_),
+      (r2 - l2),
+      apply_deadzone(axis(msg, AXIS_DPAD_Y), 0.5f),
+      -apply_deadzone(axis(msg, AXIS_RIGHT_X), deadzone_)
+    };
+  }
 
   void update_mode(const sensor_msgs::msg::Joy &msg)
   {
@@ -148,27 +172,27 @@ class JoyController : public rclcpp::Node
 
   void publish_arm(const sensor_msgs::msg::Joy &msg)
   {
+    const auto input = compute_arm_input(msg);
+
     if (mode_ == Mode::ARM) {
       geometry_msgs::msg::Twist twist;
-      float l2 = (1.0f - axis(msg, AXIS_L2)) / 2.0f, r2 = (1.0f - axis(msg, AXIS_R2)) / 2.0f;
-      twist.linear.x = -apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * arm_lin_scale_;
-      twist.linear.y =  apply_deadzone(axis(msg, AXIS_LEFT_X), deadzone_) * arm_lin_scale_;
-      twist.linear.z =  apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * arm_lin_scale_;
-      twist.angular.x = (r2 - l2) * arm_ang_scale_;
-      twist.angular.y = apply_deadzone(axis(msg, AXIS_DPAD_Y), 0.5f) * arm_ang_scale_;
-      twist.angular.z = -apply_deadzone(axis(msg, AXIS_RIGHT_X), deadzone_) * arm_ang_scale_;
+      twist.linear.x = input.linear_x * arm_lin_scale_;
+      twist.linear.y = input.linear_y * arm_lin_scale_;
+      twist.linear.z = input.linear_z * arm_lin_scale_;
+      twist.angular.x = input.angular_x * arm_ang_scale_;
+      twist.angular.y = input.angular_y * arm_ang_scale_;
+      twist.angular.z = input.angular_z * arm_ang_scale_;
       arm_publisher_->publish(twist);
     } else if (mode_ == Mode::JOINT) {
       auto j_msg = sensor_msgs::msg::JointState();
       j_msg.name = {"arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"};
-      float l2 = (1.0f - axis(msg, AXIS_L2)) / 2.0f, r2 = (1.0f - axis(msg, AXIS_R2)) / 2.0f;
       j_msg.velocity = {
-        static_cast<double>(-apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * joint_scale_),
-        static_cast<double>(apply_deadzone(axis(msg, AXIS_LEFT_X), deadzone_) * joint_scale_),
-        static_cast<double>(-apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * joint_scale_),
-        static_cast<double>(apply_deadzone(axis(msg, AXIS_RIGHT_X), deadzone_) * joint_scale_),
-        static_cast<double>((r2 - l2) * joint_scale_),
-        static_cast<double>(apply_deadzone(axis(msg, AXIS_DPAD_Y), 0.5f) * joint_scale_)
+        static_cast<double>(input.linear_x * joint_scale_),
+        static_cast<double>(input.linear_y * joint_scale_),
+        static_cast<double>(input.linear_z * joint_scale_),
+        static_cast<double>(input.angular_z * joint_scale_),
+        static_cast<double>(input.angular_x * joint_scale_),
+        static_cast<double>(input.angular_y * joint_scale_)
       };
       joint_publisher_->publish(j_msg);
     }
