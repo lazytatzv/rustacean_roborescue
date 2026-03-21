@@ -122,7 +122,19 @@ fn run() -> Result<()> {
         hardware_thread(port_name, baud_rate as u32, profile_velocity as u32, arm_ids, gripper_id as u8, gripper_max_current as u16, rx_cmd, joint_state_pub, gripper_status_pub, arm_joints, shutdown_c, estop_c);
     });
 
+    // ── Subscriber: /emergency_stop (std_msgs/Bool) ──
+    // QoS must match joy_controller publisher: transient_local + reliable
+    let estop_sub_flag = Arc::clone(&estop_flag);
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
+        "/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| {
+            estop_sub_flag.store(msg.data, Ordering::Relaxed);
+        },
+    )?;
+
     executor.spin().first_error()?;
+
+    // ── Signal hardware thread to stop and wait for clean shutdown ──
     shutdown_flag.store(true, Ordering::Relaxed);
     let _ = hw_thread.join();
     Ok(())
