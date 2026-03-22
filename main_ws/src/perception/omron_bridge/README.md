@@ -6,7 +6,8 @@ Usage (after colcon build):
 
 ros2 run omron_bridge omron_bridge_node --ros-args -p serial_port:=/dev/ttyUSB0 -p poll_period:=1.0
 
-It uses the `main_ws/src/external/omron-2jcie-bu01` submodule when available.
+It uses the `main_ws/src/external/omron-2jcie-bu01` submodule when available, or the
+`main_ws/third_party/omron-2jcie-bu01` location if the project keeps the library vendored there.
 
 RoboCup usage (implemented):
 - POI CSV export for `heat_sig` detections when temperature >= `heat_threshold_c` (default 40.0°C).

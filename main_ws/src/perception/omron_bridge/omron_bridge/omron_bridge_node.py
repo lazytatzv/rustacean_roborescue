@@ -9,9 +9,13 @@ def locate_submodule():
     # Search upward for a 'src/external/omron-2jcie-bu01' folder and add to sys.path
     p = Path(__file__).resolve()
     for parent in p.parents:
-        candidate = parent / 'src' / 'external' / 'omron-2jcie-bu01'
-        if candidate.exists():
-            sys.path.insert(0, str(candidate))
+        candidate_external = parent / 'src' / 'external' / 'omron-2jcie-bu01'
+        candidate_third = parent / 'third_party' / 'omron-2jcie-bu01'
+        if candidate_external.exists():
+            sys.path.insert(0, str(candidate_external))
+            return True
+        if candidate_third.exists():
+            sys.path.insert(0, str(candidate_third))
             return True
     return False
 
