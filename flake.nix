@@ -284,7 +284,7 @@
         # issues from nixgl/ros overlays.
         devShells.precommit = (import nixpkgs { inherit system; }).mkShell {
           name = "RoboRescue Precommit Shell";
-          packages = with (import nixpkgs { inherit system; }); [ python3 python3Packages.pre-commit python3Packages.ruff python3Packages.black python3Packages.isort python3Packages.cpplint ];
+          packages = with (import nixpkgs { inherit system; }); [ python3 python3Packages.pre-commit python3Packages.ruff python3Packages.black python3Packages.isort python3Packages.cpplint python3Packages.numpy ];
           shellHook = ''
             echo "Entering Pre-commit devShell: use 'pre-commit run --all-files'"
           '';
