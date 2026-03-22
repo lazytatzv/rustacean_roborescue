@@ -234,7 +234,11 @@
           name = "RoboRescue Env";
 
           # rosDeps を直接渡すと PATH が爆発するので圧縮環境のみ渡す
-          packages = buildTools ++ [ roboRescueEnv ];
+          # Provide an explicit Python environment so CMake/colcon find the
+          # same Python interpreter with NumPy and other dev packages.
+          pythonEnv = pkgs.python3.withPackages (ps: with ps; [ numpy opencv4 black isort pre-commit cpplint pip_audit pytest ]);
+
+          packages = buildTools ++ [ roboRescueEnv pythonEnv ];
 
           shellHook = ''
             # --- ROS 2 ---
