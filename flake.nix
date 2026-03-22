@@ -251,6 +251,10 @@
             export CXX="ccache clang++"
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
 
+            # Force colcon/CMake to use the Python interpreter from the
+            # pythonEnv so NumPy headers are discoverable by FindPython3.
+            export PYTHON_EXECUTABLE="${pythonEnv}/bin/python"
+
             # --- OpenMP (spark_fast_lio 用) ---
             export CFLAGS="-fopenmp $CFLAGS"
             export CXXFLAGS="-fopenmp $CXXFLAGS"
