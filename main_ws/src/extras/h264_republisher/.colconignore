@@ -1,5 +1,0 @@
-# Ignore building this experimental package while debugging
-# This prevents colcon from attempting to build h264_republisher
-
-# Ignore this package directory
-/

@@ -1,0 +1,9 @@
+"pois"
+"1.3"
+"<TeamName>"
+"<Country>"
+"<Start Date>"
+"<Start Time>"
+"<Mission #>"
+detection,time,type,name,x,y,z,robot,mode
+1,00:00:00,ar_code,2,0.0,0.0,0.0,robot1,A
