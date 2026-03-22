@@ -128,9 +128,15 @@ class QrDetectorNode(Node):
             self.get_logger().info(f"QR detected: {content}")
 
             # Draw bounding box on frame for compressed output
-            if self._compressed_pub is not None and points is not None and i < len(points):
+            if (
+                self._compressed_pub is not None
+                and points is not None
+                and i < len(points)
+            ):
                 pts = points[i].astype(np.int32).reshape(-1, 2)
-                cv2.polylines(frame, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
+                cv2.polylines(
+                    frame, [pts], isClosed=True, color=(0, 255, 0), thickness=2
+                )
                 cv2.putText(
                     frame,
                     content[:40],

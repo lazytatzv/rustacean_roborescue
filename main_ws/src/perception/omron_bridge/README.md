@@ -18,4 +18,3 @@ Parameters:
 - `team_name` (string)
 - `country` (string)
 - `heat_threshold_c` (float)
-

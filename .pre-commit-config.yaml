@@ -5,10 +5,15 @@ repos:
       - id: black
         language_version: python3
 
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.315
+  # ruff-pre-commit had a pinned rev that failed to initialize in this environment.
+  # Use a local-system ruff hook instead; Nix or CI should provide `ruff` in PATH.
+  - repo: local
     hooks:
       - id: ruff
+        name: ruff
+        entry: ruff check --fix
+        language: system
+        types: [python]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

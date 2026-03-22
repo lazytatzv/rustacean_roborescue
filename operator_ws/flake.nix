@@ -45,7 +45,6 @@
             export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
 
             # ── Zenoh 設定 ──
-            # <ROBOT_IP> を実機 IP に書き換えた zenoh_ope.json5 を指定
             ZENOH_CFG="$PWD/zenoh_ope.json5"
             if [ -f "$ZENOH_CFG" ]; then
               export RMW_ZENOH_CONFIG_URI="file://$ZENOH_CFG"
@@ -53,17 +52,11 @@
             else
               echo "⚠️  zenoh_ope.json5 が見つかりません。以下を作成してください:"
               echo "   cp ../operator/zenoh_ope.json5 ."
-              echo "   # <ROBOT_IP> をロボットの IP アドレスに書き換える"
             fi
 
             echo "======================================================="
             echo " Rustacean RoboRescue — Operator Station"
             echo " ROS: ${ROS_VERSION} | RMW: rmw_zenoh_cpp"
-            echo ""
-            echo " 使い方:"
-            echo "   1. PS4 コントローラを USB/Bluetooth 接続"
-            echo "   2. ros2 run joy joy_node"
-            echo "   3. Foxglove Studio → ws://<ROBOT_IP>:8765"
             echo "======================================================="
           '';
         };

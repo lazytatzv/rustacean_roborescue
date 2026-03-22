@@ -22,7 +22,7 @@ ament_target_dependencies(joy_controller_node rclcpp sensor_msgs std_msgs geomet
 
 install(TARGETS
 	joy_controller_node
-	DESTINATION lib/${PROJECT_NAME}	
+	DESTINATION lib/${PROJECT_NAME}
 
 )
 

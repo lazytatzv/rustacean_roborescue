@@ -5,6 +5,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <vector>
+
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
 
 class FlipperDriver : public rclcpp::Node
@@ -31,24 +32,25 @@ class FlipperDriver : public rclcpp::Node
         "/flipper_driver", 10,
         std::bind(&FlipperDriver::driver_callback, this, std::placeholders::_1));
 
-    watchdog_timer_ = create_wall_timer(
-        std::chrono::milliseconds(watchdog_timeout_ms_),
-        std::bind(&FlipperDriver::watchdog_callback, this));
+    watchdog_timer_ = create_wall_timer(std::chrono::milliseconds(watchdog_timeout_ms_),
+                                        std::bind(&FlipperDriver::watchdog_callback, this));
 
     // Emergency stop subscriber (transient_local to catch latched msg)
-    auto estop_qos = rclcpp::QoS(1)
-        .transient_local()
-        .reliable();
+    auto estop_qos = rclcpp::QoS(1).transient_local().reliable();
     estop_sub_ = create_subscription<std_msgs::msg::Bool>(
         "/emergency_stop", estop_qos,
-        [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        [this](const std_msgs::msg::Bool::SharedPtr msg)
+        {
           const bool was_estop = estop_active_;
           estop_active_ = msg->data;
 
-          if (estop_active_ && !was_estop) {
+          if (estop_active_ && !was_estop)
+          {
             stopMotors();
             RCLCPP_FATAL(get_logger(), "EMERGENCY STOP activated — motors halted");
-          } else if (!estop_active_ && was_estop) {
+          }
+          else if (!estop_active_ && was_estop)
+          {
             RCLCPP_WARN(get_logger(), "EMERGENCY STOP cleared — command acceptance resumed");
           }
         });
@@ -62,12 +64,12 @@ class FlipperDriver : public rclcpp::Node
   }
 
  private:
-  DynamixelWorkbench    dxl_wb_;
-  std::string           port_name_;
-  int                   baud_rate_;
+  DynamixelWorkbench dxl_wb_;
+  std::string port_name_;
+  int baud_rate_;
   std::vector<long int> dynamixel_ids_;
-  int                   watchdog_timeout_ms_;
-  int                   velocity_limit_;
+  int watchdog_timeout_ms_;
+  int velocity_limit_;
 
   rclcpp::Subscription<custom_interfaces::msg::FlipperVelocity>::SharedPtr subscription_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
@@ -77,12 +79,12 @@ class FlipperDriver : public rclcpp::Node
 
   void initParams()
   {
-    port_name_           = get_parameter("port_name").as_string();
-    baud_rate_           = get_parameter("baud_rate").as_int();
-    dynamixel_ids_       = get_parameter("dynamixel_ids").as_integer_array();
+    port_name_ = get_parameter("port_name").as_string();
+    baud_rate_ = get_parameter("baud_rate").as_int();
+    dynamixel_ids_ = get_parameter("dynamixel_ids").as_integer_array();
     watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
-    velocity_limit_      = get_parameter("velocity_limit").as_int();
-    last_cmd_time_       = now();
+    velocity_limit_ = get_parameter("velocity_limit").as_int();
+    last_cmd_time_ = now();
   }
 
   bool initDynamixel()
@@ -124,8 +126,7 @@ class FlipperDriver : public rclcpp::Node
     {
       if (!dxl_wb_.goalVelocity(id, 0))
       {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to stop Dynamixel motor ID %ld", id);
+        RCLCPP_ERROR(this->get_logger(), "Failed to stop Dynamixel motor ID %ld", id);
       }
     }
   }
@@ -137,8 +138,7 @@ class FlipperDriver : public rclcpp::Node
 
     if (msg.flipper_vel.size() < dynamixel_ids_.size())
     {
-      RCLCPP_ERROR(this->get_logger(),
-                   "flipper_vel size (%zu) < dynamixel_ids size (%zu)",
+      RCLCPP_ERROR(this->get_logger(), "flipper_vel size (%zu) < dynamixel_ids size (%zu)",
                    msg.flipper_vel.size(), dynamixel_ids_.size());
       return;
     }
@@ -160,7 +160,7 @@ class FlipperDriver : public rclcpp::Node
     if (elapsed > watchdog_timeout_ms_)
     {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000,
-                            "Watchdog: no command for %.0f ms, stopping motors", elapsed);
+                           "Watchdog: no command for %.0f ms, stopping motors", elapsed);
       stopMotors();
     }
   }

@@ -1,7 +1,7 @@
 ## colcon cargo intro
 
 ```bash
-pip install colcon-cargo colcon-ros-cargo 
+pip install colcon-cargo colcon-ros-cargo
 ```
 
 system dependencies

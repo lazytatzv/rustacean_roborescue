@@ -16,15 +16,19 @@ def generate_launch_description() -> LaunchDescription:
 
     nav2_params = DeclareLaunchArgument(
         "nav2_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "nav2_params.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "nav2_params.yaml"]
+        ),
         description="Nav2 パラメータ YAML のパス",
     )
     autostart = DeclareLaunchArgument(
-        "autostart", default_value="true",
+        "autostart",
+        default_value="true",
         description="lifecycle_manager が自動で activate する",
     )
     use_sim_time_arg = DeclareLaunchArgument(
-        "use_sim_time", default_value="false",
+        "use_sim_time",
+        default_value="false",
         description="シミュレーション時は true",
     )
 
@@ -72,8 +76,8 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
         parameters=[params_file, {"use_sim_time": use_sim_time}],
         remappings=[
-            ("cmd_vel", "cmd_vel_nav"),       # controller_server → smoother
-            ("cmd_vel_smoothed", "cmd_vel"),   # smoother → crawler_driver
+            ("cmd_vel", "cmd_vel_nav"),  # controller_server → smoother
+            ("cmd_vel_smoothed", "cmd_vel"),  # smoother → crawler_driver
         ],
     )
 
@@ -82,27 +86,31 @@ def generate_launch_description() -> LaunchDescription:
         executable="lifecycle_manager",
         name="lifecycle_manager_navigation",
         output="screen",
-        parameters=[{
-            "use_sim_time": use_sim_time,
-            "autostart": LaunchConfiguration("autostart"),
-            "node_names": [
-                "controller_server",
-                "planner_server",
-                "behavior_server",
-                "bt_navigator",
-                "velocity_smoother",
-            ],
-        }],
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "autostart": LaunchConfiguration("autostart"),
+                "node_names": [
+                    "controller_server",
+                    "planner_server",
+                    "behavior_server",
+                    "bt_navigator",
+                    "velocity_smoother",
+                ],
+            }
+        ],
     )
 
-    return LaunchDescription([
-        nav2_params,
-        autostart,
-        use_sim_time_arg,
-        controller_server,
-        planner_server,
-        behavior_server,
-        bt_navigator,
-        velocity_smoother,
-        lifecycle_manager,
-    ])
+    return LaunchDescription(
+        [
+            nav2_params,
+            autostart,
+            use_sim_time_arg,
+            controller_server,
+            planner_server,
+            behavior_server,
+            bt_navigator,
+            velocity_smoother,
+            lifecycle_manager,
+        ]
+    )

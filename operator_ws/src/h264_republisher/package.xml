@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>h264_republisher</name>
+  <version>0.1.0</version>
+  <description>Republish H.264 compressed topic as sensor_msgs/Image for viewer compatibility</description>
+  <maintainer email="dev@example.com">RoboRescue</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+</package>

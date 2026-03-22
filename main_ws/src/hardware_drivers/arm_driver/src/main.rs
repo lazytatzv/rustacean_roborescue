@@ -100,7 +100,7 @@ fn run() -> Result<()> {
     let gripper_max_current: i64 = node.declare_parameter("gripper_max_current").default(500_i64).mandatory()?.get();
     let profile_velocity: i64 = node.declare_parameter("profile_velocity").default(100_i64).mandatory()?.get();
 
-    
+
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
     let (tx_cmd, rx_cmd) = channel::<HwCommand>();

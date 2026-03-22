@@ -1172,5 +1172,3 @@ end_header
 {DATA}
 
 24
-
-

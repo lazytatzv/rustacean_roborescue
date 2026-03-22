@@ -25,13 +25,20 @@ from builtin_interfaces.msg import Time
 
 
 ARM_JOINTS = [
-    "arm_joint1", "arm_joint2", "arm_joint3",
-    "arm_joint4", "arm_joint5", "arm_joint6",
+    "arm_joint1",
+    "arm_joint2",
+    "arm_joint3",
+    "arm_joint4",
+    "arm_joint5",
+    "arm_joint6",
 ]
 
 URDF_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "src", "bringup", "urdf", "sekirei.urdf",
+    "src",
+    "bringup",
+    "urdf",
+    "sekirei.urdf",
 )
 
 
@@ -94,16 +101,18 @@ class ArmTester(Node):
         has_nonzero_pos = any(abs(p) > 1e-9 for p in pos)
         max_vel = max((abs(v) for v in vel), default=0.0)
         max_pos = max((abs(p) for p in pos), default=0.0)
-        self.results.append({
-            "phase": self.test_phase,
-            "vel": vel,
-            "pos": pos,
-            "nonzero_vel": has_nonzero_vel,
-            "nonzero_pos": has_nonzero_pos,
-            "max_vel": max_vel,
-            "max_pos": max_pos,
-            "names": list(msg.name),
-        })
+        self.results.append(
+            {
+                "phase": self.test_phase,
+                "vel": vel,
+                "pos": pos,
+                "nonzero_vel": has_nonzero_vel,
+                "nonzero_pos": has_nonzero_pos,
+                "max_vel": max_vel,
+                "max_pos": max_pos,
+                "names": list(msg.name),
+            }
+        )
 
     def _test_tick(self):
         if self.test_phase >= len(self.tests):
@@ -138,12 +147,20 @@ class ArmTester(Node):
                     f"{n} msgs, {n_nonzero_vel} with non-zero vel, "
                     f"{n_nonzero_pos} with non-zero pos"
                 )
-                self.get_logger().info(f"  Peak |vel|: {best_vel:.6f}, Peak |pos|: {best_pos:.6f}")
-                self.get_logger().info(f"  Last vel: {[f'{v:.6f}' for v in last['vel']]}")
-                self.get_logger().info(f"  Last pos: {[f'{p:.6f}' for p in last['pos']]}")
+                self.get_logger().info(
+                    f"  Peak |vel|: {best_vel:.6f}, Peak |pos|: {best_pos:.6f}"
+                )
+                self.get_logger().info(
+                    f"  Last vel: {[f'{v:.6f}' for v in last['vel']]}"
+                )
+                self.get_logger().info(
+                    f"  Last pos: {[f'{p:.6f}' for p in last['pos']]}"
+                )
                 self.get_logger().info(f"  Names: {last['names']}")
             else:
-                self.get_logger().warn(f"  Phase {self.test_phase} '{name}': NO messages received!")
+                self.get_logger().warn(
+                    f"  Phase {self.test_phase} '{name}': NO messages received!"
+                )
 
             self.test_phase += 1
             self.phase_start = None
@@ -177,7 +194,9 @@ class ArmTester(Node):
             else:
                 fail_count += 1
 
-            self.get_logger().info(f"  [{status}] Phase {i}: {name} ({n_msgs} msgs, {n_nonzero} non-zero)")
+            self.get_logger().info(
+                f"  [{status}] Phase {i}: {name} ({n_msgs} msgs, {n_nonzero} non-zero)"
+            )
 
         self.get_logger().info("-" * 60)
         self.get_logger().info(f"  Result: {pass_count} PASS, {fail_count} FAIL")
@@ -189,13 +208,20 @@ def main():
 
     # Launch arm_controller as a subprocess
     arm_cmd = [
-        "ros2", "run", "arm_controller", "arm_controller",
+        "ros2",
+        "run",
+        "arm_controller",
+        "arm_controller",
         "--ros-args",
-        "-p", f"urdf_path:={URDF_PATH}",
-        "-p", "end_link:=link_tip",
+        "-p",
+        f"urdf_path:={URDF_PATH}",
+        "-p",
+        "end_link:=link_tip",
     ]
     print(f"Starting arm_controller: {' '.join(arm_cmd)}")
-    arm_proc = subprocess.Popen(arm_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    arm_proc = subprocess.Popen(
+        arm_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
 
     # Wait for arm_controller to initialize
     time.sleep(2.0)

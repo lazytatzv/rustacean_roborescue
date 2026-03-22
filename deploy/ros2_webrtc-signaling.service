@@ -1,0 +1,13 @@
+[Unit]
+Description=ROS2 Signaling Node (webrtc)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/tatsv/working/rustacean_roborescue
+ExecStart=/usr/bin/env ros2 run ros2_webrtc signaling_node
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

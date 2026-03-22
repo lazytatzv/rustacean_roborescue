@@ -20,7 +20,7 @@ add_executable(crawler_driver_node src/crawler_driver.cpp)
 ament_target_dependencies(crawler_driver_node rclcpp geometry_msgs std_msgs custom_interfaces)
 
 install(TARGETS crawler_driver_node
-	DESTINATION lib/${PROJECT_NAME})	
+	DESTINATION lib/${PROJECT_NAME})
 
 
 if(BUILD_TESTING)

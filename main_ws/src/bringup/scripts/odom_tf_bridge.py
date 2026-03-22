@@ -16,12 +16,8 @@ class OdomTfBridge(Node):
         self.last_stamp_ns = 0
 
         qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
-        self.sub_ = self.create_subscription(
-            Odometry, "/odom", self.odom_cb, qos
-        )
-        self.get_logger().info(
-            "odom_tf_bridge started: /odom → TF odom→base_footprint"
-        )
+        self.sub_ = self.create_subscription(Odometry, "/odom", self.odom_cb, qos)
+        self.get_logger().info("odom_tf_bridge started: /odom → TF odom→base_footprint")
         self.received_first = False
 
     def odom_cb(self, msg: Odometry) -> None:
