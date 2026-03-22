@@ -5,13 +5,14 @@ to local ROS2 topics so other ROS2 nodes can publish/subscribe signaling
 messages. This allows ROS2-managed signaling while still letting remote peers
 connect via WebSocket.
 """
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
 
 import asyncio
 import json
-from aiohttp import web, WSMsgType
+
+import rclpy
+from aiohttp import WSMsgType, web
+from rclpy.node import Node
+from std_msgs.msg import String
 
 rooms = {}  # room -> set of websocket
 
@@ -36,15 +37,13 @@ class SignalingNode(Node):
 
 
 async def websocket_handler(request):
-    import os
-    import rclpy
-    from rclpy.node import Node
-    from std_msgs.msg import String
-
     import asyncio
     import json
+    import os
     import ssl
-    from aiohttp import web, WSMsgType
+
+    from rclpy.node import Node
+    from std_msgs.msg import String
 
     rooms = {}  # room -> set of websocket
 

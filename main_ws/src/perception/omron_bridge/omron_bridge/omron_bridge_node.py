@@ -1,6 +1,6 @@
-import os
 import sys
 from pathlib import Path
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
@@ -27,7 +27,7 @@ if not locate_submodule():
 
 try:
     from omron_2jcie_bu01 import Omron2JCIE_BU01
-except Exception as e:
+except Exception:
     Omron2JCIE_BU01 = None
 
 

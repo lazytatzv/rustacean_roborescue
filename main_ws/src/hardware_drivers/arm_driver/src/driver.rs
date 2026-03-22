@@ -74,54 +74,84 @@ pub struct MotorStatus {
 
 impl ArmDynamixelDriver {
     pub fn new(port_name: &str, baud_rate: u32, arm_ids: Vec<u8>, gripper_id: u8) -> Result<Self> {
-        let port =
-            SerialPort::open(port_name, baud_rate).context("Failed to open serial port")?;
+        let port = SerialPort::open(port_name, baud_rate).context("Failed to open serial port")?;
         let bus = Bus::new(port)?;
-        Ok(Self { bus, arm_ids, gripper_id })
+        Ok(Self {
+            bus,
+            arm_ids,
+            gripper_id,
+        })
     }
 
     pub fn ping(&mut self, id: u8) -> Result<()> {
-        self.bus.ping(id).map(|_| ()).map_err(|e| anyhow::anyhow!("Ping ID {} failed: {:?}", id, e))
+        self.bus
+            .ping(id)
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Ping ID {} failed: {:?}", id, e))
     }
 
     pub fn init_motors(&mut self, profile_velocity: u32, gripper_max_current: u16) -> Result<()> {
         // Torque OFF
-        for &id in &self.arm_ids { let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0); }
+        for &id in &self.arm_ids {
+            let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0);
+        }
         let _ = self.bus.write_u8(self.gripper_id, ADDR_TORQUE_ENABLE, 0);
 
         // Set Modes
         for &id in &self.arm_ids {
-            self.bus.write_u8(id, ADDR_OPERATING_MODE, MODE_POSITION_CONTROL)?;
+            self.bus
+                .write_u8(id, ADDR_OPERATING_MODE, MODE_POSITION_CONTROL)?;
         }
-        self.bus.write_u8(self.gripper_id, ADDR_OPERATING_MODE, MODE_CURRENT_BASED_POSITION)?;
+        self.bus.write_u8(
+            self.gripper_id,
+            ADDR_OPERATING_MODE,
+            MODE_CURRENT_BASED_POSITION,
+        )?;
 
         // Configs
         for &id in &self.arm_ids {
-            self.bus.write_u32(id, ADDR_PROFILE_VELOCITY, profile_velocity)?;
+            self.bus
+                .write_u32(id, ADDR_PROFILE_VELOCITY, profile_velocity)?;
         }
-        self.bus.write_u16(self.gripper_id, ADDR_GOAL_CURRENT, gripper_max_current)?;
+        self.bus
+            .write_u16(self.gripper_id, ADDR_GOAL_CURRENT, gripper_max_current)?;
 
         // Torque ON
-        for &id in &self.arm_ids { self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 1)?; }
+        for &id in &self.arm_ids {
+            self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 1)?;
+        }
         self.bus.write_u8(self.gripper_id, ADDR_TORQUE_ENABLE, 1)?;
 
         Ok(())
     }
 
     pub fn write_arm_positions(&mut self, positions_rad: &[f64]) -> Result<()> {
-        let commands: Vec<SyncWriteData<u32>> = self.arm_ids.iter().zip(positions_rad.iter())
-            .map(|(&id, &rad)| SyncWriteData { motor_id: id, data: rad_to_ticks(rad) }).collect();
-        self.bus.sync_write_u32(ADDR_GOAL_POSITION, &commands).map_err(|e| anyhow::anyhow!("{:?}", e))
+        let commands: Vec<SyncWriteData<u32>> = self
+            .arm_ids
+            .iter()
+            .zip(positions_rad.iter())
+            .map(|(&id, &rad)| SyncWriteData {
+                motor_id: id,
+                data: rad_to_ticks(rad),
+            })
+            .collect();
+        self.bus
+            .sync_write_u32(ADDR_GOAL_POSITION, &commands)
+            .map_err(|e| anyhow::anyhow!("{:?}", e))
     }
 
     pub fn write_gripper_position(&mut self, rad: f64) -> Result<()> {
-        self.bus.write_u32(self.gripper_id, ADDR_GOAL_POSITION, rad_to_ticks(rad))
+        self.bus
+            .write_u32(self.gripper_id, ADDR_GOAL_POSITION, rad_to_ticks(rad))
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("{:?}", e))
     }
 
     pub fn read_arm_positions(&mut self) -> Result<Vec<f64>> {
-        let resp = self.bus.sync_read_u32(&self.arm_ids, ADDR_PRESENT_POSITION).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let resp = self
+            .bus
+            .sync_read_u32(&self.arm_ids, ADDR_PRESENT_POSITION)
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
         Ok(resp.iter().map(|r| ticks_to_rad(r.data)).collect())
     }
 
@@ -139,23 +169,32 @@ impl ArmDynamixelDriver {
         })
     }
 
-    pub fn emergency_stop(&mut self) { self.torque_off_all(); }
+    pub fn emergency_stop(&mut self) {
+        self.torque_off_all();
+    }
 
     pub fn check_temperatures(&mut self) -> (Vec<(u8, u8)>, Vec<(u8, u8)>) {
-        let mut warnings = Vec::new(); let mut critical = Vec::new();
-        let mut all_ids = self.arm_ids.clone(); all_ids.push(self.gripper_id);
+        let mut warnings = Vec::new();
+        let mut critical = Vec::new();
+        let mut all_ids = self.arm_ids.clone();
+        all_ids.push(self.gripper_id);
         for id in all_ids {
             if let Ok(resp) = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE) {
                 let temp = resp.data;
-                if temp >= TEMP_SHUTDOWN_THRESHOLD { critical.push((id, temp)); }
-                else if temp >= TEMP_WARN_THRESHOLD { warnings.push((id, temp)); }
+                if temp >= TEMP_SHUTDOWN_THRESHOLD {
+                    critical.push((id, temp));
+                } else if temp >= TEMP_WARN_THRESHOLD {
+                    warnings.push((id, temp));
+                }
             }
         }
         (warnings, critical)
     }
 
     pub fn torque_off_all(&mut self) {
-        for &id in &self.arm_ids { let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0); }
+        for &id in &self.arm_ids {
+            let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0);
+        }
         let _ = self.bus.write_u8(self.gripper_id, ADDR_TORQUE_ENABLE, 0);
     }
 }

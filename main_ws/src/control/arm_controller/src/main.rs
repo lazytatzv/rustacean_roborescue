@@ -5,18 +5,19 @@
 /// - Subscribe: /joint_states (sensor_msgs/JointState)  — actual joint positions (feedback)
 /// - Publish:   /arm_joint_commands (sensor_msgs/JointState) — target positions + velocities
 /// - Publish:   /arm_ee_pose (geometry_msgs/PoseStamped) — current FK result
-
 use anyhow::{Context as AnyhowContext, Result};
-use k::{Chain, SerialChain};
-use k::nalgebra as na;
-use rclrs::{Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions};
-use sensor_msgs::msg::JointState;
 use geometry_msgs::msg::{PoseStamped, Twist};
+use k::nalgebra as na;
+use k::{Chain, SerialChain};
+use rclrs::{
+    Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions,
+};
+use sensor_msgs::msg::JointState;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::mpsc::{sync_channel, SyncSender, Receiver};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Acquire a Mutex lock, recovering from poison.
@@ -78,7 +79,9 @@ impl JointLimits {
         let mut lower = Vec::new();
         let mut upper = Vec::new();
         for joint in chain.iter_joints() {
-            if matches!(joint.joint_type, k::JointType::Fixed) { continue; }
+            if matches!(joint.joint_type, k::JointType::Fixed) {
+                continue;
+            }
             if let Some(ref limits) = joint.limits {
                 lower.push(limits.min);
                 upper.push(limits.max);
@@ -91,16 +94,27 @@ impl JointLimits {
     }
 
     fn velocity_scale(&self, positions: &[f64], velocities: &[f64], margin: f64) -> Vec<f64> {
-        positions.iter().zip(velocities.iter()).enumerate().map(|(i, (&q, &dq))| {
-            let lo = self.lower[i];
-            let hi = self.upper[i];
-            if lo == -f64::INFINITY && hi == f64::INFINITY { return 1.0; }
-            let dist_lo = q - lo;
-            let dist_hi = hi - q;
-            if dq < 0.0 && dist_lo < margin { return (dist_lo / margin).clamp(0.0, 1.0); }
-            if dq > 0.0 && dist_hi < margin { return (dist_hi / margin).clamp(0.0, 1.0); }
-            1.0
-        }).collect()
+        positions
+            .iter()
+            .zip(velocities.iter())
+            .enumerate()
+            .map(|(i, (&q, &dq))| {
+                let lo = self.lower[i];
+                let hi = self.upper[i];
+                if lo == -f64::INFINITY && hi == f64::INFINITY {
+                    return 1.0;
+                }
+                let dist_lo = q - lo;
+                let dist_hi = hi - q;
+                if dq < 0.0 && dist_lo < margin {
+                    return (dist_lo / margin).clamp(0.0, 1.0);
+                }
+                if dq > 0.0 && dist_hi < margin {
+                    return (dist_hi / margin).clamp(0.0, 1.0);
+                }
+                1.0
+            })
+            .collect()
     }
 
     fn repulsion_gradient(&self, positions: &[f64]) -> na::DVector<f64> {
@@ -109,9 +123,13 @@ impl JointLimits {
         for i in 0..n {
             let lo = self.lower[i];
             let hi = self.upper[i];
-            if lo == -f64::INFINITY || hi == f64::INFINITY { continue; }
+            if lo == -f64::INFINITY || hi == f64::INFINITY {
+                continue;
+            }
             let range = hi - lo;
-            if range < 1e-6 { continue; }
+            if range < 1e-6 {
+                continue;
+            }
             let mid = (hi + lo) / 2.0;
             grad[i] = (mid - positions[i]) / (range * range) * 2.0;
         }
@@ -166,7 +184,10 @@ fn solve_velocity_ik(
     let manipulability = svals.iter().fold(1.0_f64, |acc, &x| acc * x.max(0.0));
 
     if manipulability < cfg.manipulability_lockout {
-        return IkResult { joint_velocities: na::DVector::zeros(dof), manipulability };
+        return IkResult {
+            joint_velocities: na::DVector::zeros(dof),
+            manipulability,
+        };
     }
 
     let lambda = if manipulability < cfg.manipulability_threshold {
@@ -182,7 +203,12 @@ fn solve_velocity_ik(
 
     let dq_task = match jjt_damped.clone().lu().solve(twist) {
         Some(y) => &jt * y,
-        None => return IkResult { joint_velocities: na::DVector::zeros(dof), manipulability },
+        None => {
+            return IkResult {
+                joint_velocities: na::DVector::zeros(dof),
+                manipulability,
+            }
+        }
     };
 
     let j_pinv = match jjt_damped.lu().solve(&jacobian) {
@@ -193,7 +219,10 @@ fn solve_velocity_ik(
     let repulsion = limits.repulsion_gradient(joint_positions) * cfg.null_space_repulsion_gain;
     let dq_null = &null_projector * &repulsion;
 
-    IkResult { joint_velocities: dq_task + dq_null, manipulability }
+    IkResult {
+        joint_velocities: dq_task + dq_null,
+        manipulability,
+    }
 }
 
 fn run() -> Result<()> {
@@ -201,29 +230,66 @@ fn run() -> Result<()> {
     let mut executor = context.create_basic_executor();
     let node = executor.create_node("arm_controller")?;
 
-    let urdf_path: Arc<str> = node.declare_parameter("urdf_path").default(Arc::from("")).mandatory()?.get();
+    let urdf_path: Arc<str> = node
+        .declare_parameter("urdf_path")
+        .default(Arc::from(""))
+        .mandatory()?
+        .get();
     let urdf_path = urdf_path.to_string();
-    let end_link: Arc<str> = node.declare_parameter("end_link").default(Arc::from("link_tip")).mandatory()?.get();
+    let end_link: Arc<str> = node
+        .declare_parameter("end_link")
+        .default(Arc::from("link_tip"))
+        .mandatory()?
+        .get();
     let end_link = end_link.to_string();
-    let watchdog_ms: i64 = node.declare_parameter("watchdog_timeout_ms").default(DEFAULT_WATCHDOG_MS as i64).mandatory()?.get();
+    let watchdog_ms: i64 = node
+        .declare_parameter("watchdog_timeout_ms")
+        .default(DEFAULT_WATCHDOG_MS as i64)
+        .mandatory()?
+        .get();
     let watchdog_timeout = Duration::from_millis(watchdog_ms as u64);
 
-    macro_rules! declare_f64 { ($name:expr, $default:expr) => { node.declare_parameter($name).default($default).mandatory()?.get() }; }
+    macro_rules! declare_f64 {
+        ($name:expr, $default:expr) => {
+            node.declare_parameter($name)
+                .default($default)
+                .mandatory()?
+                .get()
+        };
+    }
     let ik_config = IkConfig {
-        dls_lambda_base:          declare_f64!("dls_lambda_base",          DEFAULT_DLS_LAMBDA_BASE),
-        dls_lambda_max:           declare_f64!("dls_lambda_max",           DEFAULT_DLS_LAMBDA_MAX),
-        manipulability_threshold: declare_f64!("manipulability_threshold", DEFAULT_MANIPULABILITY_THRESHOLD),
-        manipulability_lockout:   declare_f64!("manipulability_lockout",   DEFAULT_MANIPULABILITY_LOCKOUT),
-        joint_vel_limit:          declare_f64!("joint_vel_limit",          DEFAULT_JOINT_VEL_LIMIT),
-        joint_limit_margin:       declare_f64!("joint_limit_margin",       DEFAULT_JOINT_LIMIT_MARGIN),
-        null_space_repulsion_gain: declare_f64!("null_space_repulsion_gain", DEFAULT_NULL_SPACE_REPULSION_GAIN),
+        dls_lambda_base: declare_f64!("dls_lambda_base", DEFAULT_DLS_LAMBDA_BASE),
+        dls_lambda_max: declare_f64!("dls_lambda_max", DEFAULT_DLS_LAMBDA_MAX),
+        manipulability_threshold: declare_f64!(
+            "manipulability_threshold",
+            DEFAULT_MANIPULABILITY_THRESHOLD
+        ),
+        manipulability_lockout: declare_f64!(
+            "manipulability_lockout",
+            DEFAULT_MANIPULABILITY_LOCKOUT
+        ),
+        joint_vel_limit: declare_f64!("joint_vel_limit", DEFAULT_JOINT_VEL_LIMIT),
+        joint_limit_margin: declare_f64!("joint_limit_margin", DEFAULT_JOINT_LIMIT_MARGIN),
+        null_space_repulsion_gain: declare_f64!(
+            "null_space_repulsion_gain",
+            DEFAULT_NULL_SPACE_REPULSION_GAIN
+        ),
     };
 
-    if urdf_path.is_empty() { anyhow::bail!("Parameter 'urdf_path' is required but was empty"); }
-    let chain = Chain::<f64>::from_urdf_file(&urdf_path).with_context(|| format!("Failed to load URDF: {urdf_path}"))?;
-    let end_node = chain.find_link(&end_link).with_context(|| format!("Could not find link '{end_link}'"))?;
+    if urdf_path.is_empty() {
+        anyhow::bail!("Parameter 'urdf_path' is required but was empty");
+    }
+    let chain = Chain::<f64>::from_urdf_file(&urdf_path)
+        .with_context(|| format!("Failed to load URDF: {urdf_path}"))?;
+    let end_node = chain
+        .find_link(&end_link)
+        .with_context(|| format!("Could not find link '{end_link}'"))?;
     let serial = SerialChain::from_end(end_node);
-    let joint_names: Vec<String> = serial.iter_joints().filter(|j| !matches!(j.joint_type, k::JointType::Fixed)).map(|j| j.name.clone()).collect();
+    let joint_names: Vec<String> = serial
+        .iter_joints()
+        .filter(|j| !matches!(j.joint_type, k::JointType::Fixed))
+        .map(|j| j.name.clone())
+        .collect();
     let dof = joint_names.len();
     let limits = JointLimits::from_serial_chain(&serial);
 
@@ -236,49 +302,85 @@ fn run() -> Result<()> {
     let state_tw = Arc::clone(&state);
     let _sub_tw = node.create_subscription::<Twist, _>("/arm_cmd_vel", move |msg: Twist| {
         let mut s = lock_or_recover(&state_tw);
-        s.target_twist = [msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z];
+        s.target_twist = [
+            msg.linear.x,
+            msg.linear.y,
+            msg.linear.z,
+            msg.angular.x,
+            msg.angular.y,
+            msg.angular.z,
+        ];
         s.is_ik_mode = true;
         s.last_cmd_time = Instant::now();
     })?;
 
     let state_jv = Arc::clone(&state);
     let names_for_jv = joint_names.clone();
-    let _sub_jv = node.create_subscription::<JointState, _>("/arm_joint_cmd_vel", move |msg: JointState| {
-        let mut s = lock_or_recover(&state_jv);
-        s.is_ik_mode = false;
-        s.last_cmd_time = Instant::now();
-        let mut map = HashMap::new();
-        for (i, name) in msg.name.iter().enumerate() { if i < msg.velocity.len() { map.insert(name.clone(), msg.velocity[i]); } }
-        for (i, name) in names_for_jv.iter().enumerate() { s.target_joint_vel[i] = *map.get(name).unwrap_or(&0.0); }
-    })?;
+    let _sub_jv =
+        node.create_subscription::<JointState, _>("/arm_joint_cmd_vel", move |msg: JointState| {
+            let mut s = lock_or_recover(&state_jv);
+            s.is_ik_mode = false;
+            s.last_cmd_time = Instant::now();
+            let mut map = HashMap::new();
+            for (i, name) in msg.name.iter().enumerate() {
+                if i < msg.velocity.len() {
+                    map.insert(name.clone(), msg.velocity[i]);
+                }
+            }
+            for (i, name) in names_for_jv.iter().enumerate() {
+                s.target_joint_vel[i] = *map.get(name).unwrap_or(&0.0);
+            }
+        })?;
 
     let state_js = Arc::clone(&state);
     let arm_names_for_check = joint_names.clone();
     let js_count_clone = Arc::clone(&js_counter);
-    let _sub_js = node.create_subscription::<JointState, _>("/joint_states", move |msg: JointState| {
-        let mut s = lock_or_recover(&state_js);
-        for (i, name) in msg.name.iter().enumerate() { if i < msg.position.len() { s.joint_positions.insert(name.clone(), msg.position[i]); } }
-        if !s.has_joint_feedback && arm_names_for_check.iter().all(|n| s.joint_positions.contains_key(n)) {
-            s.has_joint_feedback = true;
-            println!("✅ Arm controller armed");
-        }
-        js_count_clone.fetch_add(1, Ordering::Relaxed);
-    })?;
+    let _sub_js =
+        node.create_subscription::<JointState, _>("/joint_states", move |msg: JointState| {
+            let mut s = lock_or_recover(&state_js);
+            for (i, name) in msg.name.iter().enumerate() {
+                if i < msg.position.len() {
+                    s.joint_positions.insert(name.clone(), msg.position[i]);
+                }
+            }
+            if !s.has_joint_feedback
+                && arm_names_for_check
+                    .iter()
+                    .all(|n| s.joint_positions.contains_key(n))
+            {
+                s.has_joint_feedback = true;
+                println!("✅ Arm controller armed");
+            }
+            js_count_clone.fetch_add(1, Ordering::Relaxed);
+        })?;
 
     let estop_sub_flag = Arc::clone(&estop_flag);
-    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>("/emergency_stop".reliable().transient_local().keep_last(1),
-        move |msg: std_msgs::msg::Bool| { if msg.data { estop_sub_flag.store(true, Ordering::Relaxed); } }
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
+        "/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| {
+            if msg.data {
+                estop_sub_flag.store(true, Ordering::Relaxed);
+            }
+        },
     )?;
 
     let publisher: Publisher<JointState> = node.create_publisher("/arm_joint_commands")?;
     let pose_pub: Publisher<PoseStamped> = node.create_publisher("/arm_ee_pose")?;
     // Diagnostics publishers
-    let diag_loop_pub = node.create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/loop_time_ms")?;
-    let diag_manip_pub = node.create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/manipulability")?;
-    let diag_js_rate_pub = node.create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/joint_state_rate_hz")?;
+    let diag_loop_pub = node
+        .create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/loop_time_ms")?;
+    let diag_manip_pub = node
+        .create_publisher::<std_msgs::msg::Float64>("/arm_controller/diagnostics/manipulability")?;
+    let diag_js_rate_pub = node.create_publisher::<std_msgs::msg::Float64>(
+        "/arm_controller/diagnostics/joint_state_rate_hz",
+    )?;
 
     // control period parameter (ms)
-    let control_period_ms: i64 = node.declare_parameter("control_period_ms").default(DEFAULT_CONTROL_PERIOD_MS as i64).mandatory()?.get();
+    let control_period_ms: i64 = node
+        .declare_parameter("control_period_ms")
+        .default(DEFAULT_CONTROL_PERIOD_MS as i64)
+        .mandatory()?
+        .get();
     let control_period = Duration::from_millis(control_period_ms as u64);
     let dt = control_period_ms as f64 / 1000.0;
     let state_timer = Arc::clone(&state);
@@ -291,22 +393,30 @@ fn run() -> Result<()> {
     let mut last_diag_instant = Instant::now();
 
     // Setup a background worker for IK to avoid blocking the timer callback
-    let (req_tx, req_rx): (SyncSender<(na::DVector<f64>, Vec<f64>)>, Receiver<(na::DVector<f64>, Vec<f64>)>) = sync_channel(1);
-    let (res_tx, res_rx): (SyncSender<(Vec<f64>, f64)>, Receiver<(Vec<f64>, f64)>) = sync_channel(1);
+    let (req_tx, req_rx): (
+        SyncSender<(na::DVector<f64>, Vec<f64>)>,
+        Receiver<(na::DVector<f64>, Vec<f64>)>,
+    ) = sync_channel(1);
+    let (res_tx, res_rx): (SyncSender<(Vec<f64>, f64)>, Receiver<(Vec<f64>, f64)>) =
+        sync_channel(1);
 
     let serial_for_worker = serial_chain.clone();
     let limits_for_worker = limits.clone();
     let cfg_for_worker = cfg.clone();
-    std::thread::spawn(move || {
-        loop {
-            match req_rx.recv() {
-                Ok((twist_vec, positions)) => {
-                    let res = solve_velocity_ik(&serial_for_worker, &twist_vec, &limits_for_worker, &positions, &cfg_for_worker);
-                    let vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
-                    let _ = res_tx.send((vel, res.manipulability));
-                }
-                Err(_) => break,
+    std::thread::spawn(move || loop {
+        match req_rx.recv() {
+            Ok((twist_vec, positions)) => {
+                let res = solve_velocity_ik(
+                    &serial_for_worker,
+                    &twist_vec,
+                    &limits_for_worker,
+                    &positions,
+                    &cfg_for_worker,
+                );
+                let vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
+                let _ = res_tx.send((vel, res.manipulability));
             }
+            Err(_) => break,
         }
     });
 
@@ -314,14 +424,21 @@ fn run() -> Result<()> {
 
     let _timer = node.create_timer_repeating(control_period, move || {
         loop_count += 1;
-        if estop_timer.load(Ordering::Relaxed) { return; }
+        if estop_timer.load(Ordering::Relaxed) {
+            return;
+        }
         let mut s = lock_or_recover(&state_timer);
 
-        let current_positions: Vec<f64> = names_clone.iter().map(|n| s.joint_positions.get(n).copied().unwrap_or(0.0)).collect();
+        let current_positions: Vec<f64> = names_clone
+            .iter()
+            .map(|n| s.joint_positions.get(n).copied().unwrap_or(0.0))
+            .collect();
 
         // --- FEEDBACK CHECK ---
         if !s.has_joint_feedback {
-            if loop_count % 50 == 0 { println!("⏳ Waiting for joint feedback..."); }
+            if loop_count % 50 == 0 {
+                println!("⏳ Waiting for joint feedback...");
+            }
             return;
         }
 
@@ -349,7 +466,10 @@ fn run() -> Result<()> {
         let _ = pose_pub.publish(&pose_msg);
 
         if loop_count % 50 == 0 {
-            println!("📊 EE Pose: x={:.3}, y={:.3}, z={:.3}", iso.translation.vector[0], iso.translation.vector[1], iso.translation.vector[2]);
+            println!(
+                "📊 EE Pose: x={:.3}, y={:.3}, z={:.3}",
+                iso.translation.vector[0], iso.translation.vector[1], iso.translation.vector[2]
+            );
         }
 
         let mut joint_velocities: na::DVector<f64>;
@@ -386,16 +506,26 @@ fn run() -> Result<()> {
 
         let raw_vel: Vec<f64> = joint_velocities.iter().copied().collect();
         let scale = limits.velocity_scale(&current_positions, &raw_vel, cfg.joint_limit_margin);
-        let final_vel: Vec<f64> = raw_vel.iter().zip(scale.iter()).map(|(&v, &sc)| (v * sc).clamp(-cfg.joint_vel_limit, cfg.joint_vel_limit)).collect();
+        let final_vel: Vec<f64> = raw_vel
+            .iter()
+            .zip(scale.iter())
+            .map(|(&v, &sc)| (v * sc).clamp(-cfg.joint_vel_limit, cfg.joint_vel_limit))
+            .collect();
 
         // Integrate from target_positions for smoothness, but keep it tethered to feedback
-        let mut new_targets: Vec<f64> = target_positions.iter().zip(final_vel.iter()).enumerate()
-            .map(|(i, (&q, &dq))| (q + dq * dt).clamp(limits.lower[i], limits.upper[i])).collect();
+        let mut new_targets: Vec<f64> = target_positions
+            .iter()
+            .zip(final_vel.iter())
+            .enumerate()
+            .map(|(i, (&q, &dq))| (q + dq * dt).clamp(limits.lower[i], limits.upper[i]))
+            .collect();
 
         // Tethering: if target drifts too far from feedback (> 0.2 rad), snap it back partially
         for i in 0..dof {
             let diff = new_targets[i] - current_positions[i];
-            if diff.abs() > 0.2 { new_targets[i] = current_positions[i] + diff.signum() * 0.2; }
+            if diff.abs() > 0.2 {
+                new_targets[i] = current_positions[i] + diff.signum() * 0.2;
+            }
         }
 
         s.target_positions = Some(new_targets.clone());
@@ -411,7 +541,8 @@ fn run() -> Result<()> {
 
         // diagnostics: loop time and joint_state rate
         let now = Instant::now();
-        let loop_dur = now.duration_since(last_diag_instant).as_secs_f64() * 1000.0 / (if loop_count % 1 == 0 { 1.0 } else { 1.0 });
+        let loop_dur = now.duration_since(last_diag_instant).as_secs_f64() * 1000.0
+            / (if loop_count % 1 == 0 { 1.0 } else { 1.0 });
         let mut lmsg = std_msgs::msg::Float64::default();
         lmsg.data = loop_dur;
         let _ = diag_loop_pub.publish(&lmsg);
@@ -434,4 +565,9 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-fn main() { if let Err(e) = run() { eprintln!("🔥 fatal: {e:#}"); std::process::exit(1); } }
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("🔥 fatal: {e:#}");
+        std::process::exit(1);
+    }
+}

@@ -5,7 +5,9 @@
   <description>ROS2-managed WebRTC audio components (signaling + GStreamer nodes)</description>
   <maintainer email="you@example.com">You</maintainer>
   <license>Apache-2.0</license>
-  <build_type>ament_python</build_type>
+    <!-- package format="2" must not include <build_type>; ament_python
+      is implied by the layout (setup.py / setup.cfg). Remove this tag
+      to satisfy catkin_pkg validation. -->
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <exec_depend>python3-aiohttp</exec_depend>

@@ -5,18 +5,18 @@ signaling topics. Publishes local SDP/ICE to `webrtc/outgoing` and subscribes
 to `webrtc/incoming` for remote data. Hardened with CLI args, backoff and
 improved logging.
 """
-import os
-import time
+
 import argparse
+import json
+import os
+import queue
+import sys
+import time
+
 import rclpy
+from gi.repository import GLib, Gst
 from rclpy.node import Node
 from std_msgs.msg import String
-
-import threading
-import queue
-import json
-import sys
-from gi.repository import Gst, GLib
 
 Gst.init(None)
 

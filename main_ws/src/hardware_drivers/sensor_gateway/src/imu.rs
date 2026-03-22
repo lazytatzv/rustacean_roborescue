@@ -2,7 +2,6 @@
 ///
 /// STM32 + BNO055 から受信する CSV データのパース、
 /// Euler 角 → クォータニオン変換、ROS 2 Imu メッセージ生成を担う。
-
 use sensor_msgs::msg::Imu;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -52,8 +51,8 @@ pub fn parse_csv_line(line: &str) -> Option<ImuData> {
     }
     Some(ImuData {
         heading: parts[0].parse().ok()?,
-        roll:    parts[1].parse().ok()?,
-        pitch:   parts[2].parse().ok()?,
+        roll: parts[1].parse().ok()?,
+        pitch: parts[2].parse().ok()?,
         sys_cal: parts[3].parse().ok()?,
         gyr_cal: parts[4].parse().ok()?,
         acc_cal: parts[5].parse().ok()?,
@@ -75,14 +74,18 @@ pub fn parse_csv_line(line: &str) -> Option<ImuData> {
 ///
 /// # 戻り値
 /// (w, x, y, z)
-pub fn euler_to_quaternion(heading_deg: f64, roll_deg: f64, pitch_deg: f64) -> (f64, f64, f64, f64) {
-    let yaw   = heading_deg.to_radians();
-    let roll  = roll_deg.to_radians();
+pub fn euler_to_quaternion(
+    heading_deg: f64,
+    roll_deg: f64,
+    pitch_deg: f64,
+) -> (f64, f64, f64, f64) {
+    let yaw = heading_deg.to_radians();
+    let roll = roll_deg.to_radians();
     let pitch = pitch_deg.to_radians();
 
-    let (sy, cy) = (yaw   * 0.5).sin_cos();
+    let (sy, cy) = (yaw * 0.5).sin_cos();
     let (sp, cp) = (pitch * 0.5).sin_cos();
-    let (sr, cr) = (roll  * 0.5).sin_cos();
+    let (sr, cr) = (roll * 0.5).sin_cos();
 
     let w = cr * cp * cy + sr * sp * sy;
     let x = sr * cp * cy - cr * sp * sy;
@@ -108,19 +111,11 @@ pub fn now_stamp() -> builtin_interfaces::msg::Time {
 }
 
 /// BNO055 NDOF モードの orientation covariance
-const ORIENTATION_COV: [f64; 9] = [
-    0.01, 0.0,  0.0,
-    0.0,  0.01, 0.0,
-    0.0,  0.0,  0.01,
-];
+const ORIENTATION_COV: [f64; 9] = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01];
 
 /// angular_velocity / linear_acceleration が未知の場合の covariance
 /// REP-145: covariance[0] = -1.0 → "unknown"
-const UNKNOWN_COV: [f64; 9] = [
-    -1.0, 0.0, 0.0,
-     0.0, 0.0, 0.0,
-     0.0, 0.0, 0.0,
-];
+const UNKNOWN_COV: [f64; 9] = [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
 /// ImuData から sensor_msgs/Imu メッセージを生成する。
 pub fn build_imu_msg(data: &ImuData, frame_id: &str) -> Imu {

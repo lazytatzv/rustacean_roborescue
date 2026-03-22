@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
+import select
+import sys
+import termios
+import threading
+import tty
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-import sys, select, termios, tty
-import threading
 
 msg = """
 Robot Joint Teleop (Virtual)

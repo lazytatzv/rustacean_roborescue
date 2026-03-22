@@ -20,7 +20,6 @@
           overlays = [
             nix-ros-overlay.overlays.default
             (import rust-overlay)
-            nixgl.overlay
           ];
           config.allowUnfree = true;
           config.permittedInsecurePackages = [
@@ -74,7 +73,6 @@
 
           # --- Shell & DevTools ---
           fish fishPlugins.bass just
-          pkgs.nixgl.auto.nixGLDefault
           git lazygit ripgrep fd btop zellij tmux
           nodePackages.mermaid-cli    # topology/*.mmd 図の生成
 
@@ -228,13 +226,16 @@
           paths = rosDeps ++ cppLibs;
         };
 
+        # Explicit Python environment with common developer packages (NumPy etc.)
+        pythonEnv = pkgs.python3.withPackages (ps: with ps; [ numpy opencv4 pytest ]);
+
       in
       {
         devShells.default = pkgs.mkShell {
           name = "RoboRescue Env";
 
           # rosDeps を直接渡すと PATH が爆発するので圧縮環境のみ渡す
-          packages = buildTools ++ [ roboRescueEnv ];
+          packages = buildTools ++ [ roboRescueEnv pythonEnv ];
 
           shellHook = ''
             # --- ROS 2 ---
@@ -249,6 +250,10 @@
             export CC="ccache clang"
             export CXX="ccache clang++"
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+
+            # Force colcon/CMake to use the Python interpreter from the
+            # pythonEnv so NumPy headers are discoverable by FindPython3.
+            export PYTHON_EXECUTABLE="${pythonEnv}/bin/python"
 
             # --- OpenMP (spark_fast_lio 用) ---
             export CFLAGS="-fopenmp $CFLAGS"
@@ -284,7 +289,7 @@
         # issues from nixgl/ros overlays.
         devShells.precommit = (import nixpkgs { inherit system; }).mkShell {
           name = "RoboRescue Precommit Shell";
-          packages = with (import nixpkgs { inherit system; }); [ python3 python3Packages.pre-commit python3Packages.ruff python3Packages.black python3Packages.isort python3Packages.cpplint ];
+          packages = with (import nixpkgs { inherit system; }); [ python3 python3Packages.pre-commit python3Packages.ruff python3Packages.black python3Packages.isort python3Packages.cpplint python3Packages.numpy ];
           shellHook = ''
             echo "Entering Pre-commit devShell: use 'pre-commit run --all-files'"
           '';

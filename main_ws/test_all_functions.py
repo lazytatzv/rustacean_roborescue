@@ -12,32 +12,21 @@ Tested subsystems:
   7. qr_detector_cpp      — C++ QR detector node discovery
 """
 
-import math
 import os
 import signal
 import subprocess
-import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
-
-from geometry_msgs.msg import Twist, TransformStamped
-from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Joy, JointState, PointCloud2, PointField, Image
-from std_msgs.msg import Bool, Float64, Header, String
-from tf2_msgs.msg import TFMessage
 
 # custom_interfaces
-from custom_interfaces.msg import CrawlerVelocity, FlipperVelocity
-
-import struct
-import numpy as np
-
+from custom_interfaces.msg import CrawlerVelocity
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from sensor_msgs.msg import Image, JointState, Joy
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Paths

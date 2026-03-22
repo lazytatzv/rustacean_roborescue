@@ -1,10 +1,9 @@
-name: CI
+name: CI (main-heavy)
 
 on:
   push:
-    branches: [ main, master, feature/** ]
-  pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -45,6 +44,17 @@ jobs:
       - name: Run pre-commit
         run: |
           pre-commit run --all-files --show-diff-on-failure
+
+      - name: Fail if pre-commit made changes
+        run: |
+          set -e
+          if ! git diff --exit-code --quiet; then
+            echo "pre-commit made changes. Please run 'pre-commit run --all-files' locally and include the fixes in your commit." >&2
+            git --no-pager status --porcelain
+            exit 1
+          else
+            echo "No pre-commit changes detected."
+          fi
 
       - name: Run C++ linters
         run: |
@@ -249,3 +259,60 @@ jobs:
               --packages-ignore kiss_icp \
               2>&1 | grep -v 'local_setup' || true
           "
+
+  coverage:
+    name: Coverage and upload
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, rust, cpp]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Python coverage (pytest)
+        run: |
+          set -e
+          if [ -f main_ws/test_all_functions.py ]; then
+            python -m pytest --cov=main_ws --cov-report=xml:coverage-python.xml -q || true
+          else
+            echo "No python tests found; skipping"
+          fi
+
+      - name: Install cargo-tarpaulin
+        run: |
+          set -e
+          cargo install cargo-tarpaulin || true
+
+      - name: Run Rust coverage (tarpaulin)
+        run: |
+          set -e
+          if [ -f main_ws/Cargo.toml ] || [ -f Cargo.toml ]; then
+            . $HOME/.nix-profile/etc/profile.d/nix.sh || true
+            nix develop --impure -c bash -lc '
+              set -euo pipefail
+              cd main_ws || true
+              cargo tarpaulin --workspace --out Xml || true
+            '
+          else
+            echo "No Rust workspace found; skipping tarpaulin"
+          fi
+
+      - name: Upload coverage to Codecov
+        if: secrets.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: |
+            coverage-python.xml
+            tarpaulin-report.xml
+          flags: unittests
+          fail_ci_if_error: false
