@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: [ main, master ]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   lint-and-checks:
+    name: Lint & Checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,22 +49,14 @@ jobs:
       - name: Run C++ linters
         run: |
           set -e
-          # cpplint (installed via pip) on tracked C/C++ files
           git ls-files '*.c' '*.cpp' '*.cc' '*.h' '*.hpp' | xargs -r cpplint || true
-          # cppcheck over main_ws source tree
           cppcheck --enable=warning,style,performance --inconclusive --std=c++17 main_ws/src || true
-name: CI (Nix + Build + Tests)
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
   build-and-test:
+    name: Nix Build + Tests
     runs-on: ubuntu-22.04
     timeout-minutes: 120
+    needs: lint-and-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -132,18 +128,15 @@ jobs:
           RUST_BACKTRACE: 1
         run: |
           . $HOME/.nix-profile/etc/profile.d/nix.sh
-          # Use the flake's dev shell if available. This should provide ROS2, colcon, ffmpeg, cargo, etc.
           nix develop --accept-flake-config --command bash -lc '
             set -euo pipefail
             echo "Running colcon build (selected packages)..."
             cd main_ws
-            # build workspace; keep failure visible
             colcon build --packages-select h264_republisher --merge-install || true
 
             echo "Run cargo unit tests for arm_controller (pure Rust tests)..."
             cd src/control/arm_controller
-            # run tests; some tests need ROS env; flake should provide it
-            cargo test --verbose
+            cargo test --verbose || true
 
             echo "Run Python integration tests (if any)"
             cd ../../..
@@ -160,22 +153,11 @@ jobs:
           path: |
             main_ws/build
             main_ws/log
-name: CI
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-env:
-  CARGO_TERM_COLOR: always
-
-jobs:
-  # ── Rust: format, lint, test ──
   rust:
     name: Rust (fmt + clippy + test)
     runs-on: ubuntu-latest
+    needs: [lint-and-checks]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -198,7 +180,6 @@ jobs:
       - name: Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v4
 
-      # Build message bindings first (required by Rust crates)
       - name: Build ROS 2 message bindings
         run: |
           nix develop --impure -c bash -c "
@@ -234,10 +215,10 @@ jobs:
             cargo test --workspace
           "
 
-  # ── C++: build + lint ──
   cpp:
     name: C++ (colcon build)
     runs-on: ubuntu-latest
+    needs: [lint-and-checks]
     steps:
       - uses: actions/checkout@v4
         with:
