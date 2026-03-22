@@ -37,6 +37,25 @@ class OmronBridge(Node):
         self.light_pub = self.create_publisher(Float32, 'omron/light', 10)
         self.press_pub = self.create_publisher(Float32, 'omron/pressure', 10)
 
+        # POI export parameters (RoboCup-usable: heat_sig only)
+        self.declare_parameter('enable_poi_export', True)
+        self.declare_parameter('team_name', 'Team')
+        self.declare_parameter('country', 'Country')
+        self.declare_parameter('heat_threshold_c', 40.0)
+        enable_poi = self.get_parameter('enable_poi_export').get_parameter_value().bool_value
+        team_name = self.get_parameter('team_name').get_parameter_value().string_value
+        country = self.get_parameter('country').get_parameter_value().string_value
+        self.heat_threshold = float(self.get_parameter('heat_threshold_c').get_parameter_value().double_value)
+        if enable_poi:
+            try:
+                from .poi_writer import POIWriter
+                self.poi = POIWriter(out_dir='docs/outputs', team_name=team_name, country=country)
+                self.get_logger().info(f'POI export enabled, heat threshold={self.heat_threshold}C')
+            except Exception:
+                self.poi = None
+        else:
+            self.poi = None
+
         self.sensor = None
         if Omron2JCIE_BU01 is not None:
             try:
@@ -59,14 +78,23 @@ class OmronBridge(Node):
             hum = Float32()
             light = Float32()
             press = Float32()
-            temp.data = data.get('temperature', 0) / 100.0
-            hum.data = data.get('humidity', 0) / 100.0
-            light.data = float(data.get('light', 0))
-            press.data = data.get('pressure', 0) / 1000.0
+            temp_c = data.get('temperature', 0) / 100.0
+            hum_val = data.get('humidity', 0) / 100.0
+            light_val = float(data.get('light', 0))
+            press_val = data.get('pressure', 0) / 1000.0
+            temp.data = temp_c
+            hum.data = hum_val
+            light.data = light_val
+            press.data = press_val
             self.temp_pub.publish(temp)
             self.hum_pub.publish(hum)
             self.light_pub.publish(light)
             self.press_pub.publish(press)
+
+            # RoboCup-usable detection: heat_sig (threshold-based)
+            if self.poi is not None and temp_c >= self.heat_threshold:
+                path = self.poi.add_heat_detection(name='0', x=0.0, y=0.0, z=0.0, robot='robot1', mode='A')
+                self.get_logger().info(f'Heat detection logged to {path} (temp={temp_c:.2f}C)')
         except Exception as e:
             self.get_logger().error(f'Error reading sensor: {e}')
 
