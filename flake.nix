@@ -20,7 +20,6 @@
           overlays = [
             nix-ros-overlay.overlays.default
             (import rust-overlay)
-            nixgl.overlay
           ];
           config.allowUnfree = true;
           config.permittedInsecurePackages = [
@@ -74,7 +73,6 @@
 
           # --- Shell & DevTools ---
           fish fishPlugins.bass just
-          pkgs.nixgl.auto.nixGLDefault
           git lazygit ripgrep fd btop zellij tmux
           nodePackages.mermaid-cli    # topology/*.mmd 図の生成
 
