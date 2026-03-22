@@ -25,6 +25,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Install system C/C++ tooling
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-format clang-tidy cppcheck || true
+
       - name: Byte-compile Python files
         run: |
           set -e
@@ -37,6 +41,14 @@ jobs:
       - name: Run pre-commit
         run: |
           pre-commit run --all-files || true
+
+      - name: Run C++ linters
+        run: |
+          set -e
+          # cpplint (installed via pip) on tracked C/C++ files
+          git ls-files '*.c' '*.cpp' '*.cc' '*.h' '*.hpp' | xargs -r cpplint || true
+          # cppcheck over main_ws source tree
+          cppcheck --enable=warning,style,performance --inconclusive --std=c++17 main_ws/src || true
 name: CI (Nix + Build + Tests)
 
 on:
