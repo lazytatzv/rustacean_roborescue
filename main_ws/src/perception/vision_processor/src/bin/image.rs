@@ -1,4 +1,4 @@
-use opencv::{Result, core::Vector, imgcodecs, prelude::*, wechat_qrcode::WeChatQRCode};
+use opencv::{core::Vector, imgcodecs, prelude::*, wechat_qrcode::WeChatQRCode, Result};
 use std::path::PathBuf; // パス操作用
 
 fn main() -> Result<()> {

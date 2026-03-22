@@ -4,17 +4,18 @@ Operator ROS2 node: receives WebRTC offer from robot via `webrtc/outgoing`,
 sets remote, creates answer and publishes SDP/ICE on `webrtc/incoming`.
 Also handles incoming ICE candidates and plays audio to the local sink.
 """
-import os
-import time
+
 import argparse
+import json
+import os
+import queue
+import sys
+import time
+
 import rclpy
+from gi.repository import GLib, Gst
 from rclpy.node import Node
 from std_msgs.msg import String
-
-import queue
-import json
-import sys
-from gi.repository import Gst, GLib
 
 Gst.init(None)
 

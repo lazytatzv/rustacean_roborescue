@@ -7,7 +7,6 @@
 /// Calibration status is logged periodically.
 ///
 /// IMU データ処理は `imu` モジュールに委譲。
-
 mod imu;
 
 use anyhow::Result;
@@ -18,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::imu::{ImuData, build_imu_msg, parse_csv_line};
+use crate::imu::{build_imu_msg, parse_csv_line, ImuData};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -57,7 +56,10 @@ fn serial_reader_thread(
 
     match stty_result {
         Ok(status) if status.success() => {
-            println!("✅ Serial port configured: {} @ {}bps", port_name, baud_rate);
+            println!(
+                "✅ Serial port configured: {} @ {}bps",
+                port_name, baud_rate
+            );
         }
         _ => {
             eprintln!("⚠️  Failed to configure serial port with stty, trying anyway...");

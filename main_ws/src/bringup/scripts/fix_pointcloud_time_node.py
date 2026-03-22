@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from typing import Iterable
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2

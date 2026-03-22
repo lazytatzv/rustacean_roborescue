@@ -1,11 +1,11 @@
 use opencv::{
-    Result,
     core::{Mat, Point, Scalar, Vector}, // Matもここでuseに追加しておきました
     highgui,
     imgproc,
     prelude::*,
     videoio,
     wechat_qrcode::WeChatQRCode,
+    Result,
 };
 
 fn main() -> Result<()> {

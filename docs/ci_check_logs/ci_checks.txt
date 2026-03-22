@@ -1,0 +1,29 @@
+CI CHECKS LOG - Sun Mar 22 10:56:23 PM JST 2026
+\n== GIT STATUS ==
+ M main_ws/src/external/kiss-icp
+ M main_ws/src/external/ros2_rust
+ M main_ws/src/external/spark-fast-lio
+ M stm32_ws
+?? docs/ci_check_logs/
+\n== INSTALL PYTHON DEV DEPS ==
+/usr/bin/python3: No module named pip
+/usr/bin/python3: No module named pip
+\n== PRE-COMMIT ==
+pre-commit not available
+\n== RUFF ==
+ruff not available
+\n== PYTEST QUICK ==
+/usr/bin/python3: No module named pytest
+\n== RUST (fmt + clippy) ==
+error: failed to load source for dependency `action_msgs`
+
+Caused by:
+  Unable to update /home/tatsv/working/rustacean_roborescue/main_ws/install/share/action_msgs/rust
+
+Caused by:
+  failed to read `/home/tatsv/working/rustacean_roborescue/main_ws/install/share/action_msgs/rust/Cargo.toml`
+
+Caused by:
+  No such file or directory (os error 2)
+cargo clippy had warnings/errors
+\n== FINISHED ==

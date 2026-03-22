@@ -5,11 +5,17 @@ use k::nalgebra as na;
 /// Returns the product of singular values (>= 0).
 pub fn manipulability_from_jacobian(jacobian: &na::DMatrix<f64>) -> f64 {
     let svd = jacobian.clone().svd(true, true);
-    svd.singular_values.iter().fold(1.0_f64, |acc, &x| acc * x.max(0.0))
+    svd.singular_values
+        .iter()
+        .fold(1.0_f64, |acc, &x| acc * x.max(0.0))
 }
 
 /// Solve damped least squares: dq = J^T * (J J^T + lambda^2 I)^-1 * v
-pub fn dls_solve(jacobian: &na::DMatrix<f64>, twist: &na::DVector<f64>, lambda: f64) -> na::DVector<f64> {
+pub fn dls_solve(
+    jacobian: &na::DMatrix<f64>,
+    twist: &na::DVector<f64>,
+    lambda: f64,
+) -> na::DVector<f64> {
     let jt = jacobian.transpose();
     let jjt = jacobian * &jt;
     let n = jjt.nrows();
@@ -30,9 +36,7 @@ mod tests {
 
     #[test]
     fn manipulability_nonnegative() {
-        let j = na::DMatrix::from_row_slice(3, 3, &[1.0, 0.0, 0.0,
-                                                    0.0, 2.0, 0.0,
-                                                    0.0, 0.0, 3.0]);
+        let j = na::DMatrix::from_row_slice(3, 3, &[1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 3.0]);
         let m = manipulability_from_jacobian(&j);
         assert!(m >= 0.0);
         // product should be 6.0
@@ -41,9 +45,7 @@ mod tests {
 
     #[test]
     fn manipulability_zero_for_rank_deficient() {
-        let j = na::DMatrix::from_row_slice(3, 3, &[1.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0]);
+        let j = na::DMatrix::from_row_slice(3, 3, &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         let m = manipulability_from_jacobian(&j);
         assert!(m >= 0.0);
         // product should be zero because two singular values are zero
@@ -73,8 +75,7 @@ mod tests {
     #[test]
     fn dls_overdetermined_example() {
         // J is 2x3 (2 rows, 3 cols), rank 2. Solve for dq that produces given end-effector twist
-        let j = na::DMatrix::from_row_slice(2, 3, &[1.0, 0.0, 0.0,
-                                                  0.0, 1.0, 0.0]);
+        let j = na::DMatrix::from_row_slice(2, 3, &[1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
         let v = na::DVector::from_column_slice(&[0.5, 0.25]);
         let lambda = 1e-6;
         let dq = dls_solve(&j, &v, lambda);

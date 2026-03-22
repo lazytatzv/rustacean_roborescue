@@ -9,20 +9,15 @@ This script:
   4. Subscribes to /arm_joint_commands and checks for non-zero output
 """
 
-import subprocess
-import sys
-import time
-import signal
 import os
+import signal
+import subprocess
+import time
 
 import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
-from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Header
-from builtin_interfaces.msg import Time
-
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
 
 ARM_JOINTS = [
     "arm_joint1",

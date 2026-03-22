@@ -1,11 +1,12 @@
 # Operator側起動スクリプト
 # 操縦側で立ち上げるのはこれだけで完結させること
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-import os
 
 
 def generate_launch_description():

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+import math
+import time
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-import math
-import time
 
 
 class JointDemo(Node):

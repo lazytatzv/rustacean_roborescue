@@ -18,6 +18,7 @@ arm_controller, extracts position[i], and publishes to each per-joint topic.
       ├→ /arm_joint5/cmd_pos (Float64)
       └→ /arm_joint6/cmd_pos (Float64)
 """
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState

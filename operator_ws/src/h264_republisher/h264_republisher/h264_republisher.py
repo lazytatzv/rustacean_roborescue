@@ -5,12 +5,14 @@ frames as sensor_msgs/Image for reliable viewing (e.g., Foxglove).
 
 Entry point: `h264_republisher`
 """
+
 import sys
+
+import av
 import rclpy
+from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
-from cv_bridge import CvBridge
-import av
 
 
 class H264Republisher(Node):

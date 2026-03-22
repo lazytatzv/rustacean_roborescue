@@ -3,14 +3,15 @@
 Operator ROS2 node: GStreamer WebRTC receiver integrated with ROS2 signaling
 topics. Subscribes to `webrtc/incoming` and publishes `webrtc/outgoing`.
 """
+
+import json
+import queue
+import sys
+
 import rclpy
+from gi.repository import GLib, Gst
 from rclpy.node import Node
 from std_msgs.msg import String
-
-import queue
-import json
-import sys
-from gi.repository import Gst, GLib
 
 Gst.init(None)
 
