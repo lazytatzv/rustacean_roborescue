@@ -48,14 +48,19 @@ URDF_PATH = os.path.join(WORKSPACE, "src", "bringup", "urdf", "sekirei.urdf")
 
 # Matches sekirei.urdf
 ARM_JOINTS = [
-    "arm_joint1", "arm_joint2", "arm_joint3",
-    "arm_joint4", "arm_joint5", "arm_joint6",
+    "arm_joint1",
+    "arm_joint2",
+    "arm_joint3",
+    "arm_joint4",
+    "arm_joint5",
+    "arm_joint6",
 ]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Test Result
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 @dataclass
 class TestResult:
@@ -73,6 +78,7 @@ class TestResult:
 # ═══════════════════════════════════════════════════════════════════════════
 #  Subprocess helper
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def launch_node(cmd: List[str], env: Optional[Dict] = None) -> subprocess.Popen:
     if env is None:
@@ -104,6 +110,7 @@ def kill_node(proc: subprocess.Popen) -> str:
 #  Generic message collector
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class MsgCollector:
     def __init__(self):
         self.msgs: List[Any] = []
@@ -134,6 +141,7 @@ class MsgCollector:
 #  Joy message builder
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def make_joy(axes=None, buttons=None) -> Joy:
     msg = Joy()
     msg.header.stamp = rclpy.clock.Clock().now().to_msg()
@@ -148,6 +156,7 @@ def make_joy(axes=None, buttons=None) -> Joy:
 # ═══════════════════════════════════════════════════════════════════════════
 #  Tester Node
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class ComprehensiveTester(Node):
     def __init__(self):
@@ -180,60 +189,83 @@ class ComprehensiveTester(Node):
         self.procs.append(proc)
         joy_pub = self.create_publisher(Joy, "/joy", 10)
         crawler_col = MsgCollector()
-        sub_crawler = self.create_subscription(CrawlerVelocity, "/crawler_driver", crawler_col.callback, 10)
+        sub_crawler = self.create_subscription(
+            CrawlerVelocity, "/crawler_driver", crawler_col.callback, 10
+        )
         self.spin_for(3.0)
         if not self.wait_for_subscriber(joy_pub):
             result.add("DDS discovery", False, "No subscription to /joy")
             return result
-        
+
         # STOP mode
         joy_pub.publish(make_joy(axes=[0.0, 0.5]))
         self.spin_for(0.5)
         last_c = crawler_col.last()
         if last_c:
             result.add("STOP zero", abs(last_c.m1_vel) < 0.01)
-        
+
         # Switch to DRIVE (Options=index 9)
-        joy_pub.publish(make_joy(buttons=[0]*9+[1]))
+        joy_pub.publish(make_joy(buttons=[0] * 9 + [1]))
         self.spin_for(0.1)
-        joy_pub.publish(make_joy(axes=[0.0, 0.8, 1.0, 0.0, 0.8, 1.0])) # Sticks forward
+        joy_pub.publish(make_joy(axes=[0.0, 0.8, 1.0, 0.0, 0.8, 1.0]))  # Sticks forward
         self.spin_for(0.5)
         last_c = crawler_col.last()
         if last_c:
             result.add("DRIVE non-zero", abs(last_c.m1_vel) > 0.1)
-        
-        kill_node(proc); self.procs.remove(proc)
+
+        kill_node(proc)
+        self.procs.remove(proc)
         return result
 
     def test_arm_controller(self) -> TestResult:
         result = TestResult("arm_controller", True)
         self.get_logger().info("TEST 2: arm_controller")
-        proc = launch_node(["ros2", "run", "arm_controller", "arm_controller", "--ros-args", "-p", f"urdf_path:={URDF_PATH}"])
+        proc = launch_node(
+            [
+                "ros2",
+                "run",
+                "arm_controller",
+                "arm_controller",
+                "--ros-args",
+                "-p",
+                f"urdf_path:={URDF_PATH}",
+            ]
+        )
         self.procs.append(proc)
         js_pub = self.create_publisher(JointState, "/joint_states", 10)
         twist_pub = self.create_publisher(Twist, "/arm_cmd_vel", 10)
         cmd_col = MsgCollector()
-        self.create_subscription(JointState, "/arm_joint_commands", cmd_col.callback, 10)
+        self.create_subscription(
+            JointState, "/arm_joint_commands", cmd_col.callback, 10
+        )
 
         def pub_js():
-            msg = JointState(); msg.header.stamp = self.get_clock().now().to_msg()
-            msg.name = ARM_JOINTS; msg.position = [0.0]*6
+            msg = JointState()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.name = ARM_JOINTS
+            msg.position = [0.0] * 6
             js_pub.publish(msg)
+
         timer = self.create_timer(0.05, pub_js)
-        
-        self.spin_for(5.0) # Wait for arming
+
+        self.spin_for(5.0)  # Wait for arming
         if cmd_col.count() == 0:
             result.add("Arming", False, "No /arm_joint_commands output")
             return result
-        
-        twist = Twist(); twist.linear.x = 0.1
+
+        twist = Twist()
+        twist.linear.x = 0.1
         cmd_col.clear()
-        for _ in range(20): twist_pub.publish(twist); self.spin_for(0.05)
-        
+        for _ in range(20):
+            twist_pub.publish(twist)
+            self.spin_for(0.05)
+
         has_vel = any(any(abs(v) > 1e-5 for v in m.velocity) for m in cmd_col.get_all())
         result.add("IK velocity output", has_vel)
-        
-        kill_node(proc); self.procs.remove(proc); timer.cancel()
+
+        kill_node(proc)
+        self.procs.remove(proc)
+        timer.cancel()
         return result
 
     def test_qr_detector_cpp(self) -> TestResult:
@@ -241,12 +273,23 @@ class ComprehensiveTester(Node):
         self.get_logger().info("TEST 7: qr_detector_cpp")
         qr_share = os.path.join(WORKSPACE, "src", "perception", "qr_detector")
         model_dir = os.path.join(qr_share, "models")
-        proc = launch_node(["ros2", "run", "qr_detector_cpp", "qr_detector_node", "--ros-args", "-p", f"model_dir:={model_dir}"])
+        proc = launch_node(
+            [
+                "ros2",
+                "run",
+                "qr_detector_cpp",
+                "qr_detector_node",
+                "--ros-args",
+                "-p",
+                f"model_dir:={model_dir}",
+            ]
+        )
         self.procs.append(proc)
         img_pub = self.create_publisher(Image, "/camera/image_raw", 10)
         self.spin_for(3.0)
         result.add("Node discovery", self.wait_for_subscriber(img_pub))
-        kill_node(proc); self.procs.remove(proc)
+        kill_node(proc)
+        self.procs.remove(proc)
         return result
 
     # (Other tests omitted for brevity in this rewrite, but I will keep them if I can)
@@ -259,33 +302,46 @@ class ComprehensiveTester(Node):
         twist_col = MsgCollector()
         self.create_subscription(Twist, "/cmd_vel", twist_col.callback, 10)
         self.spin_for(2.0)
-        cv_msg = CrawlerVelocity(); cv_msg.m1_vel = 0.5; cv_msg.m2_vel = 0.5
-        cv_pub.publish(cv_msg); self.spin_for(0.5)
+        cv_msg = CrawlerVelocity()
+        cv_msg.m1_vel = 0.5
+        cv_msg.m2_vel = 0.5
+        cv_pub.publish(cv_msg)
+        self.spin_for(0.5)
         if twist_col.last():
             result.add("Forward", abs(twist_col.last().linear.x - 0.5) < 0.01)
-        kill_node(proc); self.procs.remove(proc)
+        kill_node(proc)
+        self.procs.remove(proc)
         return result
 
+
 def print_report(results):
-    print("\n" + "="*40 + "\n TEST REPORT \n" + "="*40)
+    print("\n" + "=" * 40 + "\n TEST REPORT \n" + "=" * 40)
     for r in results:
         status = "PASS" if r.passed else "FAIL"
         print(f"[{status}] {r.name}")
         for s, ok, d in r.sub_results:
             print(f"  - {'ok' if ok else 'ERR'} {s}: {d}")
 
+
 def main():
     os.environ["RMW_IMPLEMENTATION"] = "rmw_fastrtps_cpp"
     rclpy.init()
     tester = ComprehensiveTester()
     results = []
-    for test in [tester.test_joy_controller, tester.test_arm_controller, tester.test_crawler_vel_bridge, tester.test_qr_detector_cpp]:
+    for test in [
+        tester.test_joy_controller,
+        tester.test_arm_controller,
+        tester.test_crawler_vel_bridge,
+        tester.test_qr_detector_cpp,
+    ]:
         try:
             results.append(test())
         except Exception as e:
             results.append(TestResult(test.__name__, False, str(e)))
     print_report(results)
-    tester.cleanup(); rclpy.shutdown()
+    tester.cleanup()
+    rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

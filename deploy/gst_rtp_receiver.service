@@ -1,0 +1,14 @@
+[Unit]
+Description=GStreamer RTP Audio Receiver (operator)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/tatsv/working/rustacean_roborescue
+Environment="LISTEN_PORT=5002"
+ExecStart=/usr/bin/env bash /home/tatsv/working/rustacean_roborescue/tools/gst_rtp_receiver.sh $LISTEN_PORT
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

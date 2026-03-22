@@ -1,0 +1,1174 @@
+RoboCup Rescue Robot League
+
+Version: 2026A
+
+2026 Championship, Icheon, South Korea
+The RoboCup Rescue Robot League gathers teams of researchers capable of developing robotic systems that enable
+emergency responders to perform extremely hazardous tasks from safer stand-off distances. These mobile robots
+need to demonstrate assistive and autonomous behaviors that can increase their reliability when operating remotely
+within complex environments, including even partially collapsed structures when necessary.
+Established just prior to the World Trade Center collapse in New York City more than twenty years ago, the RoboCup
+Rescue Robot League has hosted robot evaluations annually all over the world. In addition to demonstrating the
+state-of-the-science in robotics for unstructured environments, we help develop the standard test methods
+emergency responders use to objectively evaluate commercial robots, train with measures of remote operator
+proficiency, and compare results no matter where or when the evaluations happen.
+This is just the first step out of the laboratory for many of these robots and researchers. It is a long process to harden
+and commercialize robots for deployment into such difficult environments. But these League participants are
+determined to use their skills and energy to help emergency responders stay safe as they save lives.
+
+Bringing Robotics Researchers Together to Collaborate
+The RoboCup Rescue Robot League conducts comprehensive evaluations involving essential mission tasks required by
+emergency responders worldwide. The arenas include a variety of reproducible terrains, obstacles, and tasks with
+increasing difficulty to challenge even the most capable robots.
+• Mobility (MOB) refers to a robot’s ability to move reliably and effectively through its environment. This includes
+navigating different types of terrain, overcoming obstacles, maintaining stability, and positioning itself where tasks
+need to be performed. The reproducible tests measure how well a robot can get from place to place under
+real-world conditions.
+• Dexterity (DEX) refers to a robot’s ability to manipulate objects with precision, control, and flexibility. Dexterity
+tasks are embedded within various terrains and obstacles, including objects mounted on linear rails to evaluate
+manipulator reach and omni-directional objects to assess orientational dexterity. These tasks may be performed
+with any part of the robot—for example, legs pressing buttons or flippers turning valves. Inspection tasks may also
+be completed using a chassis-mounted camera
+• Autonomy (AUTO) is designed to reduce the operator’s cognitive load by providing reliable, precision-focused
+autonomy that supports multi robot operations, even in degraded radio-communication environments. Its
+behaviors enhance mission effectiveness by maintaining consistent performance and ensuring robots can operate
+dependably with minimal operator intervention for rescue operations. This includes the generation 2D and 3D
+maps of the environment while identifying objects of interest in the labyrinth as well as autonomous navigation
+and manipulation in the lanes.
+
+1
+
+Arena Layout 2026
+Version: 2026A
+
+Urban Approach Sequence:
+●
+Center in Doorways (auto likely): Multiple
+adjustable doorways set to the ROBOT
+WIDTH + 10cm (4in)
+●
+Pallets & Pipes: 20cm (8in) step heights
+●
+Crossing Ramps: 15°|30° slopes with
+optional spinners
+Semi-Collapsed Approach Sequence:
+●
+Gravel Terrain (auto likely): Shifty terrain
+with embedded X frames
+●
+Diagonal K-Rails: 10|20cm (4|8in) trip
+obstacles
+●
+Half-Cubic Stepfields: 15cm (6in) step
+heights
+
+Dwelling Access Sequence:
+●
+Avoid (auto only): Palletized path to stay on
+with 10cm (4in) elevation changes and 5-10
+gates set to 90cm (36in) wide.
+●
+Push/Pull Doors: Lever knob, 90cm (36in)
+wide, with weighted closure.
+●
+Stair Debris/Pallets & Pipes Climb/Crouch
+Tasks Under Landing: Choose either to
+ascend or descend. Stair Debris have 20cm
+(8 in) risers and Pallets&Pipes have 30cm
+(12in) elevation changes.
+Dwelling Search:
+●
+Maze (auto only): Reconfigurable to use
+multiple entrances, layouts, fiducials, and
+tasks for different trials.
+
+2
+
+Competition Features
+Version: 2026A
+
+Robot: Each paid registration allows one robot to compete. Robots must
+weigh under 80 kg. To qualify as a small-sized robot, the robot must be able
+to pass through a 30 cm square opening. All robots must be equipped with
+secure, safe handles to move the robot. All robots must have an e-stop.
+
+Test Methods within the Arena
+MOBILITY LANES
+
+Remote Operator Stations are used because the robot operator should not
+have direct visual contact with the robot within a test lane. No
+communication between team members and the operator is allowed unless
+reset. The operator must receive all situational awareness through the
+system interface as if the robot is down range or in a structure. One
+operator at a time only! Switching operators is OK. Operators must stay at
+the operator station and must not watch the robot during the trial.
+
+Terrains
+• Crossing Ramps (with Slip disks) (0° or
+15° slope)
+• K-Rails (0° or 15° slope)
+• Gravel (15° slope)
+• Cubic Stepfield (0° or 15° slope)
+
+Tethers are always allowed because they can provide secure
+communications and ongoing power to drive the robot or recharge batteries
+over time. To avoid getting snagged on obstacles, tethers should be spooled
+on the robot and act as a winch when necessary to help descend stairs then
+climb back up if necessary. If tethers are dragged behind the robot within
+the test lanes, the tether must be managed from the lane entrance by a
+designated cable handler. Tethers may not be guided over the lane walls.
+Only one cable handler is permitted during the mission. The cable handler
+must remain at the lane entrance (except in the labyrinth), and the use of
+sticks or similar tools to aid in cable management is prohibited.
+
+Obstacles
+• Traverse & Center (15° incline, variable
+width)
+• Pallet Hurdles with Pipes (20cm
+elevations)
+• Stairs (35°/40°/45° incline with 0, 2 or
+4 barriers)
+• Doors
+
+Difficulty Settings for Test Lanes may increase going from preliminaries to
+semis finals/finals by raising the lane slope to a 15 degree incline for
+increased difficulty. Apparatus difficulty setting is the same for all teams,
+and the time limit is the same, the trial results are comparable.
+Trial Time Limits are not intended to make it a race. Rather, there is enough
+time for a capable robot to demonstrate a statistically significant number of
+task repetitions. This provides a measure of reliability that the task can be
+performed. Trials begin every 30 minutes:
+• 5 minutes to set up
+• 20 minutes of operation
+• 2 minutes for sensor assessment (victim box)
+• 3 minutes to exit
+Autonomous Mobility are encouraged by additional points (see score form)
+for maneuvering through complex environments with no guidance from the
+remote operator –hands-off the interface from endzone-endzone. No QR
+code will be placed at the start point. The robot must rely on mapping to
+navigate from the end zone back to the start point. A single QR code will be
+located in the end zone to enable the robot to identify the end zone. After
+preliminaries one or two QRs codes may be placed at the end zones of the
+sequence. Pre mapping is allowed outside of the Maze (labyrinth). Teams
+may map the arena in advance, including for the semi-finals/finals. The
+Maze is the only exception—no pre mapping is permitted inside the maze.
+Radio Communications Degradation Assistive or autonomous behaviors can
+improve the effectiveness and reliability of the robot. We provide additional
+points to robots that work reliability within intermittent and unpredictable
+communication conditions. To train for radio degradation in advance, follow
+the build instructions of the Radio Degradation Box published by the
+Communications Network Institute of TU Dortmund University here:
+https://github.com/tudo-cni/vsting-sa
+Teams must be dressed appropriately to enter the arena area; closed toed
+shoes and long pants.
+
+AUTONOMY ONLY
+• Avoid Holes Lane (elevated path to
+follow)
+• Mapping Labyrinth (maze) (round
+fiducial, objects) (not a lane)
+DEXTERITY (included in all lanes)
+Classification Tasks
+• Inspect (linear 1 pts, omni 2 pts)
+• Touch (linear 2 pts, omni 4 pts)
+• Insert (linear 3 pts, omni 6 pts)
+Operational Tasks
+• Push E-Stops (omni 10 pts)
+• Rotate Valves (omni 10 pts)
+• Insert Keys (omni 10 pts)
+Sensing Tasks (Victim Crate)
+•
+Thermal Image Acuity (5 pts)
+•
+Partial Image Recognition (4 pts)
+•
+Motion Detection (4 pts)
+•
+Proximity Sampling (3 pts)
+•
+QR Code Acuity (2 pts)
+•
+Visual/Color Acuity (1 pt)
+•
+2 –Way Audio Acuity (1 pt)
+
+3
+
+Innovate, Evaluate, and Compare
+Version:
+The primary goal for teams is to push the capabilities of their robotic systems and improve their methods. Through
+this 2026A
+process, they gain an understanding of what their robots need to succeed in real-world situations.
+
+Inclusiveness: Teams get as many trials as possible within the time available, so they can rigorously evaluate their robots
+across the terrains, obstacles, and tasks that support their research objectives. Teams schedule their own test plan each day
+to manage their own risks.
+Resilience to Failure: During a trial, robot resets may be declared by the operator or team member. Resets will last at least
+2-minutes. This allows the robot to be safely carried and reset in the previous end zone to continue the trial. Robot repairs
+must be performed in the arena area (not in the team paddock). Touching the robot during the trial is an automatic reset.
+Configuration changes are not allowed during a trial (ie removing the arm).
+Between trials, configuration changes are allowed to optimize the robots performance for particular terrain or task.
+Locomotion must remain the same.
+If a robot is unable to continue the competition, the team may proceed with another robot; however, the score for the new
+robot will be set to zero. If the robot is identical, consideration may be given to team to not zero their score.
+Additional Challenges:
+Negotiate Leaning Obstacles:
+Perform additional maneuvering tasks in the any lane to
+earn additional points (See Mission Form). Forces larger
+robots with advantages in the terrains and step-over
+obstacles to steer precisely and crouch at times. Small
+robots simply steer clear. All bars are magnetized in place
+so that any touched bar falls. Hitting the walls hard can also
+do it, so precise control is rewarded.Fallen bars act as
+debris so are not removed until the robot has moved past
+them to the next repetition or terrain. Extra points can be
+given for the number of bars left intact for each repetition
+(reset at the start).
+
+Negotiate Leaning Obstacles
+
+Carry a pipestar in the test lane
+
+Carry a payload: Carry the payload in your gripper in all
+test lanes for additional points (See Mission Form). Note:
+this may be a pipestar or other object determined at the
+start of the competition. need to add maxs
+Radio Comms Degradation:
+Perform the mission under increasingly challenging
+network conditions over time in all test lanes by using the
+league’s Radio Degradation Box to earn additional points
+(See Mission Form).
+To train for radio degradation in advance, follow the build
+instructions of the Radio Degradation Box published by the
+Communications Network Institute of TU Dortmund
+University here: https://github.com/tudo-cni/vsting-sa.
+●
+The final parameters will be decided during test
+runs before preliminaries.
+●
+For Teams preparing ahead of the competition,
+the maximal degradation settings are: 5 Mbps
+bandwidth, 10 % packet loss and 100 ms delay.
+●
+Network degradation settings increase over time
+and are reset in between mobility and dexterity
+
+Radio Comms Degradation Setup
+
+4
+
+AWARDS
+Version: 2026A
+
+Every team has the opportunity to fully evaluate their robot. Teams that accumulate high scores are eligible to receive
+Best-in-Class awards in recognition of their achievements.
+
+1st, 2nd, and 3rd Place Awards (trophies) are given to teams that combine all three categories of capabilities to demonstrate
+the best performance across the entire arena. These teams perform the most challenging mission sequences on the final
+day. Both teleoperation and autonomous points count toward the championship awards.
+BEST IN CLASS AWARDS (certificates) are based on scores recorded during the semi-finals, when experienced judges are
+proctoring the trials. If the scores of teams in the semifinals are within 10% of one another and those teams advance to
+the finals, the Best in Class award will be determined based on the cumulative total of each team’s semifinal and final
+scores.
+• Best-In-Class Award for Autonomy is given for the team that demonstrates the most capable and reliable
+autonomous robot. All autonomous points are included. Sensor crate will not be included.
+• Best-In-Class Award for Autonomous Mobility is given for the robot that performs the most successful
+autonomous terrain repetitions across 9 different lanes in the Semi/Final sequences. Successful autonomous
+lane repetitions must be performed with no operator interactions between end zones. The threshold to be
+eligible for this award is 6 successful autonomous repetitions between end zones in any lanes, which is
+approximately 50m (150ft) distance downrange. That is 20% of all possible lane repetitions across all three
+sequences (10 repetitions x 3 sequences = 30 total repetitions). Teams can choose the order of each sequence
+but must complete all three lanes to repeat the two lanes they find easier. One way to achieve the threshold is to
+score at least 2 successful autonomous repetitions (downrange and return) in the easiest terrains for the team in
+all 3 sequences. Only autonomous mobility points count toward the best-in-class award. Scores from the maze
+and sensor crate will not be included.
+• Best-In-Class Award Autonomous Dexterity is given for the robot that performs the most successful autonomous
+Inspect tasks across 9 different lanes in the Semi/ Final sequences. Successful autonomous Inspect tasks must
+be performed with no operator interactions from a stowed position within proximity to the tasks. Autonomous
+approaches are not mandatory , as the robot can be positioned teleoperatively in front of the dexterity tasks.
+The threshold to be eligible for this award is 6 successful autonomous Inspect tasks using both Linear and Omni
+tasks. That is 20% of all available Inspect tasks across all three sequences (10 tasks x 3 sequences = 30 total
+tasks). Teams can choose which dexterity tasks are completed in which particular lanes but must change lanes to
+perform each different task with no repeated tasks allowed. The threshold requires at least 2 successful
+autonomous Inspect tasks in the 3 easiest terrains across sequences, or a complete linear set in any particular
+terrain plus one other task anywhere else. Only autonomous dexterity points count toward the best-in-class
+awards. Scores from the maze and sensor crate will not be included.
+• Best-In-Class Award for Autonomous Mapping is given for team that demonstrates the most capable and
+reliable autonomous robot within the maze. Only autonomous mapping points count toward the best-in-class
+award. Only scores from the maze will be included.
+• Best-In-Class Award for Small Robot is given for team that demonstrates the most capable and reliable robot
+that fits thru a 30 cm square passage to be considered for this award. All scores (teleop and autonomous) will
+count towards the award. 1st, 2nd and 3rd may be awarded according to RoboCup Award criteria.
+
+Bracket Classification Awards will be given to compare like-kind of robots, this will alleviate fairness concerns between
+fundamentally different robot types. At the beginning of the competition robots will be placed in their respective bracket.
+Robots will only be in one bracket. Depending on the number of robots in a bracket will determine the number of
+certificates awarded in each bracket.Brackets will consist of the following: Best Tracked Platform, Best Wheeled Platform,
+Best Bipedal Platform, Best Quadruped Platform, Best Open Platform (those that do not fit in any other category)
+Additional Certificate Awards recognize important contributions across the league such as the most intuitive operator
+interface or particularly effective design functionalities.
+
+SPARC: A Standard Platform for the Autonomous Rescue Competition is currently under
+development. Awards will be given for first, second, and third place, subject to sufficient team
+participation. Competition rules will be published in a separate document.
+
+5
+
+Lane Overview
+
+END
+START
+
+NEGOTIATE 2
+
+OMNI
+
+Version: 2026A
+
+LINEAR
+
+Crossover
+
+START
+END
+
+OMNI
+
+NEGOTIATE 1
+
+LINEAR
+
+DOOR
+
+LINEAR
+LINEAR
+
+OMNI
+
+START
+END
+
+OMNI
+
+START
+END
+
+15 DE
+GREE
+
+SLOP
+
+E
+
+6
+
+Version: 2026A
+
+●
+●
+●
+
+K-Rails
+20 cm high
+Avoid omni
+
+●
+●
+
+K-Rails - 10 cm high
+15 degree incline
+
+●
+●
+●
+
+K-Rails - 10 cm high
+15 degree incline
+Pinch points and/or
+Negotiate
+7
+
+Scoring for Missions
+Scoring Mobility
+• Mobility scoring is based on continuous driving
+end-to-end traverses in the lane. The robot must start
+and end each traverse completely within the
+designated squares (Lane Overview).
+• Driving teleoperatively scores 1 point for successful
+completion in each direction.
+• Driving autonomously (hands off the interface) scores
+10 points for successful completion in each direction.
+The remote operator may take over control at any time
+to finish a traverse teleoperatively for 1 point and try
+again autonomously on the next repetition.
+• Additional points are available for carrying a payload,
+Negotiate thru Leaning Obstacles and Radio Comms
+Degradation. Teleoperation is allowed in both end
+zones in any case to set waypoints, create maps, etc.
+• Single Lane Missions perform up to 10 end-to-end
+traverses in the first 10 minutes of the trial. If finished
+early, use the elapsed time as a measure of efficiency.
+Wait for the Dexterity time to start before performing
+any Dexterity tasks.
+• Mobility scores are normalized for comparison.
+
+Scoring Dexterity
+• In order to score any dexterity points, you must score
+at least 2 points during the mobility portion.
+• Perform the Dexterity tasks starting anywhere and in
+any order. No repeated tasks are allowed.
+• Dexterity tasks may be performed with any part of the
+robot.(Legs may press buttons/Flippers may turn
+valves)
+• Inspection tasks may be done with a chassis-mounted
+camera.
+
+Single Lane Missions
+
+Version: 2026A
+
+Prelims (30-minute rotations, 20-minute trials)
+Each test lane can be conducted individually to capture a
+statistically significant set of repetitions from end-to-end. This
+enables teams to refine their systems and tactics for the
+challenges in each test lane.
+There are 10 concurrent start points and operator stations at each
+lane. Teams schedule their own test plan each day to balance
+their objectives with related risks. Teams typically try every lane
+in the Preliminaries, but several scores can be dropped from the
+totals.
+Each team provides a “Proctor” to score and attest to the results
+of other team trials. This ensures all teams go home with
+experience conducting objective evaluations for their ongoing
+development process.
+
+Multiple Lane Missions (Sequence)
+Semis (30-minute rotations, 20-minute trials)
+These sequences challenge teams to optimize their systems across
+different capabilities. There are 4 concurrent lane sequences with
+different operational objectives. The lanes are conducted in any
+order but no repeats are allowed until all lanes are completed.
+Below are examples of semi final sequences. Finals may contain
+more or all lanes. Note: this may change due to the layout of the
+lanes in the arena.
+Sequence 1
+• Crossing Ramps (Slip disks)
+• Gravel
+• Traverse & Center
+
+Sequence 3
+• Avoid Holes
+• Stairs
+• Doors
+
+Sequence 2
+• Cubic Stepfield
+• K-Rails
+• Pallet Hurdles
+
+Sequence 4
+• Labyrinth
+
+• Performing dexterity tasks autonomously will score
+additional points. The attempt must start outside the
+hallway which contains the dexterity task (around at
+least one corner as noted in the diagram to the right).
+While inside the hallway, if the robot successfully
+performs a task with the manipulator being
+autonomous (no teleoperation of the manipulator), a
+score multiplier of 4 is applied (TA = teleoperated
+approach, autonomous manipulation). If both
+manipulation and driving are performed autonomously
+(completely hands off the interface), a multiplier of 8 is
+applied (AA = autonomous approach, autonomous
+manipulation). Teams may map, scan, and/or mark
+targets for manipulation at any time during the run.
+• Dexterity scores are normalized for comparison.
+
+Scoring Exploration/Mapping
+• See Section on Mapping and Object Detection (pg17).
+
+Approaches for Autonomous
+Dexterity Tasks
+
+8
+
+Scoring Mobility
+Version: 2026A
+
+P1
+
+7/15
+
+10:00
+
+TEAM A/COUNTRY
+
+Jane Doe/USA
+
+X
+
+1
+2
+4
+6
+10
+12
+14
+16
+1
+1
+52
+
+67
+
+9
+
+Embedded Dexterity Tasks/Scoring
+Version: 2026A
+
+Sensor Crate (White) Prelims/Semis/Finals
+• QR Code Acuity, Visual/Color Acuity, Proximity, Hazmat, Motion, Thermal, 2-Way Audio
+Inspect Tasks (Green) Prelims/Semis/Finals
+• Linear – 1 point each (does not include multiplier)
+• Omni – 2 point each (does not include multiplier)
+Touch Tasks (Blue) – Prelims Only (easier, use your own tool)
+• Linear – 2 point each (does not include multiplier)
+• Omni – 4 point each (does not include multiplier)
+Insert Tasks (Blue) - Semi and finals only (add the grasp shaft tool in center)
+• Linear – 3 point each
+• Omni – 6 point each
+Operational Tasks (Black) – Semi Finals and Finals only
+• Omni – 10 point each
+
+10
+
+Sensing Tasks (Victim Crate)
+Version: 2026A
+
+A
+
+B
+
+Scoring Sensing Tasks
+In order to score sensor points (victim crate), you must score at
+least 2 points mobility and 2 points in dexterity.
+The victim crate must be placed in the lane.
+The victim crate must be placed in an upright position.
+Any sensor on the robot may be used to score points.
+After a reset the arm must be in a stowed position.
+
+MAGNET
+
+If the manipulator is broken, you are not allowed to manually
+place the manipulator over the victim box to score.
+
+D
+E
+F
+C
+
+G
+
+A - THERMAL IMAGE ACUITY (5 pts)
+Hand warmer with 3D printed Concentric Cs
+Process: Using a thermal camera display on
+operator’s screen the heat signature in the
+pattern of the Concentric Cs 2 levels deep.
+B- PARTIAL IMAGE RECOGNITION (4 pts)
+Random hazmat labels from a known set.
+Process: Autonomously detect hazmat
+label. Display bounding box around hazmat
+label and display name of label.
+C - MOTION DETECTION (4 pts)
+Rotating disk with target
+Process: Autonomously detect the rotating
+target square or other shapes. Display on
+operator’s screen a bounding box around
+square and track while the target is in
+motion for 360 degrees
+
+D - PROXIMITY SAMPLING (3 pts)
+Magnet
+Process: Using magnetometer attached to the tool tip/
+manipulator to detect the presence of the magnet
+E - QR CODE ACUITY (2 pts)
+QR Code
+Process: Autonomously QR code. Display text on the operator’s
+screen .
+F – 2-WAY AUDIO ACUITY (1 pt)
+MP3 Player with alpha-numeric sequence to identify
+Process: Using your speaker/microphone, detect sound at the
+operator station and at the robot. Must clearly detect one line of
+the alpha-numeric sequence .
+G - VISUAL/COLOR ACUITY (1 pt)
+Concentric Cs
+Process: Concentric Cs Identify the gap in the ring 3 levels deep.
+
+11
+
+CLASSIFICATION TASKS – INSPECT OBJECTS (Green)
+Version: 2026A
+
+Available in Prelims/Semis/Finals
+●
+●
+●
+
+Visual acuity tasks in linear/omni tasks will be QR codes or partial image recognition
+Remote alignment is QR detection / partial image recognition
+Teams must submit results with an overlaid image and decoded message
+
+Note: LINEAR RAIL or OMNI may not be colored green. It may be the color of raw wood.
+
+OMNI
+
+LINEAR
+
+QR CODE
+
+QR CODE
+
+HAZMAT
+
+QR CODE
+
+QR CODE
+
+Linear rails are mounted on the wall at 60 cm (24 in).
+
+Scoring matrix is found on the mission form
+
+12
+
+CLASSIFICATION TASK – TOUCH or INSERT TOOLS (Blue)
+Version: 2026A
+
+TOUCH = Sustained contact of shaft tip to hole interior in any orientation Easier – Only in Preliminaries
+INSERT = Perpendicular penetration of shaft into hole at least 25mm (1in) Harder – In Semis and Finals
+
+Note: LINEAR RAIL or OMNI may not be colored BLUE. It may be the color of raw wood.
+LINEAR
+
+OMNI
+
+One of the standard dexterity tests is “Touch” tools which is conducted in every terrain. Linear rails are
+mounted on the wall at 60 cm (24 in), Omni may be mounted on the wall at 60 cm or floor.
+Blue apparatuses shown in both Linear (easier) and Omnidirectional (harder) configurations.
+
+Scoring matrix is found on the mission form
+
+13
+
+Operational Tasks
+OPERATIONAL TASK – PRESS BUTTONS (Black)
+
+Version: 2026A
+
+Harder due to force, friction, or precision. Omni configuration only
+
+OPERATIONAL TASK – TURN VALVES (Black)
+Harder due to force, friction, or precisions. Omni configuration only
+
+14
+
+Single Lane or Multi Lane Mission Form
+ROUND
+
+DATE
+
+TIME
+
+TEAM / COUNTRY
+
+TERRAINS (TER)
+
+PROCTOR: FULL NAME / COUNTRY
+
+OBSTACLES (OBS)
+
+Version: 2026A
+
+EXPLORATION (EXP)
+
+❑ (10) Crossing Ramps
+
+❑ (9) K-Rails
+
+❑ (1) Incline/Center
+
+❑ (5) Stairs
+
+❑ (4) Avoid Holes
+
+❑ (2) Cubic Stepfields
+
+❑ (3) Gravel
+
+❑ (8) Pallets with Pipes
+
+❑ (6) Doors
+
+❑ (7) Mapping Labyrinth
+
+CIRCLE SUCCESSFUL TASKS AND STRIKE THROUGH UNFINISHED OR PENALIZED TASKS.
+
+MOBILITY: Drive TELEOPERATVELY or AUTONOMOUSLY (no hands-on interface) end-to-end in the lane.
+
+AUTO POINTS
+
+TOTAL POINTS
+
+DEXTERITY: Perform the available SETS OF TASKS starting anywhere and in any order. No repeated tasks.
+CIRCLE SUCCESSFUL TASKS AND STRIKE THROUGH UNFINISHED OR PENALIZED TASKS.
+
+TT = Teleop Approach/Teleop Dex | CM = Comms | TA = Teleop Approach/Auto Dex | AA = Auto Approach/Auto Dex
+
+P = Prelim Only
+S = Semi
+F = Finals
+
+VISUAL ACUITY PTS: IDENTIFY 3C’S
+
+|
+
+THERMAL PTS: IDENTIFY 2C’S
+
+COMS
+
+DEX
+
+TEAM LEADER SIGNATURE
+
+TELEOP POINTS
+
++
+
++
+
++
+POINTS
+
+DEXTERITY
+
+DEX
+
+AUTO POINTS
+
+=
+SENSOR CRATE
+
+TOTAL POINTS
+
+15
+
+Overall Score Calculation
+Raw Scores
+
+Version: 2026A
+
+Max Score
+=IF(B$25=0,0,B4/B$25)
+
+Normalize Scores for Mob and DEX are combined for total score.
+Note: MOB includes AUTO MOB and DEX includes AUTO DEX
+Normalize Scores
+
+MOB + DEX = Lane Score (max 200%)
+Sum of all lane scores = Total Score (max 2000%)
+
+16
+
+Score Calculation for Best in Class and Bracket
+Version: 2026A
+
+For all BEST IN CLASS certificates individual scores are normalized
+separately eg. autonomous dexitery
+Best in Class Autonomy score is calculated by using the sum of all
+Normalized Lane Scores for AUTO MOB and AUTO DEX
+Best in Class Autonomous Mobility score is calculated by using all
+Normalized Lane Scores for AUTO MOB
+
+Best in Class Autonomous Dexterity score is calculated by using all
+Normalized Lane Scores for AUTO DEX
+Best in Class Autonomous Mapping score is calculated by using only
+autonomous mapping points from the maze and then normalized.
+Best-In-Class Award for Small Robot is normalized between small robot
+missions. The sums of all scores count
+
+Bracket Classification Awards are normalized together. (ie using the
+overall competition score). Because the overhead of normalizing for
+each bracket is too high.
+
+17
+
+FAQs
+Version: 2026A
+
+1.
+
+How much weight is required for the payload task? 2x weight of the omni
+
+2.
+
+If we would like to perform only autonomous dexterity (TELE MOB + AUTO DEX), should we
+inform the proctor to change the mode (e.g., by pressing a button to activate AUTO DEX)?
+Yes, you should inform the proctor. Hands must be off the control unit.
+
+3.
+
+If we start in autonomous mode for half of the lap and encounter a problem, then switch to
+teleoperation without touching the robot to finish the lap, how will the score be calculated?
+The score would be teleoperation for the complete lap.
+
+4.
+
+What is the height of the doorknob used in the task? 90-120cm (36 - 48 ins.)
+
+5.
+
+What is the dimension of the tool shaft? 6mm (¼ in.)
+
+6.
+
+What is the required height for the linear and omni tasks? 60cm (24 in.)
+
+7.
+
+Are there any omni or linear tasks that are placed on the floor? Yes, tasks could be placed on
+the floor.
+
+8.
+
+Is there a weight limit? Yes, 80kgs - with safe handles
+
+9.
+
+To score the victim box , Do you have to have a positive score? Yes, Mobility 2 points and Dex
+2 points
+
+10.
+
+Where should the victim box be placed to score it? Anywhere in the lane. Must be upright
+
+11.
+
+Is scoring allowed with any part of the robot or only the manipulator? Any part of the robot
+
+12.
+
+If the manipulator is broken are you allowed to manually place the manipulator over the
+victim box to score? No, not allowed. After reset the arm must be in a stowed position.
+
+13.
+
+To score ANY dexterity points you MUST have a positive score in Mobility, Yes, a score of 2
+
+18
+
+Version: 2026A
+
+Mapping and Object Detection
+Submission Specifications
+Mission:
+•
+Teams will be given a period of 20 minutes to create maps of the area.
+•
+A mapping run begins from a designated start position, and ends when a map is saved
+and cleared on the robot.
+•
+Teams may reset their mapping run if they choose, and they may perform as many
+mapping runs as possible within their allotted time. Each subsequent mapping run
+must start from the same designated start position.
+During preliminary rounds, teams will be expected to submit the data from what they believe
+to be their best mapping run (Subject to discussion).
+In later rounds, multiple maps up to a maximum of 3 will be accepted for scoring.
+Teams will be required to submit the following for each mapping run:
+2D Map:
+Submitted in the specified GeoTIFF format.
+An open-source implementation for ROS is available at http://wiki.ros.org/hector_geotiff.
+Does not contribute to mapping score.
+
+3D Point Cloud Map:
+Submitted in the specified [.PLY] format.
+Recommended to use PCL to convert and save point cloud files.
+
+Identified Objects CSV File:
+Submitted in the specified CSV format.
+The list of official object names will be provided during the competition.
+
+Hand-in:
+The files have to be automatically created - no editing by hand is allowed. The files have to be copied from the
+robot/ operating station within 5 minutes after the run.
+
+19
+
+Version: 2026A
+
+Mapping and Object Detection
+Scoring Specifications
+2D Map:
+•
+•
+
+Mandatory to submit, but will not be scored.
+Will not be scored directly, but may be used to help visualize other scoring metrics.
+
+3D Point Cloud Map:
+In comparison to our 3D ground truth cloud, two metrics will be calculated to score your point cloud:
+•
+Global Error (GE) - Computed as average cloud-to-cloud distance (in meters).
+•
+Coverage (CV) - Computed as the percentage of ground truth points for which the 3D Cloud contains a
+point within a threshold distance.
+•
+Bonus multipliers will be awarded for having sensible RGB color data and/or heat data included in your
+map. (1.25x and 1.6x respectively, 2x for both) (Subject to discussion)
+•
+Scores will be combined as: CV * (1 / (1 + GE)) * Bonus (Subject to discussion)
+Please note:
+•
+These metrics require cloud alignment and identical scaling.
+•
+Teams will be responsible for proper scaling of their 3D Cloud (see specification).
+•
+Judges will be responsible for map alignment using ICP and manual point-pair alignment if necessary.
+•
+The alignment used for evaluation will be made available to teams.
+
+Identified Objects CSV File:
+Teams will be expected to detect several different kinds of objects and localize them within their 3D map.
+These objects may include AprilTags (Standard41h12 family), Hazmat signs, physical objects (i.e. Backpack, Hard
+hat, fire extinguisher, victim (baby doll), propane tank (empty)), and a heat signature. Each object is unique in
+the arena - do not report multiple of the same type (in which case each additional detection will be discarded).
+Two metrics will be calculated from the list of detections:
+•
+Localization Error (LE) - For all detections, this metric will represent the average difference in distance
+(in meters) between all detection pairs compared to the ground truth.
+•
+Detection Score (DS) - The sum of various point denominations will be awarded (based on difficulty) for
+detections that are within an error threshold. (i.e., AR = 1, Hazmat Signs = 2, Object = 10, Heat = 15).
+Additionally, points will be subtracted for each detection above this error threshold (i.e. -3 points).
+•
+Scores will be combined as: DS / (1 + LE) (Subject to discussion)
+Please note:
+•
+Detection coordinates should correspond to the center of mass of the detected object.
+•
+These metrics are not impacted by global alignment between the ground truth and 3D Cloud.
+•
+There will be an additional Detection Score penalty for reported detections for objects which are not
+present in the mapping area.
+Overall mapping score will be the average normalized score contributions from 3D Map (0.5), Detection CSV
+(0.5). 2D Map must be submitted to receive a mapping score.
+
+20
+
+Version: 2026A
+
+Mapping and Object Detection
+Format Specifications
+2D Map Format
+2D maps have to be submitted in the specified GeoTIFF format. An open-source implementation for ROS is
+available at http://wiki.ros.org/hector_geotiff.
+Example map:
+
+21
+
+In the following, all elements of the map are described:
+
+Version: 2026A
+
+•
+
+Fileformat: GeoTIFF
+
+•
+
+FILENAME: DARK BLUE (RGB: 0, 44, 207) TEXT
+For example, “RoboCup2025-TeamName-Mission1.tiff” displayed in the upper left corner to identify
+the map, make it sort properly in a directory, and findable on a computer.
+
+•
+
+MAP SCALE: DARK BLUE (RGB: 0, 50, 140) TEXT AND EXACTLY 1 METER LONG LINE
+Display this in the upper right corner to indicate the scale of the map.
+
+•
+
+MAP ORIENTATION: DARK BLUE (RGB: 0, 50, 140) TEXT (“X” AND “Y”) AND ABOUT 50 cm LONG
+ARROWS
+Display this next to the map scale. It gives the orientation for the victim location in the victim file.
+Must be a right handed coordinate system: X points upwards, Y to the left.
+
+•
+
+UNEXPLORED AREA GRID: LIGHT/DARK GREY (RGB: 226, 226, 227/RGB: 237, 237, 238)
+CHECKERBOARD WITH 100CM SQUARES
+This solid checkerboard pattern should show the unexplored area and provide scale on all sides of the
+mapped area. It should also print in black and white without ambiguity with other areas potentially
+turned grey in the process.
+
+•
+
+EXPLORED AREA GRID: BLACK (RGB: 190,190,191) GRID WITH 50CM GRID AND ABOUT 1 CM THICK
+LINES (use a one pixel line in the map)
+This grid should only appear in the explored area, behind any walls, victim locations, or other
+information. The grid should be aligned with the checkerboard pattern of the unexplored area, but
+twice as fine to allow visual inspection of wall alignments.
+
+•
+
+INITIAL ROBOT POSITION: GREEN (RGB: 0, 240, 0) ARROW
+This should mark the initial position of the robot and always be pointed toward the top of the map.
+
+•
+
+WALLS AND OBSTACLES: DARK BLUE (RGB: 0, 40, 120) FEATURES
+This should indicate the walls and other obstacles in the environment. The color should make the walls
+stand out from everything else.
+
+•
+
+SEARCHED AREA: WHITE CONFIDENCE GRADIENT (RGB: 128, 128, 128 to RGB: 255, 255, 255)
+This should be based on the confidence that the area is really free. It should produce a clean white
+when seen as free by all measurements and nearly untouched when undecided, that is, nearly equally
+seen as occupied as free, to produce a dither effect.
+
+•
+
+APRILTAG LOCATION: SOLID YELLOW (RGB: 255, 200, 0) CIRCLE WITH ABOUT 35CM DIAM
+CONTAINING WHITE (RGB) TEXT “#” REPRESENTING THE LABEL ASSOCIATED WITH THE APRILTAG
+
+•
+
+HAZMAT LOCATION: SOLID ORANGE (RGB: 255, 100, 30) DIAMOND WITH ABOUT 30CM SIDES
+CONTAINING WHITE (RGB) TEXT “@@” REPRESENTING THE FIRST TWO LETTERS OF THE HAZMAT
+LABEL
+
+•
+
+REAL OBJECT LOCATION: SOLID RED (RGB: 240, 10, 10) DIAMOND WITH ABOUT 30CM SIDES
+CONTAINING WHITE (RGB) TEXT “@@” REPRESENTING THE FIRST TWO LETTERS OF THE IDENTIFIED
+OBJECT
+
+•
+
+ROBOT PATH: MAGENTA (RGB: 120, 0, 140) LINE ABOUT 2CM THICK
+This should show the robot path.
+
+NOTE: If a team wishes to deviate from this 2D format in order to make improvements on the
+understandability and usefulness of their generated 2D map, they will not be penalized for doing so. The
+submitted map should contain all of the same information (scale, detections, physical barriers, robot path,
+etc.), but stylistic choices may be made to make it more presentable. The important capability to demonstrate
+is producing a clean, useful 2D map for field operations.
+
+22
+
+Identified Objects CSV Format
+
+Version: 2026A
+
+In addition to indicating identified objects in the map, they have to be submitted in a CSV list. In the following,
+the structure of the file is given:
+Filename: RoboCup[Year]-[Teamname]-[Mission]-[Start Time]-pois.csv
+([Start Time] should be formatted as HH-MM-SS)
+Format for the file header:
+"pois"
+"1.3"
+"[Your team name]"
+"[Your country]"
+"[Start Date]"
+"[Start Time]"
+"[Mission #]"
+detection,time,type,name,x,y,z,robot,mode
+Replace the placeholders “[...]” with your data. Please leave the quotes in the file, but not the brackets.
+The file body contains one line for each found object in the following format:
+[detection],[time],[type],[name],[x],[y],[z],[robot],[mode]
+•
+•
+•
+•
+•
+•
+•
+
+[detection]: Unique integer counter for each object that is also printed on the geotiff map
+[time]: Time stamp when the object was found
+[type]: Type of the object: [ ar_code, hazmat_sign, real_object, heat_sig ]
+[name]: Unique ID for detection (i.e. ar_code number, hazmat label, object name)
+[x], [y], [z]: Coordinates of the object in meters
+[robot]: Name of the robot that found the object
+[mode]: Mode of the robot when it found the object: A for autonomous, T for teleoperated
+
+Strings which include spaces should be enclosed with double quotes. Here is an example of a file which might
+be named “RoboCup2025-ReskoKoblenz-Prelim1-pois.csv”:
+"pois"
+"1.3"
+"Resko Koblenz"
+"Germany"
+"2018-06-23"
+"14:37:03"
+"Prelim1"
+detection,time,type,name,x,y,z,robot,mode
+1,14:28:01,”ar_code”,”2”,-8.2992,-2.2904,0.49,"Robbie 1",A
+2,14:28:02,”ar_code”,”34”,-8.2993,-2.2902,0.4563,"Robbie 2",T
+3,14:28:05,”hazmat_sign”,”poison”,-5.7452,-7.0849,0.2130,"Robbie 1",A
+4,14:30:14,”real_object”,”gloves”,-6.0845,-0.1251,0.3561,"Robbie 1",A
+5,14:32:56,”heat_sig”,”0”,-9.2817,0.04968,0.7561,"Robbie 2",T
+IMPORTANT: There will only be one instance of each object included in the mapping area at any time. Teams
+must only include one detection per unique object. If duplicate objects are contained in the submitted CSV,
+only the first instance of that object will be used for scoring.
+A list of object labels will be provided to teams. Mislabelled objects and submissions not following the
+specified format will not be scored.
+
+23
+
+3D Point Cloud Map
+
+Version: 2026A
+
+Teams will submit a 3D pointcloud representation of the mapped area to be scored with respect to a generated
+ground truth map. The submitted map should adhere to the following specification:
+Filename: RoboCup[Year]-[Teamname]-[Mission]-[Start Time]-map.ply
+([Start Time] should be formatted as HH-MM-SS)
+Your point cloud should be formatted as an ASCII file.
+The header of your file should adhere to the PLY file format.
+At a minimum, your file should include float type fields for x, y, and z.
+Teams may include additional fields such as:
+RGB Color Information
+Heat Information
+Point Normal Information
+Confidence Scalar
+Maps which contain sensible color and/or heat data will be awarded a bonus point multiplier.
+IMPORTANT: The scale of your map coordinates are expected to be in meters. (i.e. A distance of 1 unit in the
+submitted point cloud should correspond to 1 meter in the real world). Improper scaling will severely penalize
+your score.
+The origin location (0,0,0) of the 3D Cloud should be set to the starting position for the robot which will be
+marked on the floor in the mapping area. More specifically, the origin should be set to be the center of the
+front of the robot, at floor height. Rotationally, the starting position will point the robot in the +Y direction, and
+the vertical axis will be Z.
+More information on PLY format can be found here.
+The format for the PLY header that should be included is shown below.
+NOTE: You are not required to include all fields if you are not collecting those kinds of data
+ply
+format ascii 1.0
+comment {Team Name}
+comment {Start time}
+comment {Mission #}
+element vertex {Number of Vertices}
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+property float nx
+property float ny
+property float nz
+property float temp
+property float confidence
+end_header
+{DATA}
+
+24

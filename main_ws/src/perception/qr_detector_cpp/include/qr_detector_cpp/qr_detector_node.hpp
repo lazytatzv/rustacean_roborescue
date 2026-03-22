@@ -1,27 +1,26 @@
 #ifndef QR_DETECTOR_CPP__QR_DETECTOR_NODE_HPP_
 #define QR_DETECTOR_CPP__QR_DETECTOR_NODE_HPP_
 
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/image.hpp>
-#include <sensor_msgs/msg/compressed_image.hpp>
-#include <std_msgs/msg/string.hpp>
 #include <cv_bridge/cv_bridge.hpp>
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include <opencv2/wechat_qrcode.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <string>
+#include <vector>
 
 namespace qr_detector_cpp
 {
 
 class QrDetectorNode : public rclcpp::Node
 {
-public:
-  explicit QrDetectorNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+ public:
+  explicit QrDetectorNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
-private:
+ private:
   void image_callback(const sensor_msgs::msg::Image::ConstSharedPtr msg);
 
   // Parameters

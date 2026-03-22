@@ -33,10 +33,12 @@ def generate_launch_description() -> LaunchDescription:
         package="joy",
         executable="joy_node",
         name="joy_node",
-        parameters=[{
-            "deadzone": 0.1,
-            "autorepeat_rate": 20.0,
-        }],
+        parameters=[
+            {
+                "deadzone": 0.1,
+                "autorepeat_rate": 20.0,
+            }
+        ],
     )
 
     # 2. Joy Controller (Our node to map /joy to /arm_cmd_vel)
@@ -75,12 +77,14 @@ def generate_launch_description() -> LaunchDescription:
         **respawn_config,
     )
 
-    return LaunchDescription([
-        arm_params,
-        arm_driver_params,
-        joy_params,
-        joy_node,
-        joy_controller_node,
-        arm_driver_node,
-        arm_controller_node,
-    ])
+    return LaunchDescription(
+        [
+            arm_params,
+            arm_driver_params,
+            joy_params,
+            joy_node,
+            joy_controller_node,
+            arm_driver_node,
+            arm_controller_node,
+        ]
+    )

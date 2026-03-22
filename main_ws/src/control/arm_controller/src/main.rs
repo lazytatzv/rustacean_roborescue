@@ -316,7 +316,7 @@ fn run() -> Result<()> {
         loop_count += 1;
         if estop_timer.load(Ordering::Relaxed) { return; }
         let mut s = lock_or_recover(&state_timer);
-        
+
         let current_positions: Vec<f64> = names_clone.iter().map(|n| s.joint_positions.get(n).copied().unwrap_or(0.0)).collect();
 
         // --- FEEDBACK CHECK ---
@@ -334,7 +334,7 @@ fn run() -> Result<()> {
         serial_chain.set_joint_positions_clamped(&current_positions);
         serial_chain.update_transforms();
         let iso = serial_chain.end_transform();
-        
+
         let mut pose_msg = PoseStamped::default();
         pose_msg.header.stamp = now_stamp();
         pose_msg.header.frame_id = "base_link".to_string();
@@ -391,7 +391,7 @@ fn run() -> Result<()> {
         // Integrate from target_positions for smoothness, but keep it tethered to feedback
         let mut new_targets: Vec<f64> = target_positions.iter().zip(final_vel.iter()).enumerate()
             .map(|(i, (&q, &dq))| (q + dq * dt).clamp(limits.lower[i], limits.upper[i])).collect();
-        
+
         // Tethering: if target drifts too far from feedback (> 0.2 rad), snap it back partially
         for i in 0..dof {
             let diff = new_targets[i] - current_positions[i];

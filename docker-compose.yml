@@ -5,14 +5,14 @@ services:
     tty: true
     privileged: true
     network_mode: host
-    
-    working_dir: /workspace 
+
+    working_dir: /workspace
 
     environment:
       - ROS_DOMAIN_ID=0
       - DISPLAY=${DISPLAY}
-      - QT_X11_NO_MITSHM=1 
-    
+      - QT_X11_NO_MITSHM=1
+
     volumes:
       - .:/workspace
       # X11 Forwarding

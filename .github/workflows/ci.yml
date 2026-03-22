@@ -1,3 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, feature/** ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint-and-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Install system C/C++ tooling
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-format clang-tidy cppcheck || true
+
+      - name: Byte-compile Python files
+        run: |
+          set -e
+          find . -name "*.py" -not -path "./.git/*" -print0 | xargs -0 -n1 python -m py_compile
+
+      - name: Run ruff
+        run: |
+          ruff check .
+
+      - name: Run pre-commit
+        run: |
+          pre-commit run --all-files || true
+
+      - name: Run C++ linters
+        run: |
+          set -e
+          # cpplint (installed via pip) on tracked C/C++ files
+          git ls-files '*.c' '*.cpp' '*.cc' '*.h' '*.hpp' | xargs -r cpplint || true
+          # cppcheck over main_ws source tree
+          cppcheck --enable=warning,style,performance --inconclusive --std=c++17 main_ws/src || true
 name: CI (Nix + Build + Tests)
 
 on:

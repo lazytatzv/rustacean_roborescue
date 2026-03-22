@@ -7,6 +7,7 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+
 def generate_launch_description():
     bringup_dir = get_package_share_directory("bringup")
 
@@ -53,10 +54,14 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_rviz")),
     )
 
-    return LaunchDescription([
-        urdf_arg, use_rviz_arg, use_gui_arg,
-        robot_state_publisher,
-        joint_state_publisher_gui,
-        joint_state_publisher,
-        rviz2,
-    ])
+    return LaunchDescription(
+        [
+            urdf_arg,
+            use_rviz_arg,
+            use_gui_arg,
+            robot_state_publisher,
+            joint_state_publisher_gui,
+            joint_state_publisher,
+            rviz2,
+        ]
+    )

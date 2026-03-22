@@ -279,6 +279,16 @@
             echo "======================================================="
           '';
         };
+        # Lightweight devShell for running pre-commit and Python linters.
+        # Use a plain nixpkgs import (pkgsPlain) to avoid overlay evaluation
+        # issues from nixgl/ros overlays.
+        devShells.precommit = (import nixpkgs { inherit system; }).mkShell {
+          name = "RoboRescue Precommit Shell";
+          packages = with (import nixpkgs { inherit system; }); [ python3 python3Packages.pre-commit python3Packages.ruff python3Packages.black python3Packages.isort python3Packages.cpplint ];
+          shellHook = ''
+            echo "Entering Pre-commit devShell: use 'pre-commit run --all-files'"
+          '';
+        };
       }
     );
 }

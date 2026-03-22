@@ -1,8 +1,9 @@
 #include <memory>
-#include "rclcpp/rclcpp.hpp"
-#include "qr_detector_cpp/qr_detector_node.hpp"
 
-int main(int argc, char ** argv)
+#include "qr_detector_cpp/qr_detector_node.hpp"
+#include "rclcpp/rclcpp.hpp"
+
+int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
   // Default NodeOptions (e.g. for parameters from CLI)

@@ -33,3 +33,6 @@
 	path = main_ws/src/external/dynamixel_hardware_interface
 	url = https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface.git
 	branch = jazzy
+[submodule "main_ws/third_party/omron-2jcie-bu01"]
+	path = main_ws/third_party/omron-2jcie-bu01
+	url = https://github.com/nobrin/omron-2jcie-bu01.git

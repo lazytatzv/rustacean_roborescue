@@ -17,34 +17,44 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 
+
 def generate_launch_description():
-    bringup_dir = get_package_share_directory('bringup')
+    bringup_dir = get_package_share_directory("bringup")
 
     # 各サブLaunchファイルのパス
-    network_launch = os.path.join(bringup_dir, 'launch', 'network.launch.py')
-    perception_launch = os.path.join(bringup_dir, 'launch', 'perception.launch.py')
-    control_launch = os.path.join(bringup_dir, 'launch', 'control.launch.py')
-    camera_launch = os.path.join(bringup_dir, 'launch', 'camera.launch.py')
-    nav2_launch = os.path.join(bringup_dir, 'launch', 'nav2.launch.py')
+    network_launch = os.path.join(bringup_dir, "launch", "network.launch.py")
+    perception_launch = os.path.join(bringup_dir, "launch", "perception.launch.py")
+    control_launch = os.path.join(bringup_dir, "launch", "control.launch.py")
+    camera_launch = os.path.join(bringup_dir, "launch", "camera.launch.py")
+    nav2_launch = os.path.join(bringup_dir, "launch", "nav2.launch.py")
+    audio_launch = os.path.join(bringup_dir, "launch", "audio.launch.py")
 
-    use_nav2 = DeclareLaunchArgument('use_nav2', default_value='false',
-                                      description='Nav2 自律走行を有効にする')
+    use_nav2 = DeclareLaunchArgument(
+        "use_nav2", default_value="false", description="Nav2 自律走行を有効にする"
+    )
+    use_audio = DeclareLaunchArgument(
+        "use_audio",
+        default_value="true",
+        description="Start audio (webrtc signaling + robot node)",
+    )
 
     # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
-    urdf_file = os.path.join(bringup_dir, 'urdf', 'robot.urdf.xacro')
+    urdf_file = os.path.join(bringup_dir, "urdf", "robot.urdf.xacro")
     robot_description = ParameterValue(
-        Command(['xacro ', urdf_file]),
+        Command(["xacro ", urdf_file]),
         value_type=str,
     )
     robot_state_publisher_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        parameters=[{
-            'robot_description': robot_description,
-            'use_sim_time': False,
-        }],
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="robot_state_publisher",
+        output="screen",
+        parameters=[
+            {
+                "robot_description": robot_description,
+                "use_sim_time": False,
+            }
+        ],
     )
 
     # foxglove bridgeはOperator側で立ち上げる想定
@@ -64,39 +74,41 @@ def generate_launch_description():
     #     }],
     # )
 
-    return LaunchDescription([
-        use_nav2,
-
-        # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
-        robot_state_publisher_node,
-
-        # 1. Foxglove Bridge (WebSocket :8765)
-        #foxglove_bridge_node,
-
-        # ネットワーク（Zenoh）の起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(network_launch),
-        ),
-
-        # 認識・SLAM系の起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(perception_launch),
-            launch_arguments={'use_slam': 'true', 'use_rviz': 'false'}.items()
-        ),
-
-        # カメラの起動 (qr_detector が /camera/image_raw を必要とする)
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(camera_launch),
-        ),
-
-        # 制御系の起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(control_launch),
-        ),
-
-        # Nav2 自律走行（オプション）
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(nav2_launch),
-            condition=IfCondition(LaunchConfiguration('use_nav2')),
-        ),
-    ])
+    return LaunchDescription(
+        [
+            use_nav2,
+            # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
+            robot_state_publisher_node,
+            # 1. Foxglove Bridge (WebSocket :8765)
+            # foxglove_bridge_node,
+            # ネットワーク（Zenoh）の起動
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(network_launch),
+            ),
+            # オーディオ (signaling + robot webrtc)
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(audio_launch),
+                launch_arguments={
+                    "use_audio": LaunchConfiguration("use_audio")
+                }.items(),
+            ),
+            # 認識・SLAM系の起動
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(perception_launch),
+                launch_arguments={"use_slam": "true", "use_rviz": "false"}.items(),
+            ),
+            # カメラの起動 (qr_detector が /camera/image_raw を必要とする)
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(camera_launch),
+            ),
+            # 制御系の起動
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(control_launch),
+            ),
+            # Nav2 自律走行（オプション）
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(nav2_launch),
+                condition=IfCondition(LaunchConfiguration("use_nav2")),
+            ),
+        ]
+    )

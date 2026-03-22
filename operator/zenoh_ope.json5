@@ -1,9 +1,0 @@
-{
-  // Operator typically only needs to connect to the robot's zenohd.
-  // Use "client" to avoid accepting incoming Zenoh connections on the operator.
-  // Change to "peer" only if you want the operator to be a full peer (listen/route).
-  mode: "client",
-  connect: { endpoints: ["quic/10.42.0.1:7447"] }, // Robot IP (change as needed)
-  scouting: { multicast: { enabled: false } },
-  transport: { shared_memory: { enabled: true } }
-}

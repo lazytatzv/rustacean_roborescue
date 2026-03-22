@@ -11,28 +11,40 @@ def generate_launch_description() -> LaunchDescription:
     # ── Launch arguments ──
     crawler_params = DeclareLaunchArgument(
         "crawler_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "crawler_driver.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "crawler_driver.yaml"]
+        ),
     )
     flipper_params = DeclareLaunchArgument(
         "flipper_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "flipper_driver.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "flipper_driver.yaml"]
+        ),
     )
     arm_params = DeclareLaunchArgument(
         "arm_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "arm_controller.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "arm_controller.yaml"]
+        ),
     )
     sensor_gw_params = DeclareLaunchArgument(
         "sensor_gw_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "sensor_gateway.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "sensor_gateway.yaml"]
+        ),
     )
     # 修正: 明確な名前に変更
     arm_gripper_driver_params = DeclareLaunchArgument(
         "arm_gripper_driver_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "arm_gripper_driver.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "arm_gripper_driver.yaml"]
+        ),
     )
     joy_params = DeclareLaunchArgument(
         "joy_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
+        default_value=PathJoinSubstitution(
+            [bringup_share, "config", "joy_controller.yaml"]
+        ),
     )
 
     hw_respawn = {"respawn": True, "respawn_delay": 3.0}
@@ -94,22 +106,28 @@ def generate_launch_description() -> LaunchDescription:
         output="both",
         parameters=[
             LaunchConfiguration("arm_params"),
-            {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
+            {
+                "urdf_path": PathJoinSubstitution(
+                    [bringup_share, "urdf", "sekirei.urdf"]
+                )
+            },
         ],
         **ctrl_respawn,
     )
 
-    return LaunchDescription([
-        crawler_params,
-        flipper_params,
-        arm_params,
-        sensor_gw_params,
-        arm_gripper_driver_params,
-        joy_params,
-        crawler_driver_node,
-        flipper_driver_node,
-        sensor_gateway_node,
-        arm_gripper_driver_node,
-        joy_controller_node,
-        arm_controller_node,
-    ])
+    return LaunchDescription(
+        [
+            crawler_params,
+            flipper_params,
+            arm_params,
+            sensor_gw_params,
+            arm_gripper_driver_params,
+            joy_params,
+            crawler_driver_node,
+            flipper_driver_node,
+            sensor_gateway_node,
+            arm_gripper_driver_node,
+            joy_controller_node,
+            arm_controller_node,
+        ]
+    )
