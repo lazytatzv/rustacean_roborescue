@@ -1,5 +1,10 @@
 # Rustacean RoboRescue
 
+![CI](https://github.com/yourorg/yourrepo/workflows/CI/badge.svg)
+![Docker Image](https://github.com/yourorg/yourrepo/workflows/docker-publish/badge.svg)
+![Codecov](https://codecov.io/gh/yourorg/yourrepo/branch/main/graph/badge.svg)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+
 ROS 2 Jazzy ベースのレスキューロボット制御システム。
 Rust (rclrs) + C++ (rclcpp) + Python (rclpy) のマルチ言語ワークスペース。
 
