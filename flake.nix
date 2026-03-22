@@ -251,9 +251,13 @@
             export CXX="ccache clang++"
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
 
-            # Force colcon/CMake to use the Python interpreter from the
-            # pythonEnv so NumPy headers are discoverable by FindPython3.
+            # Ensure the Nix-managed pythonEnv is first on PATH so `python`
+            # resolves to the flake-provided interpreter and its packages
+            # (NumPy, OpenCV) are available to CMake/colcon.
+            export PATH="${pythonEnv}/bin:$PATH"
             export PYTHON_EXECUTABLE="${pythonEnv}/bin/python"
+            # Make site-packages visible to other tools in the shell
+            export PYTHONPATH="${pythonEnv}/lib/python${toString pkgs.python3.version}/site-packages:$PYTHONPATH"
 
             # --- OpenMP (spark_fast_lio 用) ---
             export CFLAGS="-fopenmp $CFLAGS"
