@@ -227,7 +227,7 @@
         };
 
         # Explicit Python environment with common developer packages (NumPy etc.)
-        pythonEnv = pkgs.python3.withPackages (ps: with ps; [ numpy opencv4 black isort (ps."pre-commit") cpplint (ps."pip-audit") pytest ]);
+        pythonEnv = pkgs.python3.withPackages (ps: with ps; [ numpy opencv4 pytest ]);
 
       in
       {
