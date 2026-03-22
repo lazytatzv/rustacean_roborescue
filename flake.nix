@@ -228,6 +228,9 @@
           paths = rosDeps ++ cppLibs;
         };
 
+        # Explicit Python environment with common developer packages (NumPy etc.)
+        pythonEnv = pkgs.python3.withPackages (ps: with ps; [ numpy opencv4 black isort pre-commit cpplint pip_audit pytest ]);
+
       in
       {
         devShells.default = pkgs.mkShell {
