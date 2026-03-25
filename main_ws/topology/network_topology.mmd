@@ -22,7 +22,7 @@ graph LR
     subgraph Actuators["アクチュエータ"]
       ROBOCLAW[Roboclaw<br/>左右クローラモータ]:::device
       DXL_F[Dynamixel XM<br/>フリッパ ×4<br/>ID 1,2,3,4]:::device
-      DXL_G[Dynamixel XM<br/>グリッパ<br/>ID 10]:::device
+      DXL_AG[Dynamixel XM<br/>アーム + グリッパ<br/>ID 21-26, 10]:::device
     end
 
     subgraph ROS_Nodes["ROS 2 ノード"]
@@ -31,7 +31,6 @@ graph LR
       N_cam[usb_cam]:::ros_node
       N_crawler[crawler_driver]:::ros_node
       N_flipper[flipper_driver]:::ros_node
-      N_gripper[gripper_driver]:::ros_node
       N_spark[spark_fast_lio]:::ros_node
       N_slam[slam_toolbox]:::ros_node
       N_arm[arm_controller]:::ros_node
@@ -47,15 +46,14 @@ graph LR
     NUC -- "USB /dev/video0" --> USB_CAM
     NUC -- "USB Serial /dev/roboclaw" --> ROBOCLAW
     NUC -- "USB Serial /dev/dynamixel<br/>115200 bps (U2D2)" --> DXL_F
-    NUC -- "USB Serial /dev/ttyUSB1<br/>115200 bps (U2D2)" --> DXL_G
+    NUC -- "USB Serial /dev/ttyUSB0<br/>1000000 bps (U2D2)" --> DXL_AG
 
     STM32 -.-> N_gateway
     VLP16 -.-> N_vlp
     USB_CAM -.-> N_cam
     N_crawler -.-> ROBOCLAW
     N_flipper -.-> DXL_F
-    N_arm_drv -.-> DXL_F
-    N_gripper -.-> DXL_G
+    N_arm_drv -.-> DXL_AG
   end
 
   %% =============================================
@@ -98,7 +96,6 @@ graph LR
   N_joyctrl -. "/emergency_stop" .-> N_flipper
   N_joyctrl -. "/emergency_stop" .-> N_arm
   N_joyctrl -. "/emergency_stop" .-> N_arm_drv
-  N_joyctrl -. "/emergency_stop" .-> N_gripper
 
   N_qr -.-> N_fgbridge
   N_spark -.-> N_fgbridge

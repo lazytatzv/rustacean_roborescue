@@ -773,8 +773,7 @@ system.launch.py
  │   ├─ crawler_driver
  │   ├─ flipper_driver
  │   ├─ sensor_gateway
- │   ├─ gripper_driver
- │   ├─ arm_driver              ← アームサーボ (実機)
+ │   ├─ arm_driver              ← アーム＋グリッパ統合ドライバ (実機)
  │   ├─ joy_controller         ← NUC 側で起動
  │   ├─ arm_controller         (urdf_path を bringup から注入)
  │   └─ qr_detector

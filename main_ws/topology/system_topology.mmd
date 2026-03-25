@@ -60,7 +60,6 @@ graph LR
   subgraph Manipulation["Arm & Gripper"]
     arm[arm_controller]:::node_style
     arm_drv[arm_driver]:::node_style
-    gripper[gripper_driver]:::node_style
 
     T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
     T_a_joint{{/arm_joint_commands<br/>sensor_msgs/JointState}}:::topic_style
@@ -71,18 +70,15 @@ graph LR
     arm --> T_a_joint --> arm_drv
     T_f_state --> arm
 
-    T_g_cmd --> gripper
-    gripper --> T_g_status
+    T_g_cmd --> arm_drv
+    arm_drv --> T_g_status
 
     T_estop --> arm
     T_estop --> arm_drv
-    T_estop --> gripper
 
-    HW_dxl_a[Dynamixel<br/>Arm ×6]:::hw_style
-    HW_dxl_g[Dynamixel<br/>Gripper]:::hw_style
-    arm_drv --> HW_dxl_a
+    HW_dxl_ag[Dynamixel<br/>Arm + Gripper]:::hw_style
+    arm_drv --> HW_dxl_ag
     arm_drv --> T_f_state
-    gripper --> HW_dxl_g
   end
 
   %% =============================================
