@@ -7,12 +7,24 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+add_executable(hwt901b_imu_node src/hwt901b_imu_node.cpp)
+target_include_directories(hwt901b_imu_node PRIVATE include)
+ament_target_dependencies(hwt901b_imu_node rclcpp sensor_msgs geometry_msgs std_msgs)
+target_link_libraries(hwt901b_imu_node Boost::system)
+
+install(TARGETS
+  hwt901b_imu_node
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
