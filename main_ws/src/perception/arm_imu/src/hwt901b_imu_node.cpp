@@ -31,6 +31,7 @@ HWT901BIMUNode::HWT901BIMUNode()
 
 void HWT901BIMUNode::init_messages()
 {
+  // 向きが不明な場合の初期設定（必要に応じて）
   imu_msg_.orientation_covariance[0] = -1.0;
 }
 
@@ -83,6 +84,7 @@ void HWT901BIMUNode::poll_serial()
 
 int16_t HWT901BIMUNode::to_int16(uint8_t low, uint8_t high)
 {
+  // データシートの(short)(DataH<<8|DataL)という指示に従い、符号付き16bitで返す [cite: 151, 152]
   return static_cast<int16_t>((static_cast<uint16_t>(high) << 8U) | static_cast<uint16_t>(low));
 }
 
@@ -99,7 +101,7 @@ void HWT901BIMUNode::parse_frames()
 {
   while (rx_buffer_.size() >= FRAME_SIZE) {
     auto header_it = std::find(rx_buffer_.begin(), rx_buffer_.end(), IMU_HEADER);
-    // 0x55がなかったらその時のバッファは捨てる
+    
     if (header_it == rx_buffer_.end()) {
       rx_buffer_.clear();
       return;
@@ -108,6 +110,7 @@ void HWT901BIMUNode::parse_frames()
     if (header_it != rx_buffer_.begin()) {
       rx_buffer_.erase(rx_buffer_.begin(), header_it);
     }
+    
     if (rx_buffer_.size() < FRAME_SIZE) {
       return;
     }
@@ -135,59 +138,48 @@ void HWT901BIMUNode::stamp_headers()
   mag_msg_.header.frame_id = frame_id_;
 }
 
+// 1回1回publishすると通信を圧迫すると思ったので四つのデータが揃ったタイミングでpublishするようにした
 void HWT901BIMUNode::decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame)
 {
-  stamp_headers();
-
   switch (frame[1]) {
-    case ACCELERATION: {
-      // 最終の単位は[]
-      imu_msg_.linear_acceleration.x =
-        static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 16.0 * G;
-      imu_msg_.linear_acceleration.y =
-        static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 16.0 * G;
-      imu_msg_.linear_acceleration.z =
-        static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 16.0 * G;
-      imu_received_ = true;
-      imu_publisher_->publish(imu_msg_);
+    case ACCELERATION: { // 0x51
+      // 計算式: ((AxH<<8)|AxL)/32768*16*g
+      imu_msg_.linear_acceleration.x = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 16.0 * G;
+      imu_msg_.linear_acceleration.y = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 16.0 * G;
+      imu_msg_.linear_acceleration.z = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 16.0 * G;
       break;
     }
-    case ANGULAR_VELOCITY: {
-      // 最終の単位は[rad/s]、そのためDEG_TO_RADをかける
-      imu_msg_.angular_velocity.x =
-        static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 2000.0 * DEG_TO_RAD;
-      imu_msg_.angular_velocity.y =
-        static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 2000.0 * DEG_TO_RAD;
-      imu_msg_.angular_velocity.z =
-        static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 2000.0 * DEG_TO_RAD;
-      imu_received_ = true;
-      imu_publisher_->publish(imu_msg_);
+    case ANGULAR_VELOCITY: { // 0x52
+      // 計算式: ((wxH<<8)|wxL)/32768*2000
+      imu_msg_.angular_velocity.x = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 2000.0 * DEG_TO_RAD;
+      imu_msg_.angular_velocity.y = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 2000.0 * DEG_TO_RAD;
+      imu_msg_.angular_velocity.z = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 2000.0 * DEG_TO_RAD;
       break;
     }
-    case ANGLE: {
-      const auto roll_deg = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 180.0;
-      const auto pitch_deg = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 180.0;
-      const auto yaw_deg = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 180.0;
-      RCLCPP_DEBUG_THROTTLE(
-        this->get_logger(), *this->get_clock(), 2000,
-        "Angle frame [deg] roll=%.2f pitch=%.2f yaw=%.2f", roll_deg, pitch_deg, yaw_deg);
-      break;
-    }
-    case MAGNETIC_FIELD: {
-      mag_msg_.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA; // [Tesla]
-      mag_msg_.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA; // [Tesla]
-      mag_msg_.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA; // [Tesla]
-      mag_received_ = true;
+    case MAGNETIC_FIELD: { // 0x54
+      // 磁気データ(Teslaへ変換)
+      mag_msg_.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA;
+      mag_msg_.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA;
+      mag_msg_.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA;
+      
+      // 磁気は独立してパブリッシュ（タイムスタンプは最新のものを打刻）
+      mag_msg_.header.stamp = this->get_clock()->now();
+      mag_msg_.header.frame_id = frame_id_;
       mag_publisher_->publish(mag_msg_);
+      mag_received_ = true;
       break;
     }
-    case QUATERNION_CMD: {
+    case QUATERNION_CMD: { // 0x59
+      // 計算式: Q=((QnH<<8)|QnL)/32768
       imu_msg_.orientation.w = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0;
       imu_msg_.orientation.x = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0;
       imu_msg_.orientation.y = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0;
       imu_msg_.orientation.z = static_cast<double>(to_int16(frame[8], frame[9])) / 32768.0;
-      imu_received_ = true;
+      
+      // 【重要】0x59をトリガーにして、加速度・角速度・向きが揃った状態で1回だけパブリッシュ
+      stamp_headers(); 
       imu_publisher_->publish(imu_msg_);
+      imu_received_ = true;
       break;
     }
     default:
@@ -208,9 +200,3 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
   return 0;
 }
-
-
-
-
-
-
