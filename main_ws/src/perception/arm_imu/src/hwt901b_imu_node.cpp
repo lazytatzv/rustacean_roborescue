@@ -99,6 +99,7 @@ void HWT901BIMUNode::parse_frames()
 {
   while (rx_buffer_.size() >= FRAME_SIZE) {
     auto header_it = std::find(rx_buffer_.begin(), rx_buffer_.end(), IMU_HEADER);
+    // 0x55がなかったらその時のバッファは捨てる
     if (header_it == rx_buffer_.end()) {
       rx_buffer_.clear();
       return;
@@ -140,6 +141,7 @@ void HWT901BIMUNode::decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame)
 
   switch (frame[1]) {
     case ACCELERATION: {
+      // 最終の単位は[]
       imu_msg_.linear_acceleration.x =
         static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 16.0 * G;
       imu_msg_.linear_acceleration.y =
@@ -151,6 +153,7 @@ void HWT901BIMUNode::decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame)
       break;
     }
     case ANGULAR_VELOCITY: {
+      // 最終の単位は[rad/s]、そのためDEG_TO_RADをかける
       imu_msg_.angular_velocity.x =
         static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 2000.0 * DEG_TO_RAD;
       imu_msg_.angular_velocity.y =
@@ -171,9 +174,9 @@ void HWT901BIMUNode::decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame)
       break;
     }
     case MAGNETIC_FIELD: {
-      mag_msg_.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA;
-      mag_msg_.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA;
-      mag_msg_.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA;
+      mag_msg_.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA; // [Tesla]
+      mag_msg_.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA; // [Tesla]
+      mag_msg_.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA; // [Tesla]
       mag_received_ = true;
       mag_publisher_->publish(mag_msg_);
       break;
