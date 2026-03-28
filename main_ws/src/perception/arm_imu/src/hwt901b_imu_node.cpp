@@ -24,7 +24,7 @@ HWT901BIMUNode::HWT901BIMUNode()
   init_messages();
   open_serial();
 
-  // setting timer
+  // 一定間隔でシリアルポートをポーリングするタイマーを作成
   poll_timer_ = this->create_wall_timer(
     std::chrono::milliseconds(poll_interval_ms_),
     std::bind(&HWT901BIMUNode::poll_serial, this));
@@ -77,9 +77,7 @@ void HWT901BIMUNode::open_serial()
 void HWT901BIMUNode::poll_serial()
 {
   if (!serial_.is_open()) {
-    RCLCPP_WARN_THROTTLE(
-      this->get_logger(), *this->get_clock(), 5000,
-      "Serial port is not open: %s", port_name_.c_str());
+    RCLCPP_ERROR(this->get_logger(), "Serial port is not open");
     return;
   }
 
@@ -143,8 +141,6 @@ void HWT901BIMUNode::parse_frames()
       rx_buffer_.pop_front();
     }
   }
-  
-
 }
 
 void HWT901BIMUNode::stamp_headers()
