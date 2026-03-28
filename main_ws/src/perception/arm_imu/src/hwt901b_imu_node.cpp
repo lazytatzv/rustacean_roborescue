@@ -37,7 +37,7 @@ void HWT901BIMUNode::init_messages()
   // データシートからセンサーの精度は
   // 加速度: 0.005 m/s^2
   // 角速度: 0.05 deg/s
-  const double accel_stddev = 0.005; // [m/s^2]
+  const double accel_stddev = 0.005 * G; // [m/s^2]
   const double gyro_stddev = 0.05 * DEG_TO_RAD; // [deg/s] -> [rad/s]
   const double orientation_stddev = 0.05 * DEG_TO_RAD; // [deg/s] -> [rad/s]
   const double mag_stddev = 0.15e-6; // [uT] -> [T]
@@ -76,7 +76,12 @@ void HWT901BIMUNode::open_serial()
 
 void HWT901BIMUNode::poll_serial()
 {
-  if (!serial_.is_open()) return;
+  if (!serial_.is_open()) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000,
+      "Serial port is not open: %s", port_name_.c_str());
+    return;
+  }
 
   std::array<uint8_t, 256> buf{};
   boost::system::error_code ec;
@@ -111,38 +116,35 @@ bool HWT901BIMUNode::valid_checksum(const std::array<uint8_t, FRAME_SIZE> & fram
 }
 
 /*
-  このコードだと受信が詰まった際に計算量が増えるので std::vectorから std::dequeに変更したほうがいい
-  しかし多分動きはするためこれで行って後々修正しようかなと
-  これでも200Hzくらいなら支障ないと考えた
+  先頭削除を多用するため、受信バッファは std::deque を使う。
 */
 void HWT901BIMUNode::parse_frames()
 {
   while (rx_buffer_.size() >= FRAME_SIZE) {
-    // ヘッダー(0x55)を探索
-    auto header_it = std::find(rx_buffer_.begin(), rx_buffer_.end(), IMU_HEADER);
-    
-    if (header_it == rx_buffer_.end()) {
-      rx_buffer_.clear(); // ヘッダーがない場合は全破棄
-      return;
+    // ヘッダー(0x55)が出るまで先頭を捨てる
+    if (rx_buffer_.front() != IMU_HEADER) {
+      rx_buffer_.pop_front();
+      continue;
     }
 
-    if (header_it != rx_buffer_.begin()) {
-      rx_buffer_.erase(rx_buffer_.begin(), header_it); // 不正なデータを先頭から削除
-    }
-    
-    if (rx_buffer_.size() < FRAME_SIZE) return;
-
+    // フレームをコピーしてチェックサム確認
     std::array<uint8_t, FRAME_SIZE> frame{};
     std::copy_n(rx_buffer_.begin(), FRAME_SIZE, frame.begin());
 
     if (!valid_checksum(frame)) {
-      rx_buffer_.erase(rx_buffer_.begin()); // チェックサムエラーなら1バイトずらして再試行
+      // 不正なら先頭の 0x55 だけ捨てて次を探す
+      rx_buffer_.pop_front();
       continue;
     }
 
+    // 正常ならデコードして、使用したフレーム分をまとめて削除
     decode_frame(frame);
-    rx_buffer_.erase(rx_buffer_.begin(), rx_buffer_.begin() + static_cast<std::ptrdiff_t>(FRAME_SIZE));
+    for (size_t i = 0; i < FRAME_SIZE; ++i) {
+      rx_buffer_.pop_front();
+    }
   }
+  
+
 }
 
 void HWT901BIMUNode::stamp_headers()

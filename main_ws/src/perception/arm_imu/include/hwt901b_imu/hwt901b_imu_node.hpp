@@ -3,8 +3,8 @@
 
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <string>
-#include <vector>
 
 #include <boost/asio.hpp>
 
@@ -38,7 +38,7 @@ private:
   int baud_rate_;
   int poll_interval_ms_;
 
-  std::vector<uint8_t> rx_buffer_;
+  std::deque<uint8_t> rx_buffer_;
 
   sensor_msgs::msg::Imu imu_msg_;
   sensor_msgs::msg::MagneticField mag_msg_;

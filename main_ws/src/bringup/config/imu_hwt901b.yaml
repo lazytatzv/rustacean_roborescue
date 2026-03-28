@@ -1,0 +1,6 @@
+hwt901b_imu_node:
+  ros__parameters:
+    port: "/dev/hwt901b"           # udevで名前を縛る必要がある
+    baud_rate: 9600               # ボーレート (HWT901Bデータシート標準)
+    frame_id: "hwt901b_link"       # IMUフレームID
+    poll_interval_ms: 5            # (200Hz ) 必要に応じて変更が必要
