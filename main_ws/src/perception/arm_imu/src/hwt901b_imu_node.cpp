@@ -34,13 +34,26 @@ HWT901BIMUNode::HWT901BIMUNode()
 
 void HWT901BIMUNode::init_messages()
 {
-  // 共分散を不明として-1.0に設定（ROS 2規格）
-  imu_msg_.orientation_covariance[0] = -1.0;
-  imu_msg_.angular_velocity_covariance[0] = -1.0;
-  imu_msg_.linear_acceleration_covariance[0] = -1.0;
+  // データシートからセンサーの精度は
+  // 加速度: 0.005 m/s^2
+  // 角速度: 0.05 deg/s
+  const double accel_stddev = 0.005; // [m/s^2]
+  const double gyro_stddev = 0.05 * DEG_TO_RAD; // [deg/s] -> [rad/s]
+  const double orientation_stddev = 0.05 * DEG_TO_RAD; // [deg/s] -> [rad/s]
+  const double mag_stddev = 0.15e-6; // [uT] -> [T]
 
-  // 磁気センサの共分散も不明として-1.0に設定
-  mag_msg_.magnetic_field_covariance[0] = -1.0;
+  // 既定値はunknown(0)。対角成分のみ分散を設定する。
+  std::fill(imu_msg_.orientation_covariance.begin(), imu_msg_.orientation_covariance.end(), 0.0);
+  std::fill(imu_msg_.angular_velocity_covariance.begin(), imu_msg_.angular_velocity_covariance.end(), 0.0);
+  std::fill(imu_msg_.linear_acceleration_covariance.begin(), imu_msg_.linear_acceleration_covariance.end(), 0.0);
+  std::fill(mag_msg_.magnetic_field_covariance.begin(), mag_msg_.magnetic_field_covariance.end(), 0.0);
+
+  for(int i = 0; i < 9; i += 4){
+    imu_msg_.orientation_covariance[i] = orientation_stddev * orientation_stddev;
+    imu_msg_.angular_velocity_covariance[i] = gyro_stddev * gyro_stddev;
+    imu_msg_.linear_acceleration_covariance[i] = accel_stddev * accel_stddev;
+    mag_msg_.magnetic_field_covariance[i] = mag_stddev * mag_stddev;
+  }
 }
 
 void HWT901BIMUNode::open_serial()
@@ -169,7 +182,7 @@ void HWT901BIMUNode::decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame)
       mag_msg_.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA;
       mag_msg_.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA;
       mag_msg_.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA;
-      
+
       mag_msg_.header.stamp = this->get_clock()->now();
       mag_msg_.header.frame_id = frame_id_;
       mag_publisher_->publish(mag_msg_);
