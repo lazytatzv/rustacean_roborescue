@@ -34,8 +34,13 @@ HWT901BIMUNode::HWT901BIMUNode()
 
 void HWT901BIMUNode::init_messages()
 {
-  // 向き（Orientation）の共分散の先頭を-1に設定
+  // 共分散を不明として-1.0に設定（ROS 2規格）
   imu_msg_.orientation_covariance[0] = -1.0;
+  imu_msg_.angular_velocity_covariance[0] = -1.0;
+  imu_msg_.linear_acceleration_covariance[0] = -1.0;
+
+  // 磁気センサの共分散も不明として-1.0に設定
+  mag_msg_.magnetic_field_covariance[0] = -1.0;
 }
 
 void HWT901BIMUNode::open_serial()
@@ -47,7 +52,7 @@ void HWT901BIMUNode::open_serial()
     return;
   }
 
-  // 通信設定: データシートに基づき、パリティなし、ストップビット1、フロー制御なしで固定します。 [cite: 130]
+  // 通信設定: データシートに基づき、パリティなし、ストップビット1、フロー制御なしで固定します。 
   serial_.set_option(boost::asio::serial_port_base::baud_rate(baud_rate_));
   serial_.set_option(boost::asio::serial_port_base::character_size(8));
   serial_.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none)); // parityなし
@@ -92,6 +97,11 @@ bool HWT901BIMUNode::valid_checksum(const std::array<uint8_t, FRAME_SIZE> & fram
   return static_cast<uint8_t>(sum & 0xFFU) == frame[FRAME_SIZE - 1];
 }
 
+/*
+  このコードだと受信が詰まった際に計算量が増えるので std::vectorから std::dequeに変更したほうがいい
+  しかし多分動きはするためこれで行って後々修正しようかなと
+  これでも200Hzくらいなら支障ないと考えた
+*/
 void HWT901BIMUNode::parse_frames()
 {
   while (rx_buffer_.size() >= FRAME_SIZE) {
