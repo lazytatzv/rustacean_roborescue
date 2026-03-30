@@ -7,10 +7,12 @@
   # GitHub Actions では `--accept-flake-config` を渡すことで有効になる。
   nixConfig = {
     extra-substituters = [
+      "https://roborescue-nix.cachix.org"
       "https://nix-community.cachix.org"
       "https://ros.cachix.org"
     ];
     extra-trusted-public-keys = [
+      "roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U="
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       "ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo="
     ];

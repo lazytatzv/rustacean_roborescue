@@ -44,7 +44,7 @@ jobs:
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
-          name: rustacean-roborescue
+          name: roborescue-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: true
 
@@ -95,7 +95,7 @@ jobs:
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
-          name: rustacean-roborescue
+          name: roborescue-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           # fork からの PR は書き込み権限なし → pushDerivations のみスキップ
           pushFilter: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'skip' || '' }}
@@ -154,7 +154,7 @@ jobs:
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
-          name: rustacean-roborescue
+          name: roborescue-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           pushFilter: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'skip' || '' }}
 
@@ -206,7 +206,7 @@ jobs:
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
-          name: rustacean-roborescue
+          name: roborescue-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: true
 
