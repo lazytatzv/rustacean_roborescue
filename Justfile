@@ -4,7 +4,7 @@ set shell := ["bash", "-c"]
 default: nix
 
 nix:
-  # nixglを使う場合impureが基本的に必要
+  # nixglを使う場合impureが必要
   nix develop --impure
 
 sync:

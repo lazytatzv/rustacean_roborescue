@@ -1,211 +1,238 @@
-name: CI (PR-fast)
+name: CI (PR)
 
 on:
   pull_request:
-    branches: [ main, master ]
+    branches: [main]
+
+# 同じ PR への連続 push は古いランをキャンセルする
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Job graph:
+#
+#   lint ──┬── rust-check ──┐
+#           └── cpp         ──┴── (integration: label-triggered)
+#
+# PR では cargo test を省略し fmt + clippy のみで高速フィードバックを返す。
+# フル integration テストは `run-integration` ラベルで手動トリガー。
+# ─────────────────────────────────────────────────────────────────────────────
+
 jobs:
-  lint-and-checks:
-    name: Lint & Checks
+  # ───────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write  # pre-commit 自動修正 push に必要
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: true
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: cachix/cachix-action@v14
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
         with:
-          python-version: '3.10'
-
-      - name: Cache pip and pytest caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.cache/pytest
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dev deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Install pre-commit
-        run: |
-          python -m pip install --upgrade pip
-          pip install pre-commit || true
-
-      - name: Install system C/C++ tooling
-        run: |
-          sudo apt-get update && sudo apt-get install -y clang-format clang-tidy cppcheck || true
-
-      - name: Byte-compile Python files
-        run: |
-          set -e
-          find . -name "*.py" -not -path "./.git/*" -print0 | xargs -0 -n1 python -m py_compile
-
-      - name: Run ruff
-        run: |
-          ruff check .
+          name: rustacean-roborescue
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
 
       - name: Run pre-commit
+        id: precommit
         run: |
-          pre-commit run --all-files --show-diff-on-failure
+          nix develop .#precommit --accept-flake-config --command \
+            pre-commit run --all-files --show-diff-on-failure
+        continue-on-error: true
 
-      - name: Auto-apply pre-commit fixes and push
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+      # fork からの PR は push 権限がないので自動修正はスキップ
+      - name: pre-commit の修正を自動コミット & push (fork 以外)
+        if: |
+          steps.precommit.outcome == 'failure' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          pre-commit run --all-files --show-diff-on-failure || true
           git add -A
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "変更なし"
           else
-            git commit -m "ci: apply pre-commit fixes" || true
+            git commit -m "ci: apply pre-commit fixes [skip ci]"
             git push origin HEAD:${{ github.head_ref }}
           fi
 
-  rust-quick:
-    name: Rust quick checks (fmt + clippy)
+      - name: pre-commit 失敗を確定させる
+        if: steps.precommit.outcome == 'failure'
+        run: |
+          echo "pre-commit が失敗しました。ローカルで 'pre-commit run --all-files' を実行してください。"
+          exit 1
+
+  # ───────────────────────────────────────────────────────────────────────────
+  rust-check:
+    name: Rust (fmt + clippy)
     runs-on: ubuntu-latest
-    needs: lint-and-checks
+    timeout-minutes: 40
+    needs: lint
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache cargo registry and target (Rust job)
-        uses: actions/cache@v4
+      - uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: cachix/cachix-action@v14
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        with:
+          name: rustacean-roborescue
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          # fork からの PR は書き込み権限なし → pushDerivations のみスキップ
+          pushFilter: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'skip' || '' }}
+
+      - uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             main_ws/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            cargo-${{ runner.os }}-
 
-      - name: Install Nix (for dev shell)
-        uses: DeterminateSystems/nix-installer-action@v10
-
-      - name: Quick cargo fmt + clippy
+      - name: ROS メッセージバインディングのビルド
         run: |
-          . $HOME/.nix-profile/etc/profile.d/nix.sh || true
-          nix develop --impure -c bash -lc '
-            set -euo pipefail
-            cd main_ws || exit 0
-            echo "cargo fmt check"
-            cargo fmt --all -- --check || true
-            echo "cargo clippy (warnings treated as errors)"
-            cargo clippy --workspace -- -D warnings || true
-          '
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            colcon build --merge-install \
+              --packages-up-to rosidl_generator_rs custom_interfaces \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
+              2>&1 | grep -v '^--- stderr: local_setup'
+          "
 
-      - name: Install cargo-audit
+      - name: cargo fmt --check
         run: |
-          set -e
-          cargo install cargo-audit || true
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws && cargo fmt --all -- --check
+          "
 
-      - name: Run cargo-audit
+      - name: cargo clippy (warnings = errors)
         run: |
-          set -e
-          if command -v cargo-audit > /dev/null 2>&1; then
-            cargo audit || true
-          else
-            echo "cargo-audit not installed; skipping"
-          fi
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            source install/setup.bash
+            cargo clippy --workspace -- -D warnings
+          "
 
-  python-quick:
-    name: Python quick tests
+  # ───────────────────────────────────────────────────────────────────────────
+  cpp:
+    name: C++
     runs-on: ubuntu-latest
-    needs: lint-and-checks
+    timeout-minutes: 60
+    needs: lint
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
         with:
-          python-version: '3.10'
+          submodules: recursive
 
-      - name: Restore pip/pytest cache
-        uses: actions/cache@v4
+      - uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: cachix/cachix-action@v14
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        with:
+          name: rustacean-roborescue
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          pushFilter: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'skip' || '' }}
+
+      - uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/pip
-            ~/.cache/pytest
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+            ~/.cache/ccache
+            main_ws/build
+            main_ws/install
+          key: colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            colcon-${{ runner.os }}-
 
-      - name: Install dev deps
+      - name: colcon build
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            colcon build --merge-install \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
+              --packages-ignore kiss_icp \
+              2>&1 | grep -v '^--- stderr: local_setup'
+          "
 
-      - name: Install pip-audit
-        run: |
-          python -m pip install pip-audit || true
-
-      - name: Run pip-audit
-        run: |
-          set -e
-          if command -v pip-audit > /dev/null 2>&1; then
-            pip-audit --progress no || true
-          else
-            echo "pip-audit not installed; skipping"
-          fi
-
-      - name: Run quick pytest (fast tests)
-        run: |
-          set -e
-          if [ -f main_ws/test_all_functions.py ]; then
-            python -m pytest -q main_ws/test_all_functions.py -k "not integration" -q
-          else
-            echo "No main_ws/test_all_functions.py found; skipping quick python tests"
-          fi
-
-      - name: Upload pytest artifacts on failure
+      - name: Upload build logs (失敗時)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-logs
-          path: |
-            .pytest_cache || true
+          name: colcon-logs-pr
+          path: main_ws/log
 
-  integration-on-label:
-    name: Integration (on label run-integration)
-    runs-on: ubuntu-22.04
-    needs: [lint-and-checks]
+  # ───────────────────────────────────────────────────────────────────────────
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [rust-check, cpp]
+    # `run-integration` ラベルが付いた PR のみ実行
     if: contains(github.event.pull_request.labels.*.name, 'run-integration')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: cachix/cachix-action@v14
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        with:
+          name: rustacean-roborescue
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
 
-      - name: Run integration tests (label-triggered)
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            main_ws/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            cargo-${{ runner.os }}-
+
+      - name: cargo test --workspace
         run: |
-          . $HOME/.nix-profile/etc/profile.d/nix.sh || true
-          nix develop --impure -c bash -lc '
-            set -euo pipefail
-            cd main_ws || exit 0
-            echo "Running labeled integration pytest (if any)"
-            if python -m pytest -q -k integration; then
-              echo "integration tests ran"
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            colcon build --merge-install \
+              --packages-up-to rosidl_generator_rs custom_interfaces \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
+              2>&1 | grep -v '^--- stderr: local_setup'
+            source install/setup.bash
+            cargo test --workspace
+          "
+
+      - name: Python integration tests
+        run: |
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            if compgen -G 'test_*.py' > /dev/null; then
+              python3 -m pytest -q -k integration
             else
-              echo "no integration tests or some failed"
+              echo 'integration tests なし: スキップ'
             fi
-          '
+          "
