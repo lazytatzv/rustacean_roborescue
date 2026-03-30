@@ -364,14 +364,14 @@
             name = "RoboRescue Precommit Shell";
             packages = with pkgsPlain; [
               python3
-              python3Packages.pre-commit
+              pre-commit          # トップレベルパッケージ (python3Packages.pre-commit は存在しない場合がある)
               python3Packages.ruff
               python3Packages.black
               python3Packages.isort
               python3Packages.cpplint
               python3Packages.numpy
               # C++ linters (pre-commit フックが要求)
-              clang-tools   # clang-format
+              clang-tools         # clang-format
               cppcheck
             ];
             shellHook = ''
