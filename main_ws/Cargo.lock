@@ -312,7 +312,9 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 name = "custom_interfaces"
 version = "0.0.0"
 dependencies = [
+ "builtin_interfaces",
  "rosidl_runtime_rs",
+ "std_msgs",
 ]
 
 [[package]]
