@@ -37,10 +37,10 @@ jobs:
           submodules: true
 
       # Nix インストールは DeterminateSystems で統一
-      - uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/nix-installer-action@v22
 
       # Nix store を GHA キャッシュに保存・復元 (無設定で動く)
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
 
       # Cachix: チーム専用の永続バイナリキャッシュ
       # CACHIX_AUTH_TOKEN を repo secrets に設定すること
@@ -73,8 +73,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -146,8 +146,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -195,8 +195,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:

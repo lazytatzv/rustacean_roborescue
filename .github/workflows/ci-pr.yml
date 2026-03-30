@@ -39,8 +39,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -90,8 +90,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -149,8 +149,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -201,8 +201,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: DeterminateSystems/nix-installer-action@v10
-      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:

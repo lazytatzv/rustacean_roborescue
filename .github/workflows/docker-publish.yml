@@ -20,11 +20,11 @@ jobs:
 
       # 1. Nixのインストール
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v10
+        uses: DeterminateSystems/nix-installer-action@v22
 
       # 2. 魔法のキャッシュ
       - name: Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@v4
+        uses: DeterminateSystems/magic-nix-cache-action@v13
 
       # 3. Docker Hub にログイン
       - name: Log in to Docker Hub
