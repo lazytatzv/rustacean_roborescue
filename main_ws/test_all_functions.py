@@ -178,7 +178,7 @@ class ComprehensiveTester(Node):
         self.procs.append(proc)
         joy_pub = self.create_publisher(Joy, "/joy", 10)
         crawler_col = MsgCollector()
-        sub_crawler = self.create_subscription(
+        _sub_crawler = self.create_subscription(
             CrawlerVelocity, "/crawler_driver", crawler_col.callback, 10
         )
         self.spin_for(3.0)

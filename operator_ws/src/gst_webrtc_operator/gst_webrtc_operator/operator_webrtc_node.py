@@ -5,7 +5,6 @@ sets remote, creates answer and publishes SDP/ICE on `webrtc/incoming`.
 Also handles incoming ICE candidates and plays audio to the local sink.
 """
 
-import argparse
 import json
 import os
 import queue
@@ -150,10 +149,6 @@ def create_pipeline():
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--no-audio", action="store_true")
-    args = parser.parse_args()
-
     rclpy.init()
     node = OperatorNode()
 

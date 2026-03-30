@@ -2,13 +2,10 @@ import os
 
 from launch import LaunchDescription
 from launch.actions import SetEnvironmentVariable
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    use_foxglove = LaunchConfiguration("use_foxglove", default="true")
-
     this_dir = os.path.dirname(__file__)
     repo_root = os.path.dirname(this_dir)
     zenoh_config_path = os.path.join(repo_root, "zenoh_ope.json5")
