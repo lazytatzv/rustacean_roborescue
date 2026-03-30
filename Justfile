@@ -31,3 +31,7 @@ check-lint:
   cd main_ws && cargo clippy --workspace -- -D warnings || true
   @echo "Python: ruff"
   ruff check . || true
+
+
+cachix:
+  cachix watch-exec roborescue-nix -- nix develop --command true
