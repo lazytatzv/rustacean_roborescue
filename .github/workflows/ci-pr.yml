@@ -27,6 +27,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 20
     permissions:
       contents: write  # pre-commit 自動修正 push に必要
@@ -40,7 +42,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -79,6 +81,8 @@ jobs:
   rust-check:
     name: Rust (fmt + clippy)
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 40
     needs: lint
     steps:
@@ -89,7 +93,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -136,6 +140,8 @@ jobs:
   cpp:
     name: C++
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
     needs: lint
     steps:
@@ -146,7 +152,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -184,6 +190,8 @@ jobs:
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
     needs: [rust-check, cpp]
     # `run-integration` ラベルが付いた PR のみ実行
@@ -196,7 +204,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}

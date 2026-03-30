@@ -28,6 +28,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +45,7 @@ jobs:
       # Cachix: チーム専用の永続バイナリキャッシュ
       # CACHIX_AUTH_TOKEN を repo secrets に設定すること
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -62,6 +64,8 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
     needs: lint
     steps:
@@ -72,7 +76,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -133,6 +137,8 @@ jobs:
   cpp:
     name: C++
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
     needs: lint
     steps:
@@ -143,7 +149,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -182,6 +188,8 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
     needs: [rust, cpp]
     steps:
@@ -190,7 +198,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - uses: cachix/cachix-action@v14
-        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: rustacean-roborescue
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
