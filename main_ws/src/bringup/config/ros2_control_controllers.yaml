@@ -1,0 +1,44 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # テレオペ用: arm_controller (Rust IK) → arm_cmd_bridge → ここ
+    forward_position_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    # MoveIt2 用: 必要になったら `ros2 control switch_controllers` で切り替え
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+forward_position_controller:
+  ros__parameters:
+    joints:
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+      - arm_joint6
+    interface_name: position
+
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+      - arm_joint6
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_partial_joints_goal: false
+    open_loop_control: false
+    allow_integration_in_goal_trajectories: false
+    # MoveIt2 が FollowJointTrajectory で接続してくる

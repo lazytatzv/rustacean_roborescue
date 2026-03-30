@@ -29,6 +29,7 @@ install(PROGRAMS
   scripts/odom_tf_bridge.py
   scripts/demo_joints.py
   scripts/teleop_joints.py
+  scripts/arm_cmd_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
