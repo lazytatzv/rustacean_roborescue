@@ -66,6 +66,12 @@
           pkg-config
           ffmpeg
 
+          # --- GStreamer (audio_bridge: Opus 双方向音声) ---
+          gst_all_1.gstreamer
+          gst_all_1.gst-plugins-base  # audioconvert, audioresample, appsrc/sink, opusenc/dec
+          gst_all_1.gst-plugins-good  # pulsesrc, pulsesink
+          python3Packages.pygobject3  # gi.repository.Gst (GStreamer Python バインディング)
+
           # --- colcon ---
           colcon
           python3Packages.colcon-cargo

@@ -78,6 +78,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_nav2,
+            use_audio,
             # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
             robot_state_publisher_node,
             # 1. Foxglove Bridge (WebSocket :8765)

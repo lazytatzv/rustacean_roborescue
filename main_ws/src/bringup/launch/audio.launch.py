@@ -1,76 +1,64 @@
-import os
+# NUC 側の双方向音声ノード
+#
+# audio_sender:   マイク → Opus → /robot/audio  (Zenoh 経由でオペレータへ)
+# audio_receiver: /operator/audio  → Opus decode → スピーカー
 
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    bringup_dir = get_package_share_directory("bringup")
-    signaling_launch = os.path.join(
-        bringup_dir,
-        "launch",
-        "..",
-        "..",
-        "perception",
-        "ros2_webrtc",
-        "launch",
-        "signaling.launch.py",
+    use_audio = DeclareLaunchArgument(
+        "use_audio", default_value="true", description="音声ノードを起動するか"
     )
-    # fallback: use package ros2_webrtc if installed
-    signaling_launch = (
-        os.path.join(
-            get_package_share_directory("ros2_webrtc"), "launch", "signaling.launch.py"
-        )
-        if os.path.exists(
-            os.path.join(
-                get_package_share_directory("ros2_webrtc"),
-                "launch",
-                "signaling.launch.py",
-            )
-        )
-        else signaling_launch
+    robot_device = DeclareLaunchArgument(
+        "robot_mic_device",
+        default_value="",
+        description="NUC マイクの PulseAudio デバイス名 (空=デフォルト)",
     )
-
-    audio_device = DeclareLaunchArgument(
-        "audio_device", default_value="", description="Audio device for robot"
+    robot_spk_device = DeclareLaunchArgument(
+        "robot_spk_device",
+        default_value="",
+        description="NUC スピーカーの PulseAudio デバイス名 (空=デフォルト)",
     )
     bitrate = DeclareLaunchArgument(
-        "bitrate", default_value="64000", description="Opus bitrate"
+        "bitrate", default_value="32000", description="Opus ビットレート [bps]"
     )
 
-    ld = LaunchDescription()
-    ld.add_action(audio_device)
-    ld.add_action(bitrate)
-
-    # Start signaling (if provided by ros2_webrtc package)
-    try:
-        signaling = Node(
-            package="ros2_webrtc",
-            executable="signaling_node",
-            name="webrtc_signaling",
-            output="screen",
-        )
-        ld.add_action(signaling)
-    except Exception:
-        pass
-
-    # Start robot webrtc node
-    robot = Node(
-        package="ros2_webrtc",
-        executable="robot_webrtc_node",
-        name="robot_webrtc",
+    # マイク → /robot/audio
+    sender = Node(
+        package="audio_bridge",
+        executable="audio_sender",
+        name="robot_audio_sender",
         output="screen",
-        arguments=[
-            "--audio-device",
-            LaunchConfiguration("audio_device"),
-            "--bitrate",
-            LaunchConfiguration("bitrate"),
+        condition=IfCondition(LaunchConfiguration("use_audio")),
+        parameters=[
+            {
+                "topic": "/robot/audio",
+                "device": LaunchConfiguration("robot_mic_device"),
+                "bitrate": LaunchConfiguration("bitrate"),
+            }
         ],
     )
 
-    ld.add_action(robot)
+    # /operator/audio → スピーカー
+    receiver = Node(
+        package="audio_bridge",
+        executable="audio_receiver",
+        name="robot_audio_receiver",
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("use_audio")),
+        parameters=[
+            {
+                "topic": "/operator/audio",
+                "device": LaunchConfiguration("robot_spk_device"),
+            }
+        ],
+    )
 
-    return ld
+    return LaunchDescription(
+        [use_audio, robot_device, robot_spk_device, bitrate, sender, receiver]
+    )
