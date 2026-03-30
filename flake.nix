@@ -364,15 +364,13 @@
             name = "RoboRescue Precommit Shell";
             packages = with pkgsPlain; [
               python3
-              pre-commit          # トップレベルパッケージ (python3Packages.pre-commit は存在しない場合がある)
+              pre-commit          # top-level package
               python3Packages.ruff
               python3Packages.black
               python3Packages.isort
-              python3Packages.cpplint
-              python3Packages.numpy
-              # C++ linters (pre-commit フックが要求)
-              clang-tools         # clang-format
-              cppcheck
+              # cpplint は language:python フックなので pre-commit が venv で管理
+              # cppcheck / numpy は不要
+              clang-tools         # clang-format (language:system フックが要求)
             ];
             shellHook = ''
               echo "Entering Pre-commit devShell: use 'pre-commit run --all-files'"

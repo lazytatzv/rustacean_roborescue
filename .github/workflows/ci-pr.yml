@@ -50,6 +50,8 @@ jobs:
       - name: Run pre-commit
         id: precommit
         run: |
+          # cargo-fmt / cargo-clippy は rust-check job で別途チェックするためスキップ
+          SKIP=cargo-fmt,cargo-clippy \
           nix develop .#precommit --accept-flake-config --command \
             pre-commit run --all-files --show-diff-on-failure
         continue-on-error: true
