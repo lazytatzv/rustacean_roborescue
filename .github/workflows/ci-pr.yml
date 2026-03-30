@@ -40,7 +40,6 @@ jobs:
           persist-credentials: true
 
       - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -91,14 +90,13 @@ jobs:
           submodules: recursive
 
       - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: roborescue-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          # fork からの PR は書き込み権限なし → pushDerivations のみスキップ
-          pushFilter: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'skip' || '' }}
+          # fork PR は書き込み権限なし → read-only で使う
+          skipPush: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
 
       - uses: actions/cache@v4
         with:
@@ -112,14 +110,29 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
-      - name: ROS メッセージバインディングのビルド
+      - name: forge-bindings
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            colcon build --merge-install \
-              --packages-up-to rosidl_generator_rs custom_interfaces \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
-              2>&1 | grep -v '^--- stderr: local_setup'
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja
+          "
+
+      - name: forge custom_interfaces
+        run: |
+          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            install_dir=\$(pwd)/install
+            gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            colcon build \
+              --packages-select custom_interfaces \
+              --merge-install --symlink-install \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=\"\$gen_cmake\" -G Ninja
           "
 
       - name: cargo fmt --check
@@ -150,13 +163,12 @@ jobs:
           submodules: recursive
 
       - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: roborescue-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          pushFilter: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'skip' || '' }}
+          skipPush: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
 
       - uses: actions/cache@v4
         with:
@@ -169,14 +181,28 @@ jobs:
             colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             colcon-${{ runner.os }}-
 
-      - name: colcon build
+      - name: forge (just forge 相当)
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            colcon build --merge-install \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
-              --packages-ignore kiss_icp \
-              2>&1 | grep -v '^--- stderr: local_setup'
+            install_dir=\$(pwd)/install
+            gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja
+
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            colcon build \
+              --merge-install --symlink-install \
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -G Ninja \
+              --packages-ignore kiss_icp h264_republisher
           "
 
       - name: Upload build logs (失敗時)
@@ -202,7 +228,6 @@ jobs:
           submodules: recursive
 
       - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: cachix/cachix-action@v14
         if: env.CACHIX_AUTH_TOKEN != ''
         with:
@@ -222,14 +247,26 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
-      - name: cargo test --workspace
+      - name: forge + cargo test
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            colcon build --merge-install \
-              --packages-up-to rosidl_generator_rs custom_interfaces \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
-              2>&1 | grep -v '^--- stderr: local_setup'
+            install_dir=\$(pwd)/install
+            gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja
+
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            colcon build \
+              --packages-select custom_interfaces \
+              --merge-install --symlink-install \
+              --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=\"\$gen_cmake\" -G Ninja
+
             source install/setup.bash
             cargo test --workspace
           "
