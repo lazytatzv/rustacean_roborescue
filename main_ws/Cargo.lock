@@ -1513,6 +1513,10 @@ name = "actionlib_msgs"
 version = "5.3.6"
 
 [[patch.unused]]
+name = "arm_controller"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "composition_interfaces"
 version = "2.0.3"
 
@@ -1535,6 +1539,10 @@ version = "2.0.3"
 [[patch.unused]]
 name = "rosgraph_msgs"
 version = "2.0.3"
+
+[[patch.unused]]
+name = "sensor_gateway"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "shape_msgs"

@@ -3,10 +3,12 @@ mod driver;
 
 use anyhow::Result;
 use custom_interfaces::msg::{GripperCommand, GripperStatus};
-use std_msgs;
 use driver::ArmDynamixelDriver;
-use rclrs::{Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions};
+use rclrs::{
+    Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions,
+};
 use sensor_msgs::msg::JointState;
+use std_msgs;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver};
