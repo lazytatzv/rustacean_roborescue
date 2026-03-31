@@ -20,8 +20,8 @@ graph LR
   end
 
   T_joy{{/joy<br/>sensor_msgs/Joy}}:::topic_style
-  T_ope_audio{{/operator/audio<br/>custom_interfaces/AudioPacket}}:::topic_style
-  T_robot_audio{{/robot/audio<br/>custom_interfaces/AudioPacket}}:::topic_style
+  T_ope_audio{{/operator/audio<br/>custom_interfaces/AudioChunk}}:::topic_style
+  T_robot_audio{{/robot/audio<br/>custom_interfaces/AudioChunk}}:::topic_style
 
   joy --> T_joy
   ope_audio_sender --> T_ope_audio
@@ -70,15 +70,21 @@ graph LR
     arm_drv[arm_driver]:::node_style
 
     T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
+    T_a_jvel{{/arm_joint_cmd_vel<br/>sensor_msgs/JointState}}:::topic_style
     T_a_joint{{/arm_joint_commands<br/>sensor_msgs/JointState}}:::topic_style
+    T_ee_pose{{/arm_ee_pose<br/>geometry_msgs/PoseStamped}}:::topic_style
     T_g_cmd{{/gripper_cmd<br/>custom_interfaces/GripperCommand}}:::topic_style
     T_g_status{{/gripper_status<br/>custom_interfaces/GripperStatus}}:::topic_style
 
-    op --> T_a_cmd --> arm --> T_a_joint --> arm_drv
+    op --> T_a_cmd --> arm
+    op --> T_a_jvel --> arm
+    op --> T_g_cmd --> arm_drv
+    arm --> T_a_joint --> arm_drv
+    arm --> T_ee_pose
     T_joint --> arm
-    T_g_cmd --> arm_drv --> T_g_status
-    T_estop --> arm & arm_drv
+    arm_drv --> T_g_status
     arm_drv --> T_joint
+    T_estop --> arm & arm_drv
 
     HW_dxl_ag[Dynamixel Arm+Gripper]:::hw_style
     arm_drv --> HW_dxl_ag
@@ -155,14 +161,20 @@ graph LR
     omron[omron_bridge]:::node_style
     map_exp[robo_map_exporter]:::node_style
 
-    T_heat{{/heat_detection}}:::topic_style
+    T_omron_temp{{omron/temperature<br/>std_msgs/Float32}}:::topic_style
+    T_omron_hum{{omron/humidity<br/>std_msgs/Float32}}:::topic_style
+    T_omron_light{{omron/light<br/>std_msgs/Float32}}:::topic_style
+    T_omron_pres{{omron/pressure<br/>std_msgs/Float32}}:::topic_style
 
     HW_omron[Omron 2JCIE-BU01]:::hw_style
-    HW_omron --> omron --> T_heat
-    omron --> T_poi_det
+    HW_omron --> omron
+    omron --> T_omron_temp & T_omron_hum & T_omron_light & T_omron_pres
+    T_odom --> omron
 
     T_cloud_map & T_map & T_odom --> map_exp
   end
+
+  qr --> T_poi_det
 
   %% =============================================
   %% TF Tree

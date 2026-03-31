@@ -23,11 +23,11 @@ graph LR
     subgraph Actuators["アクチュエータ"]
       ROBOCLAW[Roboclaw<br/>クローラモータ]:::device
       DXL_F[Dynamixel XM<br/>フリッパ ×4]:::device
-      DXL_AG[Dynamixel XM<br/>アーム + グリッパ]:::device
+      DXL_AG[Dynamixel XM<br/>アーム 6軸 + グリッパ]:::device
     end
 
     subgraph ROS_Nodes["ROS 2 ノード (NUC)"]
-      N_gateway[sensor_gateway]:::ros_node
+      N_gateway[sensor_gateway<br/>Rust]:::ros_node
       N_vlp[velodyne_driver<br/>+ velodyne_pointcloud]:::ros_node
       N_cam[v4l2_camera]:::ros_node
       N_ffmpeg[ffmpeg_to_foxglove_video]:::ros_node
@@ -36,8 +36,8 @@ graph LR
       N_flipper[flipper_driver]:::ros_node
       N_spark[spark_fast_lio]:::ros_node
       N_slam[slam_toolbox]:::ros_node
-      N_arm[arm_controller]:::ros_node
-      N_arm_drv[arm_driver]:::ros_node
+      N_arm[arm_controller<br/>Rust / IK]:::ros_node
+      N_arm_drv[arm_driver<br/>Rust]:::ros_node
       N_omron[omron_bridge]:::ros_node
       N_map_exp[robo_map_exporter]:::ros_node
       N_nav2[Nav2 Stack]:::ros_node
@@ -49,10 +49,10 @@ graph LR
     NUC -- "USB Serial /dev/stm32<br/>115200 bps" --> STM32
     NUC -- "Ethernet 10.42.0.242<br/>UDP :2368" --> VLP16
     NUC -- "USB /dev/video0" --> USB_CAM
-    NUC -- "USB BLE" --> OMRON
-    NUC -- "USB Serial /dev/roboclaw" --> ROBOCLAW
-    NUC -- "USB U2D2 115200 bps" --> DXL_F
-    NUC -- "USB U2D2 1000000 bps" --> DXL_AG
+    NUC -- "USB Serial<br/>/dev/ttyUSB0" --> OMRON
+    NUC -- "USB Serial /dev/roboclaw<br/>38400 bps" --> ROBOCLAW
+    NUC -- "USB U2D2<br/>115200 bps" --> DXL_F
+    NUC -- "USB U2D2<br/>1000000 bps" --> DXL_AG
 
     STM32 -.-> N_gateway
     VLP16 -.-> N_vlp
@@ -64,6 +64,7 @@ graph LR
 
     N_cam -. "/camera/image_raw/ffmpeg" .-> N_ffmpeg
     N_cam -. "/camera/image_raw" .-> N_qr
+    N_arm -. "/arm_joint_commands" .-> N_arm_drv
   end
 
   %% =============================================
@@ -98,11 +99,14 @@ graph LR
 
   N_joy           -. "/joy" .->                     ZENOH_O
   ZENOH_R         -. "/joy" .->                     N_joyctrl
-  N_joyctrl       -.->                              N_crawler & N_flipper & N_arm & N_arm_drv
+  N_joyctrl       -. "/crawler_driver<br/>/flipper_driver" .-> N_crawler & N_flipper
+  N_joyctrl       -. "/arm_cmd_vel<br/>/arm_joint_cmd_vel" .-> N_arm
+  N_joyctrl       -. "/gripper_cmd" .->             N_arm_drv
+  N_joyctrl       -. "/emergency_stop" .->          N_crawler & N_flipper & N_arm & N_arm_drv
 
-  N_audio_ope     -. "/operator/audio" .->          ZENOH_O
+  N_audio_ope     -. "/operator/audio<br/>(AudioChunk)" .->  ZENOH_O
   ZENOH_R         -. "/operator/audio" .->          N_audio_robot
-  N_audio_robot   -. "/robot/audio" .->             ZENOH_R
+  N_audio_robot   -. "/robot/audio<br/>(AudioChunk)" .->     ZENOH_R
   ZENOH_O         -. "/robot/audio" .->             N_audio_ope
 
   %% =============================================
@@ -113,5 +117,6 @@ graph LR
   N_spark         -. "/odom" .->                    N_fgbridge
   N_vlp           -. "/velodyne_points" .->         N_fgbridge
   N_gateway       -. "/imu/data" .->                N_fgbridge
+  N_arm_drv       -. "/joint_states<br/>/gripper_status" .-> N_fgbridge
 
   N_fgbridge      == "WebSocket<br/>ws://robot_ip:8765" ==> FOXGLOVE
