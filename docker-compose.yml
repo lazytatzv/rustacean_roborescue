@@ -1,3 +1,7 @@
+# このプロジェクトでは基本的にdockerは使わないが、
+# nixからイメージを作成し使うニーズの為に一応置いておく
+# 他プロジェクトでdocker使う際もこれは最低限必要なので参考にはなりそう
+
 services:
   ros2_container:
     image: rustacean-roborescue-env:latest

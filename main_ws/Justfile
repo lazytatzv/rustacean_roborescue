@@ -20,9 +20,12 @@ common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATO
 # ignore
 # スペース区切りで追加
 ignore_list := "h264_republisher vision_processor"
+
+
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
 # nix特有のwarnフィルター
+# これをしていないとログがとんでもない量になる
 filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
 
 
@@ -72,10 +75,15 @@ check-compile:
 	source install/setup.bash && cargo check --workspace
 	@echo "✅ Compilation OK"
 
+# 特に意味はない
+# fishは環境変数まわりの問題であまり推奨されない
+# 一応bassはflake.nixで入れてある
 ready:
 	@echo "RUN below command"
 	@echo "bass . install/setup.bash"
 
+# Marmaidからpngを生成するときに使う
+# openコマンドはnix内だと基本無理なので出てから見た方が良いかも
 mm:
 	mmdc -i topology/system_topology.mmd -o topology/system_topology.png -s 5
 	mmdc -i topology/network_topology.mmd -o topology/network_topology.png -s 5

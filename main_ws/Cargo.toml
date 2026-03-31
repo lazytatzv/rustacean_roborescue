@@ -9,11 +9,18 @@ members = [
 # 依存関係の解決ルール（Rust 2021以降の推奨）
 resolver = "2"
 
+# あえて除外するもの
+# vision_processorは特に使っていないかつopencvまわりが地雷
 exclude = [
     "src/perception/vision_processor",
 ]
 
+# installに成果物が残っていればnix環境でなくてもcargo checkはできると思う
+
 [patch.crates-io]
+# ここは基本的に弄らないこと
+# rclrsを使うための設定
+
 # rclrsはソースを参照させる
 # crates.ioからとってくるのは地雷なのでやらない！！！
 rclrs = { path = "src/external/ros2_rust/rclrs" }
@@ -31,7 +38,6 @@ rosgraph_msgs = { path = "install/share/rosgraph_msgs/rust" }
 statistics_msgs = { path = "install/share/statistics_msgs/rust" }
 trajectory_msgs = { path = "install/share/trajectory_msgs/rust" }
 visualization_msgs = { path = "install/share/visualization_msgs/rust" }
-
 service_msgs = { path = "install/share/service_msgs/rust" }
 unique_identifier_msgs = { path = "install/share/unique_identifier_msgs/rust" }
 custom_interfaces = { path = "install/share/custom_interfaces/rust" }
