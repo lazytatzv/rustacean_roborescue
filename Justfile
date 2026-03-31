@@ -7,9 +7,11 @@ set shell := ["bash", "-c"]
 default: nix
 
 nix:
-  # nixglを使う場合impureが必要
+  # nixgldefaultを使う場合impureが必要だが、cachix使うときに都合悪いので使わない
+  # nixglintelかnvidiaか
+  # intel/amdならデフォルト設定しているnixglintelでいけるはず
   # accept~はcachix用
-  nix develop --impure --accept-flake-config
+  nix develop --accept-flake-config
 
 sync:
   # 新しい環境で作業する場合はsyncしてsubmoduleの内容物を取ってくる

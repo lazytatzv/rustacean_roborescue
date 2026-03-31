@@ -1517,6 +1517,10 @@ name = "arm_controller"
 version = "0.1.0"
 
 [[patch.unused]]
+name = "arm_driver"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "composition_interfaces"
 version = "2.0.3"
 

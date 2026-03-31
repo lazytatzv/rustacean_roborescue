@@ -305,7 +305,7 @@
           name = "RoboRescue Env";
 
           # rosDeps を直接渡すと PATH が爆発するので圧縮環境のみ渡す
-          packages = buildTools ++ [ roboRescueEnv pythonEnv ];
+          packages = buildTools ++ [ roboRescueEnv pythonEnv nixgl.packages.${system}.nixGLIntel ];
 
           shellHook = ''
             # --- ROS 2 ---
@@ -334,14 +334,27 @@
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
 
-            # --- GPU ドライバ パススルー (非-NixOS NVIDIA) ---
-            # Nix の Mesa はホスト NVIDIA カーネルドライバにアクセスできないため、
-            # GUI (gz sim, rviz2, rqt) は nixGL 経由で起動する必要がある。
-            # ヘッドレスモード (headless:=true) では不要。
-            alias gz="nixGL gz"
-            alias rviz2="nixGL rviz2"
-            alias rqt="nixGL rqt"
-            alias rqt_graph="nixGL rqt_graph"
+            # --- GPU ドライバ パススルー (非-NixOS) ---
+            # Intel/AMD (Mesa): nixGLIntel を nixGL として使う (pure, cachix safe)
+            # NVIDIA: impure が必要なため flake には含めない。
+            #   → nix run --impure github:nix-community/nixGL -- <cmd> を使うか
+            #     NIXGL_CMD 環境変数で上書きする。
+            _detected_nixgl=""
+            if lspci 2>/dev/null | grep -qi nvidia; then
+              echo "⚠️  NVIDIA GPU detected. nixGL is not bundled (requires --impure)."
+              echo "   Set: export NIXGL_CMD='nix run --impure github:nix-community/nixGL --'"
+              _detected_nixgl="''${NIXGL_CMD:-}"
+            else
+              _detected_nixgl="nixGLIntel"
+            fi
+            if [ -n "$_detected_nixgl" ]; then
+              alias nixGL="$_detected_nixgl"
+              alias gz="$_detected_nixgl gz"
+              alias rviz2="$_detected_nixgl rviz2"
+              alias rqt="$_detected_nixgl rqt"
+              alias rqt_graph="$_detected_nixgl rqt_graph"
+            fi
+            unset _detected_nixgl
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${roboRescueEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"

@@ -1,5 +1,9 @@
 set shell := ["bash", "-c"]
 
+# GPU ラッパー: Intel/AMD は nixGLIntel, NVIDIA は NIXGL_CMD 環境変数で上書き
+# 例: export NIXGL_CMD='nix run --impure github:nix-community/nixGL --'
+nixgl := env_var_or_default("NIXGL_CMD", "nixGLIntel")
+
 # 環境変数
 export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
 
@@ -47,6 +51,9 @@ forge: forge-bindings
 	colcon build {{common_args}} {{ignore_args}} {{filter}}
 
 reforge: clean forge
+
+display:
+	{{nixgl}} ros2 launch bringup display.launch.py
 
 launch:
 	ros2 launch bringup launch.py
