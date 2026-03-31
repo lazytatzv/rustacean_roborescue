@@ -149,7 +149,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher 2>&1 | eval \"\$filter_cmd\"
+              --packages-ignore kiss_icp h264_republisher vision_processor 2>&1 | eval \"\$filter_cmd\"
           "
 
       - name: cargo fmt --check
@@ -236,7 +236,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher 2>&1 | eval \"\$filter_cmd\"
+              --packages-ignore kiss_icp h264_republisher vision_processor 2>&1 | eval \"\$filter_cmd\"
           "
 
       - name: Upload build logs (失敗時)
@@ -316,7 +316,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher 2>&1 | eval \"\$filter_cmd\"
+              --packages-ignore kiss_icp h264_republisher vision_processor 2>&1 | eval \"\$filter_cmd\"
 
             source install/setup.bash
             export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"

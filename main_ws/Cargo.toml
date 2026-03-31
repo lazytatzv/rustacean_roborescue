@@ -9,6 +9,10 @@ members = [
 # 依存関係の解決ルール（Rust 2021以降の推奨）
 resolver = "2"
 
+exclude = [
+    "src/perception/vision_processor",
+]
+
 [patch.crates-io]
 # rclrsはソースを参照させる
 # crates.ioからとってくるのは地雷なのでやらない！！！

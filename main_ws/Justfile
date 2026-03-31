@@ -19,7 +19,7 @@ common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATO
 
 # ignore
 # スペース区切りで追加
-ignore_list := "kiss_icp h264_republisher"
+ignore_list := "kiss_icp h264_republisher vision_processor"
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
 # nix特有のwarnフィルター
