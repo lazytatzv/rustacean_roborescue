@@ -3,6 +3,7 @@ mod driver;
 
 use anyhow::Result;
 use custom_interfaces::msg::{GripperCommand, GripperStatus};
+use std_msgs;
 use driver::ArmDynamixelDriver;
 use rclrs::{Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions};
 use sensor_msgs::msg::JointState;
@@ -37,6 +38,8 @@ struct HardwareThreadParams {
     arm_ids: Vec<u8>,
     gripper_id: u8,
     gripper_max_current: u16,
+    arm_offsets: Vec<f64>,
+    gripper_offset: f64,
     rx_cmd: Receiver<HwCommand>,
     joint_state_pub: Publisher<JointState>,
     gripper_status_pub: Publisher<GripperStatus>,
@@ -51,31 +54,60 @@ fn hardware_thread(params: HardwareThreadParams) {
         params.baud_rate,
         params.arm_ids.clone(),
         params.gripper_id,
+        params.arm_offsets.clone(),
+        params.gripper_offset,
     ) {
         Ok(d) => d,
         Err(e) => {
             eprintln!("🔥 arm_gripper_driver: init failed: {e:#}");
-            return;
+            // プロセスごと終了してrespawnを確実にトリガーする。
+            // shutdown_flagをセットするだけではexecutorが止まらないため。
+            std::process::exit(1);
         }
     };
 
     if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current) {
         eprintln!("🔥 arm_gripper_driver: motor init failed: {e:#}");
-        return;
+        std::process::exit(1);
     }
 
     let loop_period = Duration::from_millis(1000 / HW_LOOP_HZ);
+    // 温度チェックは HW_LOOP_HZ/5 Hz (= 10Hz) で実施
+    const TEMP_CHECK_INTERVAL: u64 = HW_LOOP_HZ / 10;
+    let mut loop_count: u64 = 0;
+    let mut estop_was_active = false;
+
     while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
+        let estop_now = params.estop_flag.load(Ordering::Relaxed);
 
-        if params.estop_flag.load(Ordering::Relaxed) {
-            driver.emergency_stop();
-            while !params.shutdown_flag.load(Ordering::Relaxed) {
-                thread::sleep(Duration::from_millis(100));
+        if estop_now {
+            if !estop_was_active {
+                // E-Stop 立ち上がりエッジ: トルクOFF
+                driver.emergency_stop();
+                estop_was_active = true;
+                eprintln!("🛑 arm_driver: E-Stop active — torque disabled");
             }
-            break;
+            // E-Stop 中はコマンド受信のみ drain してモータには送らない
+            while params.rx_cmd.try_recv().is_ok() {}
+            let elapsed = loop_start.elapsed();
+            if elapsed < loop_period {
+                thread::sleep(loop_period - elapsed);
+            }
+            continue;
         }
 
+        if estop_was_active {
+            // E-Stop 解除: 現在位置をゴールに再設定してからトルクON
+            eprintln!("✅ arm_driver: E-Stop cleared — re-enabling torque at current position");
+            if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current) {
+                eprintln!("🔥 arm_driver: re-init after E-Stop failed: {e:#}");
+                std::process::exit(1);
+            }
+            estop_was_active = false;
+        }
+
+        // コマンド処理
         while let Ok(cmd) = params.rx_cmd.try_recv() {
             if let Some(p) = cmd.arm_positions {
                 let _ = driver.write_arm_positions(&p);
@@ -85,6 +117,7 @@ fn hardware_thread(params: HardwareThreadParams) {
             }
         }
 
+        // joint_states publish
         if let Ok(p) = driver.read_arm_positions() {
             let mut msg = JointState::default();
             msg.header.stamp = now_stamp();
@@ -93,6 +126,7 @@ fn hardware_thread(params: HardwareThreadParams) {
             let _ = params.joint_state_pub.publish(&msg);
         }
 
+        // gripper_status publish
         if let Ok(s) = driver.read_gripper_status() {
             let msg = GripperStatus {
                 position: s.position_rad as i32,
@@ -101,6 +135,22 @@ fn hardware_thread(params: HardwareThreadParams) {
                 ..Default::default()
             };
             let _ = params.gripper_status_pub.publish(&msg);
+        }
+
+        // 温度監視 (10Hz)
+        loop_count += 1;
+        if loop_count % TEMP_CHECK_INTERVAL == 0 {
+            let (warnings, critical) = driver.check_temperatures();
+            for (id, temp) in &warnings {
+                eprintln!("⚠️  arm_driver: Dynamixel ID {id} temperature warning: {temp}°C");
+            }
+            if !critical.is_empty() {
+                for (id, temp) in &critical {
+                    eprintln!("🔥 arm_driver: Dynamixel ID {id} CRITICAL temperature: {temp}°C — disabling torque");
+                }
+                driver.torque_off_all();
+                params.estop_flag.store(true, Ordering::Relaxed);
+            }
         }
 
         let elapsed = loop_start.elapsed();
@@ -169,6 +219,20 @@ fn run() -> Result<()> {
         .default(100_i64)
         .mandatory()?
         .get();
+    // per-joint ゼロ点オフセット [rad]: physical_rad = urdf_rad + offset
+    // Dynamixel tick 2048 が URDF ゼロと一致しない場合に設定する。
+    // arm_gripper_driver.yaml の arm_offsets: [j1, j2, j3, j4, j5, j6] で指定。
+    let arm_offsets_arr: Arc<[f64]> = node
+        .declare_parameter("arm_offsets")
+        .default(Arc::from(vec![0.0_f64; 6].into_boxed_slice()))
+        .mandatory()?
+        .get();
+    let arm_offsets: Vec<f64> = arm_offsets_arr.to_vec();
+    let gripper_offset: f64 = node
+        .declare_parameter("gripper_offset")
+        .default(0.0_f64)
+        .mandatory()?
+        .get();
 
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
@@ -211,6 +275,15 @@ fn run() -> Result<()> {
         },
     )?;
 
+    // /emergency_stop subscriber (transient_local: 再起動直後も latched 値を受信)
+    let estop_sub_flag = Arc::clone(&estop_flag);
+    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
+        "/emergency_stop".reliable().transient_local().keep_last(1),
+        move |msg: std_msgs::msg::Bool| {
+            estop_sub_flag.store(msg.data, Ordering::Relaxed);
+        },
+    )?;
+
     let shutdown_c = Arc::clone(&shutdown_flag);
     let estop_c = Arc::clone(&estop_flag);
     let hw_thread = thread::spawn(move || {
@@ -221,6 +294,8 @@ fn run() -> Result<()> {
             arm_ids,
             gripper_id: gripper_id as u8,
             gripper_max_current: gripper_max_current as u16,
+            arm_offsets,
+            gripper_offset,
             rx_cmd,
             joint_state_pub,
             gripper_status_pub,

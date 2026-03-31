@@ -15,8 +15,9 @@ env:
 # ─────────────────────────────────────────────────────────────────────────────
 # Job graph:
 #
-#   lint ──┬── rust-check ──┐
-#           └── cpp         ──┴── (integration: label-triggered)
+#   lint
+#   rust-check ──┐
+#   cpp        ──┴── (integration: label-triggered)
 #
 # PR では cargo test を省略し fmt + clippy のみで高速フィードバックを返す。
 # フル integration テストは `run-integration` ラベルで手動トリガー。
@@ -86,7 +87,6 @@ jobs:
     env:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 40
-    needs: lint
     steps:
       - uses: actions/checkout@v4
         with:
@@ -198,7 +198,6 @@ jobs:
     env:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
-    needs: lint
     steps:
       - uses: actions/checkout@v4
         with:

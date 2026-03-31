@@ -18,11 +18,11 @@ env:
 # ─────────────────────────────────────────────────────────────────────────────
 # Job graph:
 #
-#   lint ──┬── rust ──┐
-#           └── cpp  ──┴── coverage
+#   lint
+#   rust ──┐
+#   cpp  ──┴── coverage
 #
-# lint が通らないとビルド・テストは走らない。
-# rust と cpp は並列実行でフィードバックを最速にする。
+# lint, rust, cpp は並列実行でフィードバックを最速にする。
 # ─────────────────────────────────────────────────────────────────────────────
 
 jobs:
@@ -71,7 +71,6 @@ jobs:
     env:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
-    needs: lint
     steps:
       - uses: actions/checkout@v4
         with:
@@ -201,7 +200,6 @@ jobs:
     env:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 60
-    needs: lint
     steps:
       - uses: actions/checkout@v4
         with:

@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -119,6 +119,8 @@ def generate_launch_description() -> LaunchDescription:
             }
         ],
         condition=IfCondition(LaunchConfiguration("use_lidar")),
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     odom_selector_node = Node(
@@ -130,9 +132,33 @@ def generate_launch_description() -> LaunchDescription:
             {
                 "base_frame": LaunchConfiguration("base_frame"),
                 "odom_frame": LaunchConfiguration("map_frame"),
+                # use_imu=false 時は IMU health が届かないため、タイムアウトで自動 KISS-ICP へ
+                "health_timeout_s": 5.0,
             }
         ],
         condition=IfCondition(LaunchConfiguration("use_lidar")),
+        respawn=True,
+        respawn_delay=2.0,
+    )
+
+    # LiDAR なし時のフォールバック: odom→base_link を単位変換で配信
+    # ロボットの TF ツリーが途切れないよう最低限の TF を保証する
+    odom_base_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="odom_base_fallback_tf",
+        arguments=[
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            LaunchConfiguration("map_frame"),
+            LaunchConfiguration("base_frame"),
+        ],
+        output="screen",
+        condition=UnlessCondition(LaunchConfiguration("use_lidar")),
     )
 
     lidar_static_tf = Node(
@@ -228,6 +254,8 @@ def generate_launch_description() -> LaunchDescription:
             },
         ],
         condition=IfCondition(LaunchConfiguration("use_slam")),
+        respawn=True,
+        respawn_delay=5.0,
     )
 
     rviz_node = Node(
@@ -280,6 +308,7 @@ def generate_launch_description() -> LaunchDescription:
             kiss_icp_node,
             odom_selector_node,
             lidar_static_tf,
+            odom_base_static_tf,
             slam_node,
             rviz_node,
         ]

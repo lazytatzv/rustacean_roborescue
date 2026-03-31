@@ -53,6 +53,9 @@ def generate_launch_description() -> LaunchDescription:
         "joy_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
     )
+    arg_use_crawler = DeclareLaunchArgument(
+        "use_crawler", default_value="true", description="Roboclaw 走行ドライバを有効にする"
+    )
     arg_use_arm = DeclareLaunchArgument(
         "use_arm", default_value="true", description="アームドライバ + IK を有効にする"
     )
@@ -82,6 +85,9 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     hw_respawn = {"respawn": True, "respawn_delay": 3.0}
+    # フリッパーは Wheel Mode 中に crash すると motors が spinning し続けるため
+    # respawn_delay を短くして停止までの時間を最小化する
+    flipper_respawn = {"respawn": True, "respawn_delay": 1.0}
     ctrl_respawn = {"respawn": True, "respawn_delay": 2.0}
 
     # ── 共通: ハードウェアドライバ ────────────────────────────────────────
@@ -91,6 +97,7 @@ def generate_launch_description() -> LaunchDescription:
         name="crawler_driver",
         output="both",
         parameters=[LaunchConfiguration("crawler_params")],
+        condition=IfCondition(LaunchConfiguration("use_crawler")),
         **hw_respawn,
     )
     flipper_driver_node = Node(
@@ -100,7 +107,7 @@ def generate_launch_description() -> LaunchDescription:
         output="both",
         parameters=[LaunchConfiguration("flipper_params")],
         condition=IfCondition(LaunchConfiguration("use_flipper")),
-        **hw_respawn,
+        **flipper_respawn,
     )
     sensor_gateway_node = Node(
         package="sensor_gateway",
@@ -244,6 +251,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             # 引数
+            arg_use_crawler,
             arg_use_arm,
             arg_use_flipper,
             arg_use_imu,

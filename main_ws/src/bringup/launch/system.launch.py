@@ -44,6 +44,9 @@ def generate_launch_description():
     use_camera = DeclareLaunchArgument(
         "use_camera", default_value="true", description="カメラ + QR 検出を有効にする"
     )
+    use_crawler = DeclareLaunchArgument(
+        "use_crawler", default_value="true", description="Roboclaw 走行ドライバを有効にする"
+    )
     use_arm = DeclareLaunchArgument(
         "use_arm", default_value="true", description="アームドライバ + IK を有効にする"
     )
@@ -96,6 +99,7 @@ def generate_launch_description():
             use_audio,
             use_lidar,
             use_camera,
+            use_crawler,
             use_arm,
             use_flipper,
             use_imu,
@@ -130,6 +134,7 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(control_launch),
                 launch_arguments={
+                    "use_crawler": LaunchConfiguration("use_crawler"),
                     "use_arm": LaunchConfiguration("use_arm"),
                     "use_flipper": LaunchConfiguration("use_flipper"),
                     "use_imu": LaunchConfiguration("use_imu"),

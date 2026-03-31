@@ -42,6 +42,8 @@ def generate_launch_description():
                 "bitrate": LaunchConfiguration("bitrate"),
             }
         ],
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     # /operator/audio → スピーカー
@@ -57,6 +59,8 @@ def generate_launch_description():
                 "device": LaunchConfiguration("robot_spk_device"),
             }
         ],
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     return LaunchDescription([use_audio, robot_device, robot_spk_device, bitrate, sender, receiver])

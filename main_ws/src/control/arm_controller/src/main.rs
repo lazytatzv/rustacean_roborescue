@@ -50,7 +50,7 @@ const DEFAULT_DLS_LAMBDA_BASE: f64 = 0.01;
 const DEFAULT_DLS_LAMBDA_MAX: f64 = 0.15;
 const DEFAULT_MANIPULABILITY_THRESHOLD: f64 = 0.005;
 const DEFAULT_MANIPULABILITY_LOCKOUT: f64 = 0.0001;
-const DEFAULT_WATCHDOG_MS: u64 = 500;
+const DEFAULT_WATCHDOG_MS: u64 = 1000;
 const DEFAULT_CONTROL_PERIOD_MS: u64 = 20;
 const DEFAULT_JOINT_VEL_LIMIT: f64 = 1.5;
 const DEFAULT_JOINT_LIMIT_MARGIN: f64 = 0.10;
@@ -358,11 +358,16 @@ fn run() -> Result<()> {
         })?;
 
     let estop_sub_flag = Arc::clone(&estop_flag);
+    let state_estop = Arc::clone(&state);
     let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
         "/emergency_stop".reliable().transient_local().keep_last(1),
         move |msg: std_msgs::msg::Bool| {
-            if msg.data {
-                estop_sub_flag.store(true, Ordering::Relaxed);
+            let was_active = estop_sub_flag.swap(msg.data, Ordering::Relaxed);
+            if !msg.data && was_active {
+                // E-Stop 解除: target_positions を現在位置にリセットして再開
+                let mut s = lock_or_recover(&state_estop);
+                s.target_positions = None; // 次の制御サイクルで current_positions から再初期化
+                s.last_cmd_time = Instant::now(); // watchdog タイマーをリセット
             }
         },
     )?;

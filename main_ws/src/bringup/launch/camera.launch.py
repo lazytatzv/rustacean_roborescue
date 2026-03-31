@@ -81,6 +81,8 @@ def generate_launch_description():
         executable="ffmpeg_to_foxglove_video.py",
         parameters=[{"use_sim_time": False}],
         condition=IfCondition(LaunchConfiguration("use_camera")),
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     return LaunchDescription([arg_use_camera, container, ffmpeg_to_foxglove])
