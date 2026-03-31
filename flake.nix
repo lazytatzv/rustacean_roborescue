@@ -424,6 +424,7 @@
             export CMAKE_PREFIX_PATH="${ciEnv}:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${ciEnv}:$AMENT_PREFIX_PATH"
             export LD_LIBRARY_PATH="${ciEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export PYTHONPATH="${ciEnv}/${pkgs.python3.sitePackages}''${PYTHONPATH:+:$PYTHONPATH}"
           '';
         };
       }
