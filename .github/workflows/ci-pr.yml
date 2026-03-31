@@ -119,12 +119,12 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            
+
             # 1. 環境変数のセットアップ
             export COLCON_ROS_SKIP_INSTALL_CHECK=1
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
             export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
-            
+
             install_dir=\$(pwd)/install
             py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
@@ -141,7 +141,7 @@ jobs:
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
-            
+
             colcon build \
               --merge-install --symlink-install \
               --cmake-args \
@@ -206,12 +206,12 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            
+
             # 1. 環境変数のセットアップ
             export COLCON_ROS_SKIP_INSTALL_CHECK=1
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
             export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
-            
+
             install_dir=\$(pwd)/install
             py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
@@ -228,7 +228,7 @@ jobs:
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
-            
+
             colcon build \
               --merge-install --symlink-install \
               --cmake-args \
@@ -286,12 +286,12 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            
+
             # 1. 環境変数のセットアップ
             export COLCON_ROS_SKIP_INSTALL_CHECK=1
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
             export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
-            
+
             install_dir=\$(pwd)/install
             py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
@@ -308,7 +308,7 @@ jobs:
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
-            
+
             colcon build \
               --merge-install --symlink-install \
               --cmake-args \
