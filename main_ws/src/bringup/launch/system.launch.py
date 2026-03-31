@@ -43,7 +43,9 @@ def generate_launch_description():
     audio_launch = os.path.join(bringup_dir, "launch", "audio.launch.py")
 
     use_nav2 = DeclareLaunchArgument(
-        "use_nav2", default_value=_b(cfg.get("use_nav2", False)), description="Nav2 自律走行を有効にする"
+        "use_nav2",
+        default_value=_b(cfg.get("use_nav2", False)),
+        description="Nav2 自律走行を有効にする",
     )
     use_audio = DeclareLaunchArgument(
         "use_audio",
@@ -51,22 +53,34 @@ def generate_launch_description():
         description="Start audio (webrtc signaling + robot node)",
     )
     use_lidar = DeclareLaunchArgument(
-        "use_lidar", default_value=_b(cfg.get("use_lidar", True)), description="LiDAR + FAST-LIO + SLAM を有効にする"
+        "use_lidar",
+        default_value=_b(cfg.get("use_lidar", True)),
+        description="LiDAR + FAST-LIO + SLAM を有効にする",
     )
     use_camera = DeclareLaunchArgument(
-        "use_camera", default_value=_b(cfg.get("use_camera", True)), description="カメラ + QR 検出を有効にする"
+        "use_camera",
+        default_value=_b(cfg.get("use_camera", True)),
+        description="カメラ + QR 検出を有効にする",
     )
     use_crawler = DeclareLaunchArgument(
-        "use_crawler", default_value=_b(cfg.get("use_crawler", True)), description="Roboclaw 走行ドライバを有効にする"
+        "use_crawler",
+        default_value=_b(cfg.get("use_crawler", True)),
+        description="Roboclaw 走行ドライバを有効にする",
     )
     use_arm = DeclareLaunchArgument(
-        "use_arm", default_value=_b(cfg.get("use_arm", True)), description="アームドライバ + IK を有効にする"
+        "use_arm",
+        default_value=_b(cfg.get("use_arm", True)),
+        description="アームドライバ + IK を有効にする",
     )
     use_flipper = DeclareLaunchArgument(
-        "use_flipper", default_value=_b(cfg.get("use_flipper", True)), description="フリッパドライバを有効にする"
+        "use_flipper",
+        default_value=_b(cfg.get("use_flipper", True)),
+        description="フリッパドライバを有効にする",
     )
     use_imu = DeclareLaunchArgument(
-        "use_imu", default_value=_b(cfg.get("use_imu", True)), description="STM32 IMU (sensor_gateway) を有効にする"
+        "use_imu",
+        default_value=_b(cfg.get("use_imu", True)),
+        description="STM32 IMU (sensor_gateway) を有効にする",
     )
 
     # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──

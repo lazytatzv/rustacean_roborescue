@@ -124,6 +124,23 @@
         <child link="arm6_link"/>
         <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
     </joint>
+    <!-- Gripper (parallel link, 2x Dynamixel) -->
+    <link name="gripper_left_link"/>
+    <link name="gripper_right_link"/>
+    <joint name="gripper_joint7" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="arm6_link"/>
+        <child link="gripper_left_link"/>
+        <limit effort="5" lower="-1.57" upper="1.57" velocity="1.0"/>
+    </joint>
+    <joint name="gripper_joint8" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="arm6_link"/>
+        <child link="gripper_right_link"/>
+        <limit effort="5" lower="-1.57" upper="1.57" velocity="1.0"/>
+    </joint>
     <!-- End effector (tip) -->
     <link name="link_tip"/>
     <joint name="tip_joint" type="fixed">

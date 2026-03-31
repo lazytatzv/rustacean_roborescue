@@ -52,8 +52,29 @@ forge: forge-bindings
 
 reforge: clean forge
 
+# スライダでURDF上の各関節を動かして可動域・方向を確認する
 display:
 	{{nixgl}} ros2 launch bringup display.launch.py
+
+# IK動作確認: arm_controller + モックドライバ + RViz を起動する
+# 別ターミナルで `just teleop-arm` を実行してアームを操作する
+test-ik:
+	{{nixgl}} ros2 launch bringup test_ik.launch.py
+
+# IK確認 + テレオペを tmux で一括起動する
+# 左ペイン: RViz + arm_controller  右ペイン: キーボードテレオペ
+# 終了: Ctrl-C → tmux kill-session または `tmux kill-session -t ik`
+ik:
+	tmux new-session -d -s ik -x 220 -y 50 \; \
+		send-keys "{{nixgl}} ros2 launch bringup test_ik.launch.py" Enter \; \
+		split-window -h \; \
+		send-keys "sleep 4 && ros2 run bringup arm_teleop.py" Enter \; \
+		attach -t ik
+
+# アーム IK テレオペ (test-ik と併用)
+# W/S: 前後  A/D: 左右  R/F: 上下  Space: 停止
+teleop-arm:
+	ros2 run bringup arm_teleop.py
 
 launch:
 	ros2 launch bringup launch.py
