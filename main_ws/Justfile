@@ -77,4 +77,5 @@ ready:
 	@echo "bass . install/setup.bash"
 
 mm:
-	mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
+	npx @mermaid-js/mermaid-cli -i topology/system_topology.mmd -o topology/system_topology.png -b white --width 3000
+	npx @mermaid-js/mermaid-cli -i topology/network_topology.mmd -o topology/network_topology.png -b white --width 2400
