@@ -20,6 +20,8 @@
   <exec_depend>velodyne_driver</exec_depend>
   <exec_depend>velodyne_pointcloud</exec_depend>
   <exec_depend>custom_interfaces</exec_depend>
+  <exec_depend>foxglove_msgs</exec_depend>
+  <exec_depend>ffmpeg_image_transport_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <!-- ros2_control (arm_backend:=ros2_control 時) -->
   <exec_depend>controller_manager</exec_depend>

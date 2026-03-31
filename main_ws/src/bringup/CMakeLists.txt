@@ -30,6 +30,7 @@ install(PROGRAMS
   scripts/demo_joints.py
   scripts/teleop_joints.py
   scripts/arm_cmd_bridge.py
+  scripts/ffmpeg_to_foxglove_video.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

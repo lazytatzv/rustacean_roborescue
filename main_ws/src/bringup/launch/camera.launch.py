@@ -2,12 +2,19 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch_ros.actions import ComposableNodeContainer
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
     qr_share = get_package_share_directory("qr_detector")
+
+    arg_use_camera = DeclareLaunchArgument(
+        "use_camera", default_value="true", description="カメラ + QR 検出を有効にする"
+    )
 
     # v4l2_camera configuration
     # Note: Use /dev/video0 or similar.
@@ -22,17 +29,15 @@ def generate_launch_description():
                 "image_size": [640, 480],
                 "time_per_frame": [1, 30],
                 "camera_frame_id": "camera_link",
-                # ffmpeg_image_transport params (published as /camera/image_raw/ffmpeg)
-                "ffmpeg_image_transport.encoding": "h264",
-                # Foxglove-compatible encoder settings:
-                # - use BASELINE (no B-frames)
-                # - low-latency preset/tune
-                # - enforce no B-frames via x264 opts and set an explicit bitrate
-                "ffmpeg_image_transport.profile": "baseline",
-                "ffmpeg_image_transport.preset": "ultrafast",
-                "ffmpeg_image_transport.tune": "zerolatency",
-                "ffmpeg_image_transport.x264opts": "bframes=0",
-                "ffmpeg_image_transport.bitrate": 2000000,  # 2 Mbps default; tune as needed
+                # ffmpeg_image_transport パラメータ: <topic>.<transport>.<param>
+                # topic = "image_raw"、namespace は除く
+                "image_raw.ffmpeg.encoder": "libx264",
+                "image_raw.ffmpeg.bit_rate": 2000000,  # 2 Mbps
+                "image_raw.ffmpeg.gop_size": 10,  # 10フレームごとにキーフレーム
+                # Foxglove CompressedVideo 要件:
+                # - profile=baseline: B-framesなし (Foxglove非対応のため必須)
+                # - x264-params:repeat_headers=1: IDRごとにSPS/PPS付与
+                "image_raw.ffmpeg.av_options": "profile:baseline,preset:ultrafast,x264-params:repeat_headers=1",
             }
         ],
         extra_arguments=[{"use_intra_process_comms": True}],
@@ -66,6 +71,16 @@ def generate_launch_description():
             qr_detector_node,
         ],
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_camera")),
     )
 
-    return LaunchDescription([container])
+    # FFMPEGPacket → foxglove_msgs/CompressedVideo 変換
+    # foxglove_bridge + Foxglove Studio でネイティブH264表示するために必要
+    ffmpeg_to_foxglove = Node(
+        package="bringup",
+        executable="ffmpeg_to_foxglove_video.py",
+        parameters=[{"use_sim_time": False}],
+        condition=IfCondition(LaunchConfiguration("use_camera")),
+    )
+
+    return LaunchDescription([arg_use_camera, container, ffmpeg_to_foxglove])

@@ -25,6 +25,19 @@
           ros.joy-linux          # Linux joystick backend
           ros.foxglove-bridge    # Foxglove Bridge for visualization
           ros.ros2cli-common-extensions
+          ros.rclpy
+          ros.rosidl-default-generators
+          ros.rosidl-default-runtime
+          ros.image-transport
+          ros.ffmpeg-image-transport       # /camera/image_raw/ffmpeg の型定義
+          ros.ffmpeg-image-transport-msgs  # FFMPEGPacket メッセージ型
+          # audio_bridge 依存: GStreamer + Python GI bindings
+          pkgs.gst_all_1.gstreamer
+          pkgs.gst_all_1.gst-plugins-base  # opusdec, audioconvert, audioresample
+          pkgs.gst_all_1.gst-plugins-good  # pulsesrc, pulsesink
+          pkgs.gobject-introspection
+          pkgs.python3Packages.pygobject3
+          pkgs.pulseaudio
         ];
 
         operatorEnv = pkgs.symlinkJoin {

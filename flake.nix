@@ -147,8 +147,10 @@
           ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
           ros.image-transport
           ros.compressed-image-transport
-          ros.ffmpeg-image-transport  # H.264 compression support
-          ros.v4l2-camera             # Optimized camera driver
+          ros.ffmpeg-image-transport       # H.264 compression support
+          ros.ffmpeg-image-transport-msgs  # FFMPEGPacket メッセージ型
+          ros.foxglove-msgs                # foxglove.CompressedVideo スキーマ (Foxglove Studio ネイティブH264)
+          ros.v4l2-camera                  # Optimized camera driver
           ros.camera-info-manager
           ros.rclcpp-components
 

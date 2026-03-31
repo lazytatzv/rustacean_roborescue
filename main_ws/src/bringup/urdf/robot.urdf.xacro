@@ -14,8 +14,21 @@
   <material name="white"><color rgba="1 1 1 1"/></material>
 
   <!-- ======================== Base ======================== -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}"/>
+  </joint>
+
   <link name="base_link">
     <visual><geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry><material name="silver"/></visual>
+    <collision><geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry></collision>
+    <inertial>
+      <mass value="15.0"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="0.175" ixy="0" ixz="0" iyy="0.600" iyz="0" izz="0.725"/>
+    </inertial>
   </link>
 
   <!-- Flippers (RPY based on Mesh Z-axis as length) -->
@@ -71,5 +84,131 @@
     <visual><origin xyz="0 0 0" rpy="0 3.14 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm7_ver2.STL" scale="${mesh_scale}"/></geometry></visual>
   </link>
   <joint name="arm_joint6" type="revolute"><origin xyz="0.07425 0 -0.03"/><axis xyz="1 0 0"/><parent link="arm5_link"/><child link="arm6_link"/><limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/></joint>
+
+
+  <!-- ======================== Simulation: Drive Wheels ======================== -->
+  <!-- クローラを diff_drive で近似する仮想ホイール (シミュレーション専用) -->
+  <xacro:macro name="drive_wheel" params="name y_offset">
+    <link name="${name}">
+      <visual>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="silver"/>
+      </visual>
+      <collision>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="1.0"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="0 ${y_offset} ${-base_height/2}"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:drive_wheel name="left_wheel"  y_offset="${track_width/2}"/>
+  <xacro:drive_wheel name="right_wheel" y_offset="${-track_width/2}"/>
+
+  <!-- ======================== Simulation: Sensors ======================== -->
+  <link name="velodyne">
+    <visual>
+      <geometry><cylinder radius="0.05" length="0.07"/></geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.05" length="0.07"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.8"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+  <joint name="velodyne_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="velodyne"/>
+    <origin xyz="0.15 0 ${base_height/2 + 0.05}"/>
+  </joint>
+
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0"/>
+  </joint>
+
+  <!-- ======================== Gazebo Plugins ======================== -->
+  <!-- DiffDrive: /cmd_vel → 走行、/odom → オドメトリ出力 -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${track_width}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <!-- TFはodom_tf_bridge.pyが発行するためここでは無効 -->
+      <publish_odom_tf>false</publish_odom_tf>
+    </plugin>
+  </gazebo>
+
+  <!-- JointStatePublisher: アーム・フリッパの状態を/joint_statesへ -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+      <update_rate>50</update_rate>
+    </plugin>
+  </gazebo>
+
+  <!-- LiDAR (GPU必須。nixGL環境またはGPU搭載マシンのみ有効) -->
+  <gazebo reference="velodyne">
+    <sensor name="vlp16" type="gpu_lidar">
+      <topic>velodyne_points</topic>
+      <update_rate>10</update_rate>
+      <gz_frame_id>velodyne</gz_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>1800</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>16</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.261799</min_angle>
+            <max_angle>0.261799</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.1</min>
+          <max>100.0</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <visualize>false</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- IMU -->
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <topic>imu/data</topic>
+      <update_rate>100</update_rate>
+      <gz_frame_id>imu_link</gz_frame_id>
+      <always_on>true</always_on>
+    </sensor>
+  </gazebo>
 
 </robot>

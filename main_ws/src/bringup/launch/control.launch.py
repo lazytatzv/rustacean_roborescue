@@ -15,9 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def _load_robot_description() -> str:
     """URDF を読み込み DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER を実パスに置換して返す。"""
-    urdf_path = os.path.join(
-        get_package_share_directory("bringup"), "urdf", "sekirei.urdf"
-    )
+    urdf_path = os.path.join(get_package_share_directory("bringup"), "urdf", "sekirei.urdf")
     dxl_model_folder = os.path.join(
         get_package_share_directory("dynamixel_hardware_interface"),
         "param",
@@ -33,39 +31,36 @@ def generate_launch_description() -> LaunchDescription:
     # ── Launch arguments ──────────────────────────────────────────────────
     arg_crawler_params = DeclareLaunchArgument(
         "crawler_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "crawler_driver.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "crawler_driver.yaml"]),
     )
     arg_flipper_params = DeclareLaunchArgument(
         "flipper_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "flipper_driver.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "flipper_driver.yaml"]),
     )
     arg_arm_params = DeclareLaunchArgument(
         "arm_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "arm_controller.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "arm_controller.yaml"]),
     )
     arg_sensor_gw_params = DeclareLaunchArgument(
         "sensor_gw_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "sensor_gateway.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "sensor_gateway.yaml"]),
     )
     arg_arm_gripper_driver_params = DeclareLaunchArgument(
         "arm_gripper_driver_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "arm_gripper_driver.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "arm_gripper_driver.yaml"]),
     )
     arg_joy_params = DeclareLaunchArgument(
         "joy_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "joy_controller.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
+    )
+    arg_use_arm = DeclareLaunchArgument(
+        "use_arm", default_value="true", description="アームドライバ + IK を有効にする"
+    )
+    arg_use_flipper = DeclareLaunchArgument(
+        "use_flipper", default_value="true", description="フリッパドライバを有効にする"
+    )
+    arg_use_imu = DeclareLaunchArgument(
+        "use_imu", default_value="true", description="STM32 IMU (sensor_gateway) を有効にする"
     )
     arg_arm_backend = DeclareLaunchArgument(
         "arm_backend",
@@ -104,6 +99,7 @@ def generate_launch_description() -> LaunchDescription:
         name="flipper_driver",
         output="both",
         parameters=[LaunchConfiguration("flipper_params")],
+        condition=IfCondition(LaunchConfiguration("use_flipper")),
         **hw_respawn,
     )
     sensor_gateway_node = Node(
@@ -112,6 +108,7 @@ def generate_launch_description() -> LaunchDescription:
         name="sensor_gateway",
         output="both",
         parameters=[LaunchConfiguration("sensor_gw_params")],
+        condition=IfCondition(LaunchConfiguration("use_imu")),
         **hw_respawn,
     )
 
@@ -131,12 +128,9 @@ def generate_launch_description() -> LaunchDescription:
         output="both",
         parameters=[
             LaunchConfiguration("arm_params"),
-            {
-                "urdf_path": PathJoinSubstitution(
-                    [bringup_share, "urdf", "sekirei.urdf"]
-                )
-            },
+            {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
         ],
+        condition=IfCondition(LaunchConfiguration("use_arm")),
         **ctrl_respawn,
     )
 
@@ -147,7 +141,18 @@ def generate_launch_description() -> LaunchDescription:
         name="arm_gripper_driver",
         output="both",
         parameters=[LaunchConfiguration("arm_gripper_driver_params")],
-        condition=UnlessCondition(use_ros2_control),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    LaunchConfiguration("use_arm"),
+                    "' == 'true'",
+                    " and '",
+                    LaunchConfiguration("arm_backend"),
+                    "' != 'ros2_control'",
+                ]
+            )
+        ),
         **hw_respawn,
     )
 
@@ -167,7 +172,18 @@ def generate_launch_description() -> LaunchDescription:
             controllers_yaml,
         ],
         output="both",
-        condition=IfCondition(use_ros2_control),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    LaunchConfiguration("use_arm"),
+                    "' == 'true'",
+                    " and '",
+                    LaunchConfiguration("arm_backend"),
+                    "' == 'ros2_control'",
+                ]
+            )
+        ),
     )
     robot_state_publisher_node = Node(
         package="robot_state_publisher",
@@ -228,6 +244,9 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             # 引数
+            arg_use_arm,
+            arg_use_flipper,
+            arg_use_imu,
             arg_crawler_params,
             arg_flipper_params,
             arg_arm_params,

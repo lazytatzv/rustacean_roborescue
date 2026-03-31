@@ -2,7 +2,9 @@ import sys
 from pathlib import Path
 
 import rclpy
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float32
 
 
@@ -37,9 +39,7 @@ class OmronBridge(Node):
         self.declare_parameter("serial_port", "/dev/ttyUSB0")
         self.declare_parameter("poll_period", 1.0)
         port = self.get_parameter("serial_port").get_parameter_value().string_value
-        period = float(
-            self.get_parameter("poll_period").get_parameter_value().double_value
-        )
+        period = float(self.get_parameter("poll_period").get_parameter_value().double_value)
 
         self.temp_pub = self.create_publisher(Float32, "omron/temperature", 10)
         self.hum_pub = self.create_publisher(Float32, "omron/humidity", 10)
@@ -51,9 +51,7 @@ class OmronBridge(Node):
         self.declare_parameter("team_name", "Team")
         self.declare_parameter("country", "Country")
         self.declare_parameter("heat_threshold_c", 40.0)
-        enable_poi = (
-            self.get_parameter("enable_poi_export").get_parameter_value().bool_value
-        )
+        enable_poi = self.get_parameter("enable_poi_export").get_parameter_value().bool_value
         team_name = self.get_parameter("team_name").get_parameter_value().string_value
         country = self.get_parameter("country").get_parameter_value().string_value
         self.heat_threshold = float(
@@ -63,16 +61,23 @@ class OmronBridge(Node):
             try:
                 from .poi_writer import POIWriter
 
-                self.poi = POIWriter(
-                    out_dir="docs/outputs", team_name=team_name, country=country
-                )
-                self.get_logger().info(
-                    f"POI export enabled, heat threshold={self.heat_threshold}C"
-                )
+                self.poi = POIWriter(out_dir="docs/outputs", team_name=team_name, country=country)
+                self.get_logger().info(f"POI export enabled, heat threshold={self.heat_threshold}C")
             except Exception:
                 self.poi = None
         else:
             self.poi = None
+
+        self._robot_x = 0.0
+        self._robot_y = 0.0
+        self._robot_z = 0.0
+
+        sensor_qos = QoSProfile(
+            depth=5,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        self.create_subscription(Odometry, "/odom", self._odom_cb, sensor_qos)
 
         self.sensor = None
         if Omron2JCIE_BU01 is not None:
@@ -85,6 +90,11 @@ class OmronBridge(Node):
             self.get_logger().warn("omron_2jcie_bu01 module not available")
 
         self.timer = self.create_timer(period, self.timer_cb)
+
+    def _odom_cb(self, msg: Odometry) -> None:
+        self._robot_x = msg.pose.pose.position.x
+        self._robot_y = msg.pose.pose.position.y
+        self._robot_z = msg.pose.pose.position.z
 
     def timer_cb(self):
         if self.sensor is None:
@@ -112,11 +122,14 @@ class OmronBridge(Node):
             # RoboCup-usable detection: heat_sig (threshold-based)
             if self.poi is not None and temp_c >= self.heat_threshold:
                 path = self.poi.add_heat_detection(
-                    name="0", x=0.0, y=0.0, z=0.0, robot="robot1", mode="A"
+                    name="0",
+                    x=self._robot_x,
+                    y=self._robot_y,
+                    z=self._robot_z,
+                    robot="robot1",
+                    mode="A",
                 )
-                self.get_logger().info(
-                    f"Heat detection logged to {path} (temp={temp_c:.2f}C)"
-                )
+                self.get_logger().info(f"Heat detection logged to {path} (temp={temp_c:.2f}C)")
         except Exception as e:
             self.get_logger().error(f"Error reading sensor: {e}")
 
