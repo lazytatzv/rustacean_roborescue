@@ -9,7 +9,6 @@ main_ws/src/**/Cargo.lock
 install/
 build/
 log/
-COLCON_IGNORE
 
 # --- Python ---
 __pycache__/
