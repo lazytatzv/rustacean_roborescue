@@ -114,29 +114,31 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
-      - name: forge-bindings
-        run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
-            cd main_ws
-            colcon build \
-              --packages-up-to rosidl_generator_rs \
-              --merge-install --symlink-install \
-              --cmake-args -G Ninja
-          "
-
-      - name: forge custom_interfaces
+      # just forge に相当するビルド
+      - name: forge (Build all packages)
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+
+            # 1. ジェネレーター単体をビルド (forge-bindings)
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja
+
+            # 2. 全体をビルド (forge)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             colcon build \
-              --packages-select custom_interfaces \
               --merge-install --symlink-install \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=\"\$gen_cmake\" -G Ninja
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -G Ninja \
+              --packages-ignore kiss_icp h264_republisher
           "
 
       - name: cargo fmt --check
@@ -150,6 +152,8 @@ jobs:
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
+            # rosidl_generator_rs のパスを明示的に追加
+            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
             cargo clippy --workspace -- -D warnings
           "
 
@@ -186,6 +190,7 @@ jobs:
             colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             colcon-${{ runner.os }}-
 
+      # just forge に完全一致するビルド
       - name: forge (just forge 相当)
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
@@ -207,7 +212,7 @@ jobs:
                 -DROSIDL_GENERATOR_RUST=ON \
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -G Ninja \
-              --packages-ignore kiss_icp
+              --packages-ignore kiss_icp h264_republisher
           "
 
       - name: Upload build logs (失敗時)
@@ -260,20 +265,26 @@ jobs:
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
 
+            # forge-bindings
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
               --cmake-args -G Ninja
 
+            # forge (Build all packages with Rust bindings)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             colcon build \
-              --packages-select custom_interfaces \
               --merge-install --symlink-install \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=\"\$gen_cmake\" -G Ninja
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -G Ninja \
+              --packages-ignore kiss_icp h264_republisher
 
             source install/setup.bash
+            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
             cargo test --workspace
           "
 

@@ -1,5 +1,7 @@
 name: CI
 
+# Nixを用いたビルドチェック等
+
 on:
   push:
     branches: [main]
@@ -29,6 +31,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
+      # GithubのVariableに登録してある
+      # CachixのAuth tokenはサイトで生成
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     timeout-minutes: 20
     steps:
@@ -95,31 +99,31 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
-      # just forge-bindings に相当 (rosidl_generator_rs のみ)
-      - name: forge-bindings
-        run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
-            cd main_ws
-            colcon build \
-              --packages-up-to rosidl_generator_rs \
-              --merge-install --symlink-install \
-              --cmake-args -G Ninja
-          "
-
-      # custom_interfaces の Rust バインディングを生成
-      - name: forge custom_interfaces
+      # just forge に相当するビルド
+      - name: forge (Build all packages)
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+
+            # 1. ジェネレーター単体をビルド (forge-bindings)
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja
+
+            # 2. 全体をビルド (forge)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             colcon build \
-              --packages-select custom_interfaces \
               --merge-install --symlink-install \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=\"\$gen_cmake\" -G Ninja
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -G Ninja \
+              --packages-ignore kiss_icp h264_republisher
           "
 
       - name: cargo fmt --check
@@ -133,6 +137,8 @@ jobs:
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
+            # rosidl_generator_rs のパスを明示的に追加
+            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
             cargo clippy --workspace -- -D warnings
           "
 
@@ -141,6 +147,7 @@ jobs:
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
+            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
             cargo test --workspace
           "
 
@@ -208,7 +215,7 @@ jobs:
                 -DROSIDL_GENERATOR_RUST=ON \
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -G Ninja \
-              --packages-ignore kiss_icp
+              --packages-ignore kiss_icp h264_republisher
           "
 
       - name: Upload build logs (失敗時)
@@ -250,23 +257,30 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
-      - name: forge-bindings + custom_interfaces
+      - name: forge (Build all packages)
         run: |
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+
+            # forge-bindings
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
               --cmake-args -G Ninja
+
+            # forge
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
             export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             colcon build \
-              --packages-select custom_interfaces \
               --merge-install --symlink-install \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -Drosidl_generator_rs_DIR=\"\$gen_cmake\" -G Ninja
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -G Ninja \
+              --packages-ignore kiss_icp h264_republisher
           "
 
       - name: Rust カバレッジ (tarpaulin)
@@ -274,6 +288,7 @@ jobs:
           nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
+            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
             cargo tarpaulin --workspace --out Xml --output-file tarpaulin-report.xml
           "
 
