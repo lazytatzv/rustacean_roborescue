@@ -31,6 +31,7 @@ install(PROGRAMS
   scripts/teleop_joints.py
   scripts/arm_cmd_bridge.py
   scripts/ffmpeg_to_foxglove_video.py
+  scripts/odom_selector.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -19,7 +19,7 @@ common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATO
 
 # ignore
 # スペース区切りで追加
-ignore_list := "kiss_icp h264_republisher vision_processor"
+ignore_list := "h264_republisher vision_processor"
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
 # nix特有のwarnフィルター
@@ -77,5 +77,5 @@ ready:
 	@echo "bass . install/setup.bash"
 
 mm:
-	npx @mermaid-js/mermaid-cli -i topology/system_topology.mmd -o topology/system_topology.png -b white --width 3000
-	npx @mermaid-js/mermaid-cli -i topology/network_topology.mmd -o topology/network_topology.png -b white --width 2400
+	mmdc -i topology/system_topology.mmd -o topology/system_topology.png -s 5
+	mmdc -i topology/network_topology.mmd -o topology/network_topology.png -s 5

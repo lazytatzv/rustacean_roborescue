@@ -99,6 +99,18 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
+      # colcon ビルド成果物 (ROS2パッケージ) をキャッシュ。cpp ジョブと共用。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            main_ws/build
+            main_ws/install
+          key: colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            colcon-${{ runner.os }}-
+
       # just forge に相当するビルド
       - name: forge (Build all packages)
         run: |
@@ -135,7 +147,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor dynamixel_hardware_interface
+              --packages-ignore h264_republisher vision_processor dynamixel_hardware_interface
 
           "
 
@@ -251,7 +263,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor dynamixel_hardware_interface
+              --packages-ignore h264_republisher vision_processor dynamixel_hardware_interface
 
           "
 
@@ -294,6 +306,18 @@ jobs:
             cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
             cargo-${{ runner.os }}-
 
+      # colcon ビルド成果物 (ROS2パッケージ) をキャッシュ。cpp/rust ジョブと共用。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            main_ws/build
+            main_ws/install
+          key: colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            colcon-${{ runner.os }}-
+
       - name: forge (Build all packages)
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
@@ -328,7 +352,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor dynamixel_hardware_interface
+              --packages-ignore h264_republisher vision_processor dynamixel_hardware_interface
 
           "
 

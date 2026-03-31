@@ -88,7 +88,8 @@ def generate_launch_description() -> LaunchDescription:
         remappings=[
             ("lidar", LaunchConfiguration("lidar_topic")),
             ("imu", LaunchConfiguration("imu_topic")),
-            ("odometry", "/odom"),  # Nav2 は /odom を期待
+            # /spark_lio/odom に出力し、odom_selector が /odom に中継する
+            ("odometry", "/spark_lio/odom"),
         ],
         parameters=[
             LaunchConfiguration("config_path"),
@@ -97,6 +98,39 @@ def generate_launch_description() -> LaunchDescription:
                 "common.base_frame": LaunchConfiguration("base_frame"),
                 "common.lidar_frame": LaunchConfiguration("lidar_frame"),
             },
+        ],
+        condition=IfCondition(LaunchConfiguration("use_lidar")),
+    )
+
+    kiss_icp_node = Node(
+        package="kiss_icp",
+        executable="kiss_icp_node",
+        name="kiss_icp",
+        output="screen",
+        remappings=[
+            ("pointcloud_topic", LaunchConfiguration("lidar_topic_raw")),
+        ],
+        parameters=[
+            {
+                "base_frame": LaunchConfiguration("base_frame"),
+                "lidar_odom_frame": LaunchConfiguration("map_frame"),
+                "publish_odom_tf": False,  # odom_selector が TF を担当
+                "invert_odom_tf": False,
+            }
+        ],
+        condition=IfCondition(LaunchConfiguration("use_lidar")),
+    )
+
+    odom_selector_node = Node(
+        package="bringup",
+        executable="odom_selector.py",
+        name="odom_selector",
+        output="screen",
+        parameters=[
+            {
+                "base_frame": LaunchConfiguration("base_frame"),
+                "odom_frame": LaunchConfiguration("map_frame"),
+            }
         ],
         condition=IfCondition(LaunchConfiguration("use_lidar")),
     )
@@ -243,6 +277,8 @@ def generate_launch_description() -> LaunchDescription:
             time_fix_node,
             dummy_imu_node,
             spark_node,
+            kiss_icp_node,
+            odom_selector_node,
             lidar_static_tf,
             slam_node,
             rviz_node,
