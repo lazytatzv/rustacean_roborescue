@@ -110,7 +110,7 @@ jobs:
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
             export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
 
-            install_dir=$(pwd)/install
+            install_dir=\$(pwd)/install
             py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
             # Nix環境特有の警告を抑制
@@ -227,7 +227,7 @@ jobs:
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
             export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
 
-            install_dir=$(pwd)/install
+            install_dir=\$(pwd)/install
             py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
             # Nix環境特有の警告を抑制
@@ -304,7 +304,7 @@ jobs:
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
             export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
 
-            install_dir=$(pwd)/install
+            install_dir=\$(pwd)/install
             py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
             # Nix環境特有の警告を抑制
