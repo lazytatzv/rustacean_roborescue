@@ -163,9 +163,11 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            source install/setup.bash
-            # rosidl_generator_rs のパスを明示的に追加
-            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             cargo clippy --workspace -- -D warnings
           "
 
@@ -319,8 +321,11 @@ jobs:
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
               --packages-ignore kiss_icp h264_republisher vision_processor
-            source install/setup.bash
-            export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             cargo test --workspace
           "
 
