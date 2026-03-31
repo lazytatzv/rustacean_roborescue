@@ -119,26 +119,37 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
+            
+            # 1. 環境変数のセットアップ
+            export COLCON_ROS_SKIP_INSTALL_CHECK=1
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
+            
             install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            # Nix環境特有の警告を抑制
+            filter_cmd=\"grep -v 'doesn.t contain any .local_setup... files' || true\"
 
-            # 1. ジェネレーター単体をビルド (forge-bindings)
+            # 2. ジェネレーター単体をビルド (forge-bindings相当)
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
-              --cmake-args -G Ninja
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF 2>&1 | eval \"\$filter_cmd\"
 
-            # 2. 全体をビルド (forge)
+            # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
-            export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            
             colcon build \
               --merge-install --symlink-install \
               --cmake-args \
                 -DROSIDL_GENERATOR_RUST=ON \
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher
+              --packages-ignore kiss_icp h264_republisher 2>&1 | eval \"\$filter_cmd\"
           "
 
       - name: cargo fmt --check
@@ -195,24 +206,37 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
+            
+            # 1. 環境変数のセットアップ
+            export COLCON_ROS_SKIP_INSTALL_CHECK=1
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
+            
             install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            # Nix環境特有の警告を抑制
+            filter_cmd=\"grep -v 'doesn.t contain any .local_setup... files' || true\"
 
+            # 2. ジェネレーター単体をビルド (forge-bindings相当)
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
-              --cmake-args -G Ninja
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF 2>&1 | eval \"\$filter_cmd\"
 
+            # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
-            export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            
             colcon build \
               --merge-install --symlink-install \
               --cmake-args \
                 -DROSIDL_GENERATOR_RUST=ON \
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher
+              --packages-ignore kiss_icp h264_republisher 2>&1 | eval \"\$filter_cmd\"
           "
 
       - name: Upload build logs (失敗時)
@@ -262,26 +286,37 @@ jobs:
         run: |
           nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
+            
+            # 1. 環境変数のセットアップ
+            export COLCON_ROS_SKIP_INSTALL_CHECK=1
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
+            
             install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            # Nix環境特有の警告を抑制
+            filter_cmd=\"grep -v 'doesn.t contain any .local_setup... files' || true\"
 
-            # forge-bindings
+            # 2. ジェネレーター単体をビルド (forge-bindings相当)
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
-              --cmake-args -G Ninja
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF 2>&1 | eval \"\$filter_cmd\"
 
-            # forge (Build all packages with Rust bindings)
+            # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
-            export PYTHONPATH=\"\$install_dir/lib/python3.12/site-packages\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
             export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            
             colcon build \
               --merge-install --symlink-install \
               --cmake-args \
                 -DROSIDL_GENERATOR_RUST=ON \
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher
+              --packages-ignore kiss_icp h264_republisher 2>&1 | eval \"\$filter_cmd\"
 
             source install/setup.bash
             export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
