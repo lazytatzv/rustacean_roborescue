@@ -135,7 +135,7 @@ jobs:
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
-              --cmake-args -G Ninja -DBUILD_TESTING=OFF 2>&1 | eval \"\$filter_cmd\"
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF
 
             # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
@@ -149,7 +149,8 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor 2>&1 | eval \"\$filter_cmd\"
+              --packages-ignore kiss_icp h264_republisher vision_processor
+
           "
 
       - name: cargo fmt --check
@@ -222,7 +223,7 @@ jobs:
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
-              --cmake-args -G Ninja -DBUILD_TESTING=OFF 2>&1 | eval \"\$filter_cmd\"
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF
 
             # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
@@ -236,7 +237,8 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor 2>&1 | eval \"\$filter_cmd\"
+              --packages-ignore kiss_icp h264_republisher vision_processor
+
           "
 
       - name: Upload build logs (失敗時)
@@ -302,7 +304,7 @@ jobs:
             colcon build \
               --packages-up-to rosidl_generator_rs \
               --merge-install --symlink-install \
-              --cmake-args -G Ninja -DBUILD_TESTING=OFF 2>&1 | eval \"\$filter_cmd\"
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF
 
             # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
             export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
@@ -316,8 +318,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor 2>&1 | eval \"\$filter_cmd\"
-
+              --packages-ignore kiss_icp h264_republisher vision_processor
             source install/setup.bash
             export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
             cargo test --workspace
