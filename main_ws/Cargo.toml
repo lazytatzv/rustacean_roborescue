@@ -4,7 +4,6 @@ members = [
     "src/control/arm_controller",
     "src/hardware_drivers/sensor_gateway",
     "src/hardware_drivers/arm_driver",
-    "src/perception/vision_processor",
 ]
 
 # 依存関係の解決ルール（Rust 2021以降の推奨）
