@@ -396,10 +396,8 @@ fn run() -> Result<()> {
     let mut last_diag_instant = Instant::now();
 
     // Setup a background worker for IK to avoid blocking the timer callback
-    let (req_tx, req_rx): (SyncSender<WorkerRequest>, Receiver<WorkerRequest>) =
-        sync_channel(1);
-    let (res_tx, res_rx): (SyncSender<WorkerResponse>, Receiver<WorkerResponse>) =
-        sync_channel(1);
+    let (req_tx, req_rx): (SyncSender<WorkerRequest>, Receiver<WorkerRequest>) = sync_channel(1);
+    let (res_tx, res_rx): (SyncSender<WorkerResponse>, Receiver<WorkerResponse>) = sync_channel(1);
 
     let serial_for_worker = serial_chain.clone();
     let limits_for_worker = limits.clone();
@@ -541,9 +539,7 @@ fn run() -> Result<()> {
         // diagnostics: loop time and joint_state rate
         let now = Instant::now();
         let loop_dur = now.duration_since(last_diag_instant).as_secs_f64() * 1000.0;
-        let lmsg = std_msgs::msg::Float64 {
-            data: loop_dur,
-        };
+        let lmsg = std_msgs::msg::Float64 { data: loop_dur };
         let _ = diag_loop_pub.publish(&lmsg);
 
         let js_now = js_counter.load(Ordering::Relaxed);
@@ -551,9 +547,7 @@ fn run() -> Result<()> {
         let elapsed = now.duration_since(last_diag_instant).as_secs_f64();
         if elapsed > 0.0 {
             let rate = delta / elapsed;
-            let rmsg = std_msgs::msg::Float64 {
-                data: rate,
-            };
+            let rmsg = std_msgs::msg::Float64 { data: rate };
             let _ = diag_js_rate_pub.publish(&rmsg);
         }
         last_js_count = js_now;
