@@ -5,7 +5,7 @@ default: nix
 
 nix:
   # nixglを使う場合impureが必要
-  nix develop --impure　--accept-flake-config
+  nix develop --impure --accept-flake-config
 
 sync:
   # 新しい環境で作業する場合はsyncしてsubmoduleの内容物を取ってくる
