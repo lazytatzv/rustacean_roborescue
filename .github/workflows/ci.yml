@@ -129,6 +129,7 @@ jobs:
 
             colcon build \
               --merge-install --symlink-install \
+              --event-handlers console_cohesion+ \
               --cmake-args \
                 -DROSIDL_GENERATOR_RUST=ON \
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
@@ -137,6 +138,13 @@ jobs:
               --packages-ignore kiss_icp h264_republisher vision_processor
 
           "
+
+      - name: Upload build logs (失敗時)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: colcon-logs-rust
+          path: main_ws/log
 
       - name: cargo fmt --check
         run: |
