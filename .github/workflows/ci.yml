@@ -58,7 +58,7 @@ jobs:
         run: |
           # cargo-fmt / cargo-clippy は rust job で別途チェックするためスキップ
           SKIP=cargo-fmt,cargo-clippy \
-          nix develop .#precommit --accept-flake-config --command \
+          nix develop .#precommit --fallback --accept-flake-config --command \
             pre-commit run --all-files --show-diff-on-failure
 
       - name: pre-commit による変更がないか確認
@@ -102,7 +102,7 @@ jobs:
       # just forge に相当するビルド
       - name: forge (Build all packages)
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
@@ -128,13 +128,13 @@ jobs:
 
       - name: cargo fmt --check
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws && cargo fmt --all -- --check
           "
 
       - name: cargo clippy (warnings = errors)
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
             # rosidl_generator_rs のパスを明示的に追加
@@ -144,7 +144,7 @@ jobs:
 
       - name: cargo test
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
             export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"
@@ -153,7 +153,7 @@ jobs:
 
       - name: cargo audit (セキュリティ脆弱性チェック)
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws && cargo audit
           "
 
@@ -194,7 +194,7 @@ jobs:
       # just forge に完全一致するビルド
       - name: forge (just forge 相当)
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
@@ -259,7 +259,7 @@ jobs:
 
       - name: forge (Build all packages)
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             install_dir=\$(pwd)/install
             gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
@@ -285,7 +285,7 @@ jobs:
 
       - name: Rust カバレッジ (tarpaulin)
         run: |
-          nix develop .#ci --accept-flake-config --command bash -euo pipefail -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
             source install/setup.bash
             export PATH=\"\$(pwd)/install/lib/rosidl_generator_rs:\$PATH\"

@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021" # 2024だと新しすぎる
 
 [dependencies]
-opencv = { version = "0.92", features = ["clang-runtime", "objdetect"] }
+opencv = { version = "0.93", features = ["clang-runtime", "objdetect", "imgcodecs", "wechat_qrcode", "videoio"] }
