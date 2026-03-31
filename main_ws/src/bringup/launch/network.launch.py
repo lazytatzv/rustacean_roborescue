@@ -23,9 +23,7 @@ def generate_launch_description():
             # 起動されるすべてのROS 2ノードは、強制的にZenohプロトコルで通信します。
             # ROS2ノードは zenohd (client として localhost:7447 に接続) を使う。
             SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
-            SetEnvironmentVariable(
-                "RMW_ZENOH_CONFIG_URI", f"file://{zenoh_robot_config}"
-            ),
+            SetEnvironmentVariable("RMW_ZENOH_CONFIG_URI", f"file://{zenoh_robot_config}"),
             # ==========================================
             # 2. Zenohルーター (zenohd) のデーモン起動
             # ==========================================

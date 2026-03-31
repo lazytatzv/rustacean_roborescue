@@ -33,7 +33,7 @@ fn main() -> Result<()> {
     let results = detector.detect_and_decode(&img, &mut points)?;
 
     // 5. 結果の表示
-    if results.len() == 0 {
+    if results.is_empty() {
         println!("QRコードは見つかりませんでした。");
     } else {
         println!("=== 検出成功！ ({}個) ===", results.len());

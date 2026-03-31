@@ -72,6 +72,8 @@ pub struct MotorStatus {
     pub temperature_c: u8,
 }
 
+type TemperatureReport = (u8, u8);
+
 impl ArmDynamixelDriver {
     pub fn new(port_name: &str, baud_rate: u32, arm_ids: Vec<u8>, gripper_id: u8) -> Result<Self> {
         let port = SerialPort::open(port_name, baud_rate).context("Failed to open serial port")?;
@@ -173,7 +175,7 @@ impl ArmDynamixelDriver {
         self.torque_off_all();
     }
 
-    pub fn check_temperatures(&mut self) -> (Vec<(u8, u8)>, Vec<(u8, u8)>) {
+    pub fn check_temperatures(&mut self) -> (Vec<TemperatureReport>, Vec<TemperatureReport>) {
         let mut warnings = Vec::new();
         let mut critical = Vec::new();
         let mut all_ids = self.arm_ids.clone();

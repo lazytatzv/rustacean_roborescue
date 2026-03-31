@@ -167,6 +167,7 @@ fn run() -> Result<()> {
             let _ = imu_pub.publish(&imu_msg);
 
             msg_count += 1;
+            #[allow(clippy::manual_is_multiple_of)]
             if msg_count % CALIB_LOG_INTERVAL == 0 {
                 println!(
                     "📡 IMU calib: sys={} gyr={} acc={} mag={} | heading={:.1}° roll={:.1}° pitch={:.1}°",

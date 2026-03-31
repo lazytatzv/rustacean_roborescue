@@ -224,9 +224,7 @@ class ComprehensiveTester(Node):
         js_pub = self.create_publisher(JointState, "/joint_states", 10)
         twist_pub = self.create_publisher(Twist, "/arm_cmd_vel", 10)
         cmd_col = MsgCollector()
-        self.create_subscription(
-            JointState, "/arm_joint_commands", cmd_col.callback, 10
-        )
+        self.create_subscription(JointState, "/arm_joint_commands", cmd_col.callback, 10)
 
         def pub_js():
             msg = JointState()

@@ -20,13 +20,9 @@ class CrawlerVelBridge(Node):
         self.declare_parameter("track_width", 0.4)
         self.track_width_ = self.get_parameter("track_width").value
 
-        self.sub_ = self.create_subscription(
-            CrawlerVelocity, "/crawler_driver", self.callback, 10
-        )
+        self.sub_ = self.create_subscription(CrawlerVelocity, "/crawler_driver", self.callback, 10)
         self.pub_ = self.create_publisher(Twist, "/cmd_vel", 10)
-        self.get_logger().info(
-            f"CrawlerVelocity → Twist bridge (track_width={self.track_width_})"
-        )
+        self.get_logger().info(f"CrawlerVelocity → Twist bridge (track_width={self.track_width_})")
 
     def callback(self, msg: CrawlerVelocity) -> None:
         twist = Twist()

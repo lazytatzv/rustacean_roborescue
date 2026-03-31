@@ -59,6 +59,4 @@ def generate_launch_description():
         ],
     )
 
-    return LaunchDescription(
-        [use_audio, robot_device, robot_spk_device, bitrate, sender, receiver]
-    )
+    return LaunchDescription([use_audio, robot_device, robot_spk_device, bitrate, sender, receiver])

@@ -16,9 +16,7 @@ def generate_launch_description() -> LaunchDescription:
 
     nav2_params = DeclareLaunchArgument(
         "nav2_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "nav2_params.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "nav2_params.yaml"]),
         description="Nav2 パラメータ YAML のパス",
     )
     autostart = DeclareLaunchArgument(

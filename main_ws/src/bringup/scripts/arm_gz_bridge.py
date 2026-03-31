@@ -47,13 +47,9 @@ class ArmGzBridge(Node):
             self.get_logger().info(f"  Publishing: {topic}")
 
         # Subscribe to arm_controller output
-        self.sub_ = self.create_subscription(
-            JointState, "/arm_joint_commands", self.callback, 10
-        )
+        self.sub_ = self.create_subscription(JointState, "/arm_joint_commands", self.callback, 10)
 
-        self.get_logger().info(
-            "arm_gz_bridge started: /arm_joint_commands → per-joint cmd_pos"
-        )
+        self.get_logger().info("arm_gz_bridge started: /arm_joint_commands → per-joint cmd_pos")
 
     def callback(self, msg: JointState) -> None:
         # Build name→position map from incoming message

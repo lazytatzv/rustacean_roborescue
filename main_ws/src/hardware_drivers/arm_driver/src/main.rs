@@ -30,7 +30,7 @@ fn now_stamp() -> builtin_interfaces::msg::Time {
     }
 }
 
-fn hardware_thread(
+struct HardwareThreadParams {
     port_name: String,
     baud_rate: u32,
     profile_velocity: u32,
@@ -43,34 +43,40 @@ fn hardware_thread(
     arm_joint_names: Vec<String>,
     shutdown_flag: Arc<AtomicBool>,
     estop_flag: Arc<AtomicBool>,
-) {
-    let mut driver =
-        match ArmDynamixelDriver::new(&port_name, baud_rate, arm_ids.clone(), gripper_id) {
-            Ok(d) => d,
-            Err(e) => {
-                eprintln!("🔥 arm_gripper_driver: init failed: {e:#}");
-                return;
-            }
-        };
+}
 
-    if let Err(e) = driver.init_motors(profile_velocity, gripper_max_current) {
+fn hardware_thread(params: HardwareThreadParams) {
+    let mut driver = match ArmDynamixelDriver::new(
+        &params.port_name,
+        params.baud_rate,
+        params.arm_ids.clone(),
+        params.gripper_id,
+    ) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("🔥 arm_gripper_driver: init failed: {e:#}");
+            return;
+        }
+    };
+
+    if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current) {
         eprintln!("🔥 arm_gripper_driver: motor init failed: {e:#}");
         return;
     }
 
     let loop_period = Duration::from_millis(1000 / HW_LOOP_HZ);
-    while !shutdown_flag.load(Ordering::Relaxed) {
+    while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
 
-        if estop_flag.load(Ordering::Relaxed) {
+        if params.estop_flag.load(Ordering::Relaxed) {
             driver.emergency_stop();
-            while !shutdown_flag.load(Ordering::Relaxed) {
+            while !params.shutdown_flag.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_millis(100));
             }
             break;
         }
 
-        while let Ok(cmd) = rx_cmd.try_recv() {
+        while let Ok(cmd) = params.rx_cmd.try_recv() {
             if let Some(p) = cmd.arm_positions {
                 let _ = driver.write_arm_positions(&p);
             }
@@ -82,17 +88,19 @@ fn hardware_thread(
         if let Ok(p) = driver.read_arm_positions() {
             let mut msg = JointState::default();
             msg.header.stamp = now_stamp();
-            msg.name = arm_joint_names.clone();
+            msg.name = params.arm_joint_names.clone();
             msg.position = p;
-            let _ = joint_state_pub.publish(&msg);
+            let _ = params.joint_state_pub.publish(&msg);
         }
 
         if let Ok(s) = driver.read_gripper_status() {
-            let mut msg = GripperStatus::default();
-            msg.position = s.position_rad as i32;
-            msg.current = s.current_a as i16;
-            msg.temperature = s.temperature_c as u8;
-            let _ = gripper_status_pub.publish(&msg);
+            let msg = GripperStatus {
+                position: s.position_rad as i32,
+                current: s.current_a as i16,
+                temperature: s.temperature_c,
+                ..Default::default()
+            };
+            let _ = params.gripper_status_pub.publish(&msg);
         }
 
         let elapsed = loop_start.elapsed();
@@ -206,20 +214,20 @@ fn run() -> Result<()> {
     let shutdown_c = Arc::clone(&shutdown_flag);
     let estop_c = Arc::clone(&estop_flag);
     let hw_thread = thread::spawn(move || {
-        hardware_thread(
+        hardware_thread(HardwareThreadParams {
             port_name,
-            baud_rate as u32,
-            profile_velocity as u32,
+            baud_rate: baud_rate as u32,
+            profile_velocity: profile_velocity as u32,
             arm_ids,
-            gripper_id as u8,
-            gripper_max_current as u16,
+            gripper_id: gripper_id as u8,
+            gripper_max_current: gripper_max_current as u16,
             rx_cmd,
             joint_state_pub,
             gripper_status_pub,
-            arm_joints,
-            shutdown_c,
-            estop_c,
-        );
+            arm_joint_names: arm_joints,
+            shutdown_flag: shutdown_c,
+            estop_flag: estop_c,
+        });
     });
 
     executor.spin(SpinOptions::default()).first_error()?;

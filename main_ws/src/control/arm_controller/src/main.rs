@@ -20,6 +20,9 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+type WorkerRequest = (na::DVector<f64>, Vec<f64>);
+type WorkerResponse = (Vec<f64>, f64);
+
 /// Acquire a Mutex lock, recovering from poison.
 fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     match mutex.lock() {
@@ -393,30 +396,25 @@ fn run() -> Result<()> {
     let mut last_diag_instant = Instant::now();
 
     // Setup a background worker for IK to avoid blocking the timer callback
-    let (req_tx, req_rx): (
-        SyncSender<(na::DVector<f64>, Vec<f64>)>,
-        Receiver<(na::DVector<f64>, Vec<f64>)>,
-    ) = sync_channel(1);
-    let (res_tx, res_rx): (SyncSender<(Vec<f64>, f64)>, Receiver<(Vec<f64>, f64)>) =
+    let (req_tx, req_rx): (SyncSender<WorkerRequest>, Receiver<WorkerRequest>) =
+        sync_channel(1);
+    let (res_tx, res_rx): (SyncSender<WorkerResponse>, Receiver<WorkerResponse>) =
         sync_channel(1);
 
     let serial_for_worker = serial_chain.clone();
     let limits_for_worker = limits.clone();
     let cfg_for_worker = cfg.clone();
-    std::thread::spawn(move || loop {
-        match req_rx.recv() {
-            Ok((twist_vec, positions)) => {
-                let res = solve_velocity_ik(
-                    &serial_for_worker,
-                    &twist_vec,
-                    &limits_for_worker,
-                    &positions,
-                    &cfg_for_worker,
-                );
-                let vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
-                let _ = res_tx.send((vel, res.manipulability));
-            }
-            Err(_) => break,
+    std::thread::spawn(move || {
+        while let Ok((twist_vec, positions)) = req_rx.recv() {
+            let res = solve_velocity_ik(
+                &serial_for_worker,
+                &twist_vec,
+                &limits_for_worker,
+                &positions,
+                &cfg_for_worker,
+            );
+            let vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
+            let _ = res_tx.send((vel, res.manipulability));
         }
     });
 
@@ -472,7 +470,7 @@ fn run() -> Result<()> {
             );
         }
 
-        let mut joint_velocities: na::DVector<f64>;
+        let joint_velocities: na::DVector<f64>;
         if s.last_cmd_time.elapsed() > watchdog_timeout {
             joint_velocities = na::DVector::zeros(dof);
             // Sync target to feedback when stationary to prevent drift buildup
@@ -492,8 +490,9 @@ fn run() -> Result<()> {
                 }
                 // publish manipulability occasionally
                 if loop_count % 5 == 0 {
-                    let mut mmsg = std_msgs::msg::Float64::default();
-                    mmsg.data = manipulability;
+                    let mmsg = std_msgs::msg::Float64 {
+                        data: manipulability,
+                    };
                     let _ = diag_manip_pub.publish(&mmsg);
                 }
             } else {
@@ -541,10 +540,10 @@ fn run() -> Result<()> {
 
         // diagnostics: loop time and joint_state rate
         let now = Instant::now();
-        let loop_dur = now.duration_since(last_diag_instant).as_secs_f64() * 1000.0
-            / (if loop_count % 1 == 0 { 1.0 } else { 1.0 });
-        let mut lmsg = std_msgs::msg::Float64::default();
-        lmsg.data = loop_dur;
+        let loop_dur = now.duration_since(last_diag_instant).as_secs_f64() * 1000.0;
+        let lmsg = std_msgs::msg::Float64 {
+            data: loop_dur,
+        };
         let _ = diag_loop_pub.publish(&lmsg);
 
         let js_now = js_counter.load(Ordering::Relaxed);
@@ -552,8 +551,9 @@ fn run() -> Result<()> {
         let elapsed = now.duration_since(last_diag_instant).as_secs_f64();
         if elapsed > 0.0 {
             let rate = delta / elapsed;
-            let mut rmsg = std_msgs::msg::Float64::default();
-            rmsg.data = rate;
+            let rmsg = std_msgs::msg::Float64 {
+                data: rate,
+            };
             let _ = diag_js_rate_pub.publish(&rmsg);
         }
         last_js_count = js_now;

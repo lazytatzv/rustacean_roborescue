@@ -32,6 +32,7 @@ pub struct ImuData {
 
 impl ImuData {
     /// キャリブレーションがすべて完了しているか
+    #[allow(dead_code)]
     pub fn is_fully_calibrated(&self) -> bool {
         self.sys_cal == 3 && self.gyr_cal == 3 && self.acc_cal == 3 && self.mag_cal == 3
     }

@@ -20,12 +20,7 @@ from rclpy.node import Node
 Gst.init(None)
 
 # sender 側と合わせた固定値
-_OPUS_CAPS = (
-    "audio/x-opus,"
-    "rate=(int)48000,"
-    "channels=(int)1,"
-    "channel-mapping-family=(int)0"
-)
+_OPUS_CAPS = "audio/x-opus," "rate=(int)48000," "channels=(int)1," "channel-mapping-family=(int)0"
 
 
 class AudioReceiverNode(Node):

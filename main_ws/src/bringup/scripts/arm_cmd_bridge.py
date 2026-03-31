@@ -26,9 +26,7 @@ class ArmCmdBridge(Node):
         self.pub = self.create_publisher(
             Float64MultiArray, "/forward_position_controller/commands", 10
         )
-        self.sub = self.create_subscription(
-            JointState, "/arm_joint_commands", self._on_cmd, 10
-        )
+        self.sub = self.create_subscription(JointState, "/arm_joint_commands", self._on_cmd, 10)
 
     def _on_cmd(self, msg: JointState):
         pos_map = dict(zip(msg.name, msg.position))
