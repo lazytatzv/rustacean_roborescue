@@ -135,7 +135,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor
+              --packages-ignore kiss_icp h264_republisher vision_processor dynamixel_hardware_interface
 
           "
 
@@ -251,7 +251,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor
+              --packages-ignore kiss_icp h264_republisher vision_processor dynamixel_hardware_interface
 
           "
 
@@ -328,7 +328,7 @@ jobs:
                 -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
                 -DBUILD_TESTING=OFF \
                 -G Ninja \
-              --packages-ignore kiss_icp h264_republisher vision_processor
+              --packages-ignore kiss_icp h264_republisher vision_processor dynamixel_hardware_interface
 
           "
 
