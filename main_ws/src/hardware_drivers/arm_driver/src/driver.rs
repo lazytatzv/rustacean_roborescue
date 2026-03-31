@@ -145,7 +145,9 @@ impl ArmDynamixelDriver {
             }
         }
         if let Ok(resp) = self.bus.read_u32(self.gripper_id, ADDR_PRESENT_POSITION) {
-            let _ = self.bus.write_u32(self.gripper_id, ADDR_GOAL_POSITION, resp.data);
+            let _ = self
+                .bus
+                .write_u32(self.gripper_id, ADDR_GOAL_POSITION, resp.data);
         }
 
         // Torque ON

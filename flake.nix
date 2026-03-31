@@ -278,6 +278,7 @@
           ros.pcl-ros ros.pcl-conversions ros.pcl-msgs
           ros.laser-geometry ros.interactive-markers ros.resource-retriever
           ros.map-msgs ros.point-cloud-transport
+          ros.libstatistics-collector
           ros.ament-cmake ros.ros-core
           ros.rmw-zenoh-cpp
           # Nav2: インターフェース層のみ (巨大な実行バイナリは除外)

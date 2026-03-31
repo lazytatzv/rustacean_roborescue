@@ -8,13 +8,13 @@ use rclrs::{
     Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions,
 };
 use sensor_msgs::msg::JointState;
-use std_msgs;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std_msgs;
 
 const HW_LOOP_HZ: u64 = 50;
 
@@ -102,7 +102,8 @@ fn hardware_thread(params: HardwareThreadParams) {
         if estop_was_active {
             // E-Stop 解除: 現在位置をゴールに再設定してからトルクON
             eprintln!("✅ arm_driver: E-Stop cleared — re-enabling torque at current position");
-            if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current) {
+            if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current)
+            {
                 eprintln!("🔥 arm_driver: re-init after E-Stop failed: {e:#}");
                 std::process::exit(1);
             }
