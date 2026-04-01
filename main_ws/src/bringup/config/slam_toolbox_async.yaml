@@ -1,4 +1,4 @@
-/**:
+slam_toolbox:
   ros__parameters:
 
     # ── 基本フレーム設定 ──
@@ -6,11 +6,19 @@
     odom_frame: odom
     base_frame: base_footprint
     scan_topic: /scan
-    use_sim_time: false # 実機をデフォルトにする
+    use_sim_time: false # Launchで上書き
 
     # ── SLAMモード ──
     # 本当にこれで良いかは謎
     mode: mapping # 初期地図作成用に mapping
+
+    # /scan は pointcloud_to_laserscan 側が Best Effort で publish するため、
+    # SLAM 側 subscription も合わせる。
+    qos_overrides:
+      /scan:
+        subscription:
+          reliability: best_effort
+          durability: volatile
 
     # ── Solver設定 ──
     solver_plugin: solver_plugins::CeresSolver

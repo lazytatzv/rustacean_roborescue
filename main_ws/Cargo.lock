@@ -1581,5 +1581,9 @@ name = "unique_identifier_msgs"
 version = "2.5.0"
 
 [[patch.unused]]
+name = "vision_processor"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "visualization_msgs"
 version = "5.3.6"

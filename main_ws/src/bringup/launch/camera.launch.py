@@ -118,6 +118,8 @@ def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfi
         composable_node_descriptions=composable_nodes,
         output="screen",
         condition=IfCondition(use_camera_cfg),
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     # ffmpeg ブリッジ: カラー画像があるカメラのみ

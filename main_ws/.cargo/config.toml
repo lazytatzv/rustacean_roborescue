@@ -19,6 +19,9 @@ path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/action_ms
 [patch.crates-io.std_srvs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/std_srvs/rust"
 
+[patch.crates-io.vision_processor]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/vision_processor/rust"
+
 [patch.crates-io.sensor_msgs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/sensor_msgs/rust"
 

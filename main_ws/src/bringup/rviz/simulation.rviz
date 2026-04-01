@@ -41,7 +41,7 @@ Visualization Manager:
       Value: true
       Topic:
         Value: /scan
-        Reliability: Reliable
+        Reliability: Best Effort
         Durability: Volatile
       Size (m): 0.05
       Color Transformer: Intensity

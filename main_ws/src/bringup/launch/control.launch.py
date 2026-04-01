@@ -197,6 +197,8 @@ def generate_launch_description() -> LaunchDescription:
         executable="robot_state_publisher",
         parameters=[{"robot_description": robot_description}],
         output="screen",
+        respawn=True,
+        respawn_delay=3.0,
         condition=IfCondition(use_ros2_control),
     )
 

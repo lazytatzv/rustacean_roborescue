@@ -94,6 +94,8 @@ def generate_launch_description():
         executable="robot_state_publisher",
         name="robot_state_publisher",
         output="screen",
+        respawn=True,
+        respawn_delay=3.0,
         parameters=[
             {
                 "robot_description": robot_description,

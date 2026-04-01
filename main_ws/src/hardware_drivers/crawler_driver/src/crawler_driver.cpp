@@ -69,8 +69,15 @@ struct RoboclawTelemetry
 class RoboclawDriver
 {
  public:
-  explicit RoboclawDriver(const std::string &port) : io_(), serial_(io_, port)
+  RoboclawDriver() : io_(), serial_(io_) {}
+
+  /// シリアルポートを開く。失敗した場合は false を返す (例外を投げない)
+  bool connect(const std::string &port)
   {
+    boost::system::error_code ec;
+    serial_.open(port, ec);
+    if (ec) return false;
+
     using spb = boost::asio::serial_port_base;
     serial_.set_option(spb::baud_rate(SERIAL_BAUD_RATE));
     serial_.set_option(spb::character_size(8));
@@ -83,9 +90,10 @@ class RoboclawDriver
     if (tcgetattr(fd, &tio) == 0)
     {
       tio.c_cc[VMIN] = 0;
-      tio.c_cc[VTIME] = 2;  // 200 ms read timeout
+      tio.c_cc[VTIME] = 2;
       tcsetattr(fd, TCSANOW, &tio);
     }
+    return true;
   }
 
   // ── Write commands (expect 1-byte ACK) ───────────────────────────────────
@@ -284,10 +292,9 @@ struct StallState
 class CrawlerDriver : public rclcpp::Node
 {
  public:
-  CrawlerDriver()
-      : Node("crawler_driver"),
-        roboclaw_(this->declare_parameter<std::string>("serial_port", "/dev/roboclaw"))
+  CrawlerDriver() : Node("crawler_driver")
   {
+    this->declare_parameter<std::string>("serial_port", "/dev/roboclaw");
     declare_parameter("crawler_circumference", 0.39);
     declare_parameter("counts_per_rev", 256);
     declare_parameter("gearhead_ratio", 66);
@@ -321,11 +328,13 @@ class CrawlerDriver : public rclcpp::Node
 
     // ── テレメトリ周期 ────────────────────────────────────────────────────
     declare_parameter("telemetry_hz", 10);
+    // ── ハード接続リトライ間隔 ────────────────────────────────────────────
+    declare_parameter("connect_retry_sec", 3.0);
 
     initParams();
-    initHardware();
     initPublishers();
 
+    // サブスクリプションはハード未接続でも安全に設定できる
     subscription_ = create_subscription<custom_interfaces::msg::CrawlerVelocity>(
         "/crawler_driver", 10,
         std::bind(&CrawlerDriver::driver_callback, this, std::placeholders::_1));
@@ -349,7 +358,7 @@ class CrawlerDriver : public rclcpp::Node
           estop_active_ = msg->data;
           if (estop_active_ && !was_estop)
           {
-            stopMotors();
+            if (hw_connected_) stopMotors();
             RCLCPP_FATAL(get_logger(), "⛔ EMERGENCY STOP — motors halted");
           }
           else if (!estop_active_ && was_estop)
@@ -357,9 +366,18 @@ class CrawlerDriver : public rclcpp::Node
             RCLCPP_WARN(get_logger(), "✅ E-STOP cleared");
           }
         });
+
+    // ハードウェア接続をリトライ付きで試みる
+    const double retry_sec = get_parameter("connect_retry_sec").as_double();
+    connect_timer_ = create_wall_timer(std::chrono::duration<double>(retry_sec),
+                                       std::bind(&CrawlerDriver::tryConnect, this));
+    tryConnect();
   }
 
-  ~CrawlerDriver() override { stopMotors(); }
+  ~CrawlerDriver() override
+  {
+    if (hw_connected_) stopMotors();
+  }
 
  private:
   RoboclawDriver roboclaw_;
@@ -381,8 +399,9 @@ class CrawlerDriver : public rclcpp::Node
   // ── 状態 ──────────────────────────────────────────────────────────────────
   rclcpp::Time last_cmd_time_;
   bool estop_active_ = false;
+  bool hw_connected_ = false;
   StallState m1_stall_, m2_stall_;
-  int32_t m1_cmd_qpps_ = 0, m2_cmd_qpps_ = 0;  // 最後の指令値
+  int32_t m1_cmd_qpps_ = 0, m2_cmd_qpps_ = 0;
   RoboclawTelemetry telemetry_;
 
   // ── タイマー / サブスクリプション ─────────────────────────────────────────
@@ -391,6 +410,7 @@ class CrawlerDriver : public rclcpp::Node
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   rclcpp::TimerBase::SharedPtr watchdog_timer_;
   rclcpp::TimerBase::SharedPtr telemetry_timer_;
+  rclcpp::TimerBase::SharedPtr connect_timer_;
 
   // ── パブリッシャ ───────────────────────────────────────────────────────────
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_m1_current_;
@@ -430,6 +450,25 @@ class CrawlerDriver : public rclcpp::Node
 
     counts_per_meter_ = (counts_per_rev * gearhead_ratio * pulley_ratio) / circumference;
     last_cmd_time_ = now();
+  }
+
+  void tryConnect()
+  {
+    if (hw_connected_) return;
+
+    const std::string port = get_parameter("serial_port").as_string();
+    if (!roboclaw_.connect(port))
+    {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
+                           "Failed to connect to Roboclaw on %s. Retrying...", port.c_str());
+      return;
+    }
+
+    hw_connected_ = true;
+    connect_timer_->cancel();
+    last_cmd_time_ = now();
+    initHardware();
+    RCLCPP_INFO(get_logger(), "Connected to Roboclaw on %s", port.c_str());
   }
 
   void initHardware()
@@ -474,6 +513,8 @@ class CrawlerDriver : public rclcpp::Node
   // ── テレメトリ取得 + publish + 警告ログ ──────────────────────────────────
   void telemetry_callback()
   {
+    if (!hw_connected_) return;
+
     telemetry_ = roboclaw_.readTelemetry();
     if (!telemetry_.valid) return;
 
@@ -543,12 +584,15 @@ class CrawlerDriver : public rclcpp::Node
 
   void stopMotors()
   {
+    if (!hw_connected_) return;
     roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
     roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
   }
 
   void sendMotorCommands(double m1_vel, double m2_vel)
   {
+    if (!hw_connected_) return;
+
     m1_cmd_qpps_ = static_cast<int32_t>(m1_vel * counts_per_meter_);
     m2_cmd_qpps_ = static_cast<int32_t>(m2_vel * counts_per_meter_);
 
@@ -596,6 +640,8 @@ class CrawlerDriver : public rclcpp::Node
 
   void watchdog_callback()
   {
+    if (!hw_connected_) return;
+
     const double elapsed = (now() - last_cmd_time_).seconds() * 1000.0;
     if (elapsed > watchdog_timeout_ms_)
     {

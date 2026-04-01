@@ -1,9 +1,5 @@
 set shell := ["bash", "-c"]
 
-# GPU ラッパー: Intel/AMD は nixGLIntel, NVIDIA は NIXGL_CMD 環境変数で上書き
-# 例: export NIXGL_CMD='nix run --impure github:nix-community/nixGL --'
-nixgl := env_var_or_default("NIXGL_CMD", "nixGLIntel")
-
 # 環境変数
 export COLCON_ROS_SKIP_INSTALL_CHECK := "1"
 
@@ -23,13 +19,10 @@ common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATO
 
 # ignore
 # スペース区切りで追加
-ignore_list := "h264_republisher vision_processor"
-
-
+ignore_list := ""
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
 # nix特有のwarnフィルター
-# これをしていないとログがとんでもない量になる
 filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
 
 
@@ -51,30 +44,6 @@ forge: forge-bindings
 	colcon build {{common_args}} {{ignore_args}} {{filter}}
 
 reforge: clean forge
-
-# スライダでURDF上の各関節を動かして可動域・方向を確認する
-display:
-	{{nixgl}} ros2 launch bringup display.launch.py
-
-# IK動作確認: arm_controller + モックドライバ + RViz を起動する
-# 別ターミナルで `just teleop-arm` を実行してアームを操作する
-test-ik:
-	{{nixgl}} ros2 launch bringup test_ik.launch.py
-
-# IK確認 + テレオペを tmux で一括起動する
-# 左ペイン: RViz + arm_controller  右ペイン: キーボードテレオペ
-# 終了: Ctrl-C → tmux kill-session または `tmux kill-session -t ik`
-ik:
-	tmux new-session -d -s ik -x 220 -y 50 \; \
-		send-keys "{{nixgl}} ros2 launch bringup test_ik.launch.py" Enter \; \
-		split-window -h \; \
-		send-keys "sleep 4 && ros2 run bringup arm_teleop.py" Enter \; \
-		attach -t ik
-
-# アーム IK テレオペ (test-ik と併用)
-# W/S: 前後  A/D: 左右  R/F: 上下  Space: 停止
-teleop-arm:
-	ros2 run bringup arm_teleop.py
 
 launch:
 	ros2 launch bringup launch.py
@@ -103,15 +72,9 @@ check-compile:
 	source install/setup.bash && cargo check --workspace
 	@echo "✅ Compilation OK"
 
-# 特に意味はない
-# fishは環境変数まわりの問題であまり推奨されない
-# 一応bassはflake.nixで入れてある
 ready:
 	@echo "RUN below command"
 	@echo "bass . install/setup.bash"
 
-# Marmaidからpngを生成するときに使う
-# openコマンドはnix内だと基本無理なので出てから見た方が良いかも
 mm:
-	mmdc -i topology/system_topology.mmd -o topology/system_topology.png -s 5
-	mmdc -i topology/network_topology.mmd -o topology/network_topology.png -s 5
+	mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
