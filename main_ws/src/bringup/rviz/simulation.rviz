@@ -53,7 +53,7 @@ Visualization Manager:
 
     - Class: rviz_default_plugins/PointCloud2
       Name: VelodynePoints
-      Value: false
+      Value: true
       Topic:
         Value: /velodyne_points
         Reliability Policy: Best Effort

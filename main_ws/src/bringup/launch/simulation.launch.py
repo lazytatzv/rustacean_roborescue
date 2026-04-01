@@ -150,7 +150,7 @@ def generate_launch_description():
     )
 
     # ── Gazebo ↔ ROS 2 ブリッジ ───────────────────────────────────────────────
-    # LiDAR は Gazebo 側の LaserScan を ROS 2 に直接橋渡しする。
+    # LiDAR は Gazebo の点群を ROS 2 に橋渡しし、ROS 側で /scan に変換する。
     bridge = TimerAction(
         period=5.0,
         actions=[
@@ -161,10 +161,27 @@ def generate_launch_description():
                 arguments=[
                     "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
                     "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-                    "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
+                    "/velodyne_points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked",
                     "/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU",
                     "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
                     "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model",
+                ],
+                output="screen",
+            )
+        ],
+    )
+
+    scan_node = TimerAction(
+        period=6.0,
+        actions=[
+            Node(
+                package="pointcloud_to_laserscan",
+                executable="pointcloud_to_laserscan_node",
+                name="pointcloud_to_laserscan",
+                parameters=[os.path.join(bringup_dir, "config", "pointcloud_to_laserscan.yaml")],
+                remappings=[
+                    ("cloud_in", "/velodyne_points"),
+                    ("scan", "/scan"),
                 ],
                 output="screen",
             )
@@ -194,7 +211,7 @@ def generate_launch_description():
                 parameters=[
                     os.path.join(bringup_dir, "config", "slam_toolbox_async.yaml"),
                     {
-                        "qos_overrides./scan.subscription.reliability": "reliable",
+                        "qos_overrides./scan.subscription.reliability": "best_effort",
                         "qos_overrides./scan.subscription.durability": "volatile",
                     },
                     {"use_sim_time": True},
@@ -224,13 +241,15 @@ def generate_launch_description():
                     }
                 ],
                 condition=IfCondition(
-                    PythonExpression([
-                        "'",
-                        use_slam,
-                        "' == 'true' and '",
-                        headless,
-                        "' != 'true'",
-                    ])
+                    PythonExpression(
+                        [
+                            "'",
+                            use_slam,
+                            "' == 'true' and '",
+                            headless,
+                            "' != 'true'",
+                        ]
+                    )
                 ),
             )
         ],
@@ -278,6 +297,7 @@ def generate_launch_description():
             gz_sim_headless,
             spawn_entity,
             bridge,
+            scan_node,
             odom_tf_bridge,
             slam_toolbox,
             slam_lifecycle_manager,

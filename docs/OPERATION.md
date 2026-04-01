@@ -25,6 +25,8 @@
 
 ### 1.2 初回セットアップ
 
+以降のコマンドは、まず `nix develop --accept-flake-config` で開いた Nix dev shell の中で実行してください。
+
 ```bash
 # リポジトリクローン (サブモジュール含む)
 git clone --recursive <REPO_URL>
@@ -41,6 +43,9 @@ just sync
 ### 2.1 フルビルド
 
 ```bash
+# Nix dev shell へ入る
+nix develop --accept-flake-config
+
 cd main_ws
 just forge
 ```
@@ -78,8 +83,8 @@ ros2 launch bringup system.launch.py
 
 | 引数 | デフォルト | 説明 |
 |------|-----------|------|
-| `use_nav2:=true` | false | Nav2 自律走行を同時に起動 |
-| `use_audio:=false` | true | WebRTC 音声転送を無効にする |
+| `use_nav2` | `false` | `true` で Nav2 自律走行を同時に起動 |
+| `use_audio` | `true` | `false` で音声転送を無効化 |
 
 ### 3.3 起動されるノード一覧
 
@@ -141,7 +146,7 @@ ros2 launch launch/operator.launch.py
 ### 4.3 Foxglove Studio の設定
 
 1. Foxglove Studio を起動
-2. 「Open connection」→「Rosbridge WebSocket」→ `ws://127.0.0.1:8765`
+2. 「Open connection」→「Foxglove WebSocket」→ `ws://127.0.0.1:8765`
 3. カメラ映像: 「+」→「Image」パネル→ トピックに `/camera/image_raw/ffmpeg` を選択
 4. LiDAR: 「+」→「3D」パネル → `/velodyne_points` または `/scan`
 
@@ -153,6 +158,8 @@ ros2 launch launch/operator.launch.py
 
 ロボットとオペレータ間の ROS 2 通信は `rmw_zenoh_cpp` (Zenoh / QUIC) を使います。
 従来の DDS (UDP マルチキャスト) の代わりに QUIC を用いることで、Wi-Fi 環境でのパケットロスに強い通信を実現します。
+
+ロボット側では `zenohd` が router として動作し、ROS 2 ノードは `zenoh_robot.json5` を使って client として接続します。オペレータ側は `zenoh_ope.json5` でロボット側 router に接続します。
 
 ```
 Operator PC                                   Robot NUC
@@ -166,12 +173,14 @@ Operator PC                                   Robot NUC
                                                     connect: quic/127.0.0.1:7447
 ```
 
-重要: **ロボット側の ROS2 ノードは `mode: "client"` で `zenohd` に接続します**。
-ROS2 ノード自身が router になると `zenohd` とポート競合するため、別の設定ファイル (`zenoh_robot.json5`) を使います。
+重要: **ロボット側の ROS 2 ノードは `zenoh_robot.json5` を使い、`zenohd` とは別プロセスとして動作します**。
+ROS2 ノード自身が router になると `zenohd` とポート競合するため、ロボットノード用と router 用で設定ファイルを分けます。
 
 ### 5.2 ロボット側 Zenoh 設定
 
 **ファイル**: `main_ws/src/bringup/config/zenoh_router.json5`
+
+これは `zenohd` (router daemon) 用の設定です。ロボット側 ROS 2 ノードには `main_ws/src/bringup/config/zenoh_robot.json5` が使われます。
 
 ```json5
 {
@@ -247,9 +256,23 @@ ros2 topic echo /joy --once
 ### 6.1 基本的な起動
 
 ```bash
+# Nix dev shell へ入る
+nix develop --accept-flake-config
+
+cd main_ws
+source install/setup.bash
+
 # シミュレーション + SLAM (地図作成)
 ros2 launch bringup simulation.launch.py use_slam:=true
+
+# Gazebo GUI も開く場合
+ros2 launch bringup simulation.launch.py use_slam:=true use_gz_gui:=true
+
+# GPU なし / CI 向け
+ros2 launch bringup simulation.launch.py headless:=true use_slam:=false use_rviz:=false
 ```
+
+シミュレーションでは Gazebo が `/velodyne_points` を publish し、`pointcloud_to_laserscan` が `/scan` に変換します。SLAM Toolbox と Nav2 は原則として `/scan` を購読します。
 
 ### 6.2 自律走行 (Nav2) を有効にして起動
 
@@ -392,6 +415,5 @@ sudo usermod -aG dialout $USER
 
 ### 10.7 Gazebo が起動しない / SEGV する
 
-- GPU がない環境では `gz-sim-sensors-system` プラグインが SEGV します。
-  `robot.urdf.xacro` のセンサープラグインをコメントアウトしてください。
-- `--headless-rendering` でも SEGV する場合は GPU が必須です。
+- `rescue_field.sdf` の `gz-sim-sensors-system` は `render_engine=ogre` を使います。GUI や OpenGL 周りが不安定な環境では `simulation.launch.py headless:=true` か `use_gz_gui:=false` で起動してください。
+- それでも落ちる場合は、`nixGL` / Mesa の設定が合っているか、Gazebo が正しい GPU/ソフトウェアレンダリング経路で起動しているかを確認してください。

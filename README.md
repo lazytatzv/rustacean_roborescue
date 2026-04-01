@@ -1,117 +1,73 @@
 # Rustacean RoboRescue — Rescue Robot Control Platform
 
-Rustacean RoboRescue は、屋内救助・探索タスク向けの統合ロボット制御プラットフォームです。
-堅牢なロボティクスミドルウェア（ROS 2）を基盤に、Rust/C++/Python を組み合わせたマルチランゲージワークスペースで実装されています。
+Rustacean RoboRescue は、屋内救助・探索タスク向けの ROS 2 ベース統合ロボット制御プラットフォームです。Rust / C++ / Python を混ぜたワークスペース構成で、実機・シミュレーション・オペレータ用ノードをまとめて管理します。
 
-目的:
-- 実機とシミュレーションの双方で再現可能なロボットソフトウェアスタックの提供
-- 高信頼なローカル制御（アーム、グリッパ、クローラ、フリッパ）と低遅延テレオペレーション
-- コンテスト（RoboCup Rescue など）を念頭に置いた高速な運用と診断性
+## Repository Layout
 
-主要機能（抜粋）:
-- 6-DOF アーム制御（IK + DLS-based damping／関節制限）
-- Dynamixel ベースのドライバ（クローラ、フリッパ、アーム、グリッパ）
-- v4l2_camera + ffmpeg_image_transport による低遅延 H.264 映像転送
-- Foxglove Studio によるリアルタイム映像・センサ監視
-- Nix による再現性の高い開発シェル
+| Path | Purpose |
+|------|---------|
+| [main_ws/](main_ws) | Robot-side ROS 2 workspace. Drivers, bringup, control, perception, and vendored dependencies live here. |
+| [operator_ws/](operator_ws) | Operator PC workspace. Zenoh client and operator launch files live here. |
+| [stm32_ws/](stm32_ws) | STM32 firmware workspace for the IMU bridge and embedded support code. |
+| [docs/](docs) | Architecture, operation, package inventory, and setup guides. |
+| [deploy/](deploy) | NUC deployment scripts, udev rules, and systemd units. |
 
-## アーキテクチャ
+## What The Stack Covers
 
-```text
-Operator PC                                Robot (NUC)
-┌──────────────────────────┐  Zenoh/QUIC  ┌──────────────────────────┐
-│ Foxglove Studio          │◄─────────────►│ joy_controller           │
-│ joy_node (PS4)           │  /joy →       │ arm_controller (IK)      │
-│ foxglove_bridge (:8765)  │  ← /camera   │ arm_driver (Dynamixel)   │
-└──────────────────────────┘               │ crawler_driver (Roboclaw)│
-                                           │ flipper_driver (Dxl)     │
-                                           │ sensor_gateway (IMU)     │
-                                           │ v4l2_camera + QR検出     │
-                                           │ zenohd router (:7447)    │
-                                           └──────────────────────────┘
-```
+- 実機とシミュレーションの両方で動く bringup / launch 群
+- クローラ、フリッパ、アーム、IMU のハードウェアドライバ
+- 低遅延音声転送とカメラ映像のブリッジ
+- Nav2 / SLAM / LiDAR / QR 検出 / 外部センサの統合
+- Zenoh ベースの operator 連携と Foxglove 監視
 
-## クイックスタート
+## Quick Start
 
-詳細は [docs/DEV_QUICKSTART.md](docs/DEV_QUICKSTART.md) を参照。
-
-### 1. 開発シェル（推奨：Nix）
+詳細は [docs/DEV_QUICKSTART.md](docs/DEV_QUICKSTART.md) を参照してください。
 
 ```bash
-# リポジトリのルートで
+# 1. 開発シェル
 nix develop --accept-flake-config
-```
 
-### 2. ワークスペースのビルド
-
-```bash
+# 2. ワークスペースのビルド
 cd main_ws
-just forge      # 初回セットアップ（依存生成など）
-colcon build --merge-install
+just forge
 source install/setup.bash
-```
 
-### 3. 実機起動
-
-**ロボット側 (NUC)**:
-```bash
-cd main_ws
-source install/setup.bash
+# 3. 実機起動
 ros2 launch bringup system.launch.py
+
+# 4. シミュレーション
+ros2 launch bringup simulation.launch.py use_slam:=true
 ```
 
-**オペレータ側 (ラップトップ)**:
-```bash
-# operator_ws/zenoh_ope.json5 の Robot IP を確認・更新してから
-cd operator_ws
-ros2 launch launch/operator.launch.py
-# Foxglove Studio で ws://127.0.0.1:8765 に接続
-```
+オペレータ側は [operator_ws/README.md](operator_ws/README.md) と [docs/OPERATION.md](docs/OPERATION.md) を参照してください。
 
-### 4. シミュレーション実行
+## Package Guide
 
-```bash
-ros2 launch bringup simulation.launch.py
-ros2 launch bringup simulation.launch.py use_nav2:=true  # Nav2 を有効にする場合
-```
+workspace 内の package 一覧と役割は [docs/PACKAGES.md](docs/PACKAGES.md) にまとめています。
 
-## 開発ワークフロー
+## Documentation
 
-```bash
-# コード品質チェック（フォーマット、lint、quick tests）
-just check
+| Document | Purpose |
+|----------|---------|
+| [docs/PACKAGES.md](docs/PACKAGES.md) | Workspace package inventory and entry points |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture, node graph, topics, TF, and data flow |
+| [docs/OPERATION.md](docs/OPERATION.md) | Build, run, deploy, and troubleshooting guide |
+| [docs/DEV_QUICKSTART.md](docs/DEV_QUICKSTART.md) | Fast setup guide for Nix / Docker / Just |
+| [docs/NIX.md](docs/NIX.md) | Nix flake and dev-shell details |
 
-# 自動フォーマット
-just fmt
+## Hardware Map
 
-# テスト
-just test
-```
+| Component | Interface | Driver |
+|-----------|-----------|--------|
+| Crawler motors (Roboclaw) | UART `/dev/roboclaw` | `crawler_driver` |
+| Flippers (Dynamixel XM) | RS485 `/dev/ttyUSB_flipper` | `flipper_driver` |
+| 6-DOF arm + gripper (Dynamixel XM) | RS485 `/dev/ttyUSB_arm` | `arm_driver` |
+| IMU (BNO055 via STM32) | UART `/dev/stm32` | `sensor_gateway` |
+| Camera (USB / UVC / RealSense depending on the setup) | `/dev/video*` | `v4l2_camera`, `qr_detector`, `h264_republisher` |
+| Audio I/O | PulseAudio / GStreamer | `audio_bridge` |
+| LiDAR (real robot) | Ethernet | vendor LiDAR driver, pointcloud bridge, SLAM stack |
 
-## ドキュメント
+## License
 
-詳細は `docs/README.md` を参照。
-
-| ドキュメント | 内容 |
-|-------------|------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | システム構成・ノード・トピック・TF ツリー・データフロー |
-| [docs/OPERATION.md](docs/OPERATION.md) | ビルド・デプロイ・操作・トラブルシューティング |
-| [docs/DEV_QUICKSTART.md](docs/DEV_QUICKSTART.md) | 開発者向け即席手順（Nix/Docker） |
-| [docs/NIX.md](docs/NIX.md) | Nix フレークと dev-shell の詳細 |
-
-## ハードウェア構成
-
-| コンポーネント | インターフェース | ドライバ |
-|---------------|-----------------|---------|
-| クローラモータ (Roboclaw) | UART `/dev/roboclaw` | crawler_driver (C++) |
-| フリッパ (Dynamixel XM) | RS485 `/dev/ttyUSB_flipper` | flipper_driver (C++) |
-| 6-DOF アーム + グリッパ (Dynamixel XM) | RS485 `/dev/ttyUSB_arm` | arm_driver (Rust) |
-| IMU (BNO055 via STM32) | UART `/dev/stm32` | sensor_gateway (Rust) |
-| LiDAR (Velodyne VLP-16) | Ethernet (10.42.0.242:2368) | velodyne_driver |
-| カメラ (USB) | `/dev/video0` | v4l2_camera |
-
-## ライセンス
-
-Apache-2.0 — 詳細は [LICENSE](LICENSE)
-
-貢献: 開発者向けガイドラインは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+Apache-2.0. See [LICENSE](LICENSE) for details.

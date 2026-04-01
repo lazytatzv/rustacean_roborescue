@@ -47,6 +47,34 @@ def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
     return composable
 
 
+def _theta_s_nodes(cam: dict, ns: str) -> list:
+    """RICOH THETA S (UVC live streaming) のコンポーザブルノードリストを返す。
+    THETA S は USB接続時にMJPEGのUVCデバイスとして認識される。
+    """
+    return [
+        ComposableNode(
+            package="v4l2_camera",
+            plugin="v4l2_camera::V4L2Camera",
+            name="v4l2_camera",
+            namespace=ns,
+            parameters=[
+                {
+                    "video_device": cam.get("device", "/dev/video4"),
+                    "pixel_format": "MJPG",
+                    "image_size": [cam.get("width", 1280), cam.get("height", 720)],
+                    "time_per_frame": [1, cam.get("fps", 15)],
+                    "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
+                    "image_raw.ffmpeg.encoder": cam.get("encoder", "libx264"),
+                    "image_raw.ffmpeg.bit_rate": cam.get("bitrate", 4000000),
+                    "image_raw.ffmpeg.gop_size": 10,
+                    "image_raw.ffmpeg.av_options": "profile:baseline,preset:ultrafast,x264-params:repeat_headers=1",
+                }
+            ],
+            extra_arguments=[{"use_intra_process_comms": True}],
+        )
+    ]
+
+
 def _realsense_nodes(cam: dict, ns: str) -> list:
     """RealSense ドライバのコンポーザブルノードリストを返す。"""
     params = {
@@ -104,6 +132,8 @@ def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfi
     # コンポーザブルノード
     if driver == "realsense":
         composable_nodes = _realsense_nodes(cam, ns)
+    elif driver == "theta_s":
+        composable_nodes = _theta_s_nodes(cam, ns)
     else:
         composable_nodes = _v4l2_nodes(cam, qr_model_dir, ns)
 

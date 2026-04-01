@@ -13,11 +13,11 @@ slam_toolbox:
     mode: mapping # 初期地図作成用に mapping
     use_bond: false
 
-    # /scan は Gazebo からの LaserScan 直ブリッジで受ける。
+    # /scan は pointcloud_to_laserscan の出力を受ける。
     qos_overrides:
       /scan:
         subscription:
-          reliability: reliable
+          reliability: best_effort
           durability: volatile
 
     # CPU負荷が高い環境でのタイムジャンプ対策

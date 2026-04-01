@@ -211,11 +211,11 @@
     </plugin>
   </gazebo>
 
-  <!-- LiDAR: Gazebo の LaserScan を /scan で直接出す -->
+  <!-- LiDAR: Gazebo の生点群を /velodyne_points として出す -->
   <gazebo reference="velodyne">
-    <sensor name="vlp16" type="gpu_lidar">
+    <sensor name="vlp16" type="lidar">
       <pose>0 0 0 0 0 0</pose>
-      <topic>/scan</topic>
+      <topic>/velodyne_points</topic>
       <update_rate>8</update_rate>
       <always_on>true</always_on>
       <lidar>

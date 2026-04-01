@@ -1,47 +1,37 @@
-# JoyController ノード
+# joy_controller
 
-このNodeは、Joystickの入力を受け取り、クローラとフリッパーの速度指令を別々のメッセージで送信します。
-ボタン操作により STOP / DRIVE モードを切り替えます。
+`joy_controller` is the joystick-to-command bridge for the robot. It converts `/joy` input into crawler, flipper, and arm commands, and it is launched from [bringup/launch/control.launch.py](../../bringup/launch/control.launch.py).
 
-## 必要な依存関係
+## Modes
 
-- ROS2 Humble 以降
-- `sensor_msgs` package
-- `custom_interfaces` package（`CrawlerVelocity` msg, `FlipperVelocity` msg を含む）
+| Button | Mode | Purpose |
+|--------|------|---------|
+| `PS` | `STOP` | Latches the emergency stop and zeroes all outputs |
+| `OPTIONS` | `DRIVE` | Drives the crawler and flipper actuators |
+| `SHARE` | `ARM` | Sends arm velocity commands to the IK pipeline |
 
-## ビルド方法
+## Topics
 
-```sh
-colcon build --packages-select joy_controller
+| Direction | Topic | Type |
+|-----------|-------|------|
+| Subscribe | `/joy` | `sensor_msgs/msg/Joy` |
+| Publish | `/crawler_driver` | `custom_interfaces/msg/CrawlerVelocity` |
+| Publish | `/flipper_driver` | `custom_interfaces/msg/FlipperVelocity` |
+| Publish | `/arm_cmd_vel` | `geometry_msgs/msg/Twist` |
+| Publish | `/arm_joint_cmd_vel` | `sensor_msgs/msg/JointState` |
+| Publish | `/gripper_cmd` | `custom_interfaces/msg/GripperCommand` |
+| Publish | `/emergency_stop` | `std_msgs/msg/Bool` |
+
+## Quick Run
+
+```bash
+cd main_ws
 source install/setup.bash
-```
-
-## 使用方法
-
-### ノードの実行
-
-```sh
 ros2 run joy_controller joy_controller_node
 ```
 
-### ジョイスティック操作
+## Notes
 
-- **Share ボタン** を押すと `STOP` モードに変更
-- **Options ボタン** を押すと `DRIVE` モードに変更
-- **左スティック Y軸** で左クローラの速度を制御
-- **右スティック Y軸** で右クローラの速度を制御
-- **D-Pad / L1,L2 / R1,R2 / Cross,Square** でフリッパーを制御
-
-## トピック
-
-| トピック名        | 型                                        | 説明                          |
-|-------------------|-------------------------------------------|-------------------------------|
-| `/joy`            | `sensor_msgs/msg/Joy`                     | Joystickの入力をSubscribe     |
-| `/crawler_driver` | `custom_interfaces/msg/CrawlerVelocity`   | クローラ速度をPublish         |
-| `/flipper_driver` | `custom_interfaces/msg/FlipperVelocity`   | フリッパー速度をPublish       |
-
-## ライセンス
-
-MIT
-
-MIT License
+- Button edges are handled explicitly so holding a button does not flood the downstream nodes.
+- STOP is latched until the node is restarted.
+- The package is tuned for the current Jazzy workspace and the launch wiring in `bringup`.

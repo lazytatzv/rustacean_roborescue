@@ -17,7 +17,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     arm_driver_params = DeclareLaunchArgument(
         "arm_driver_params",
-        default_value=os.path.join(bringup_share, "config", "arm_driver.yaml"),
+        default_value=os.path.join(bringup_share, "config", "arm_gripper_driver.yaml"),
     )
     joy_params = DeclareLaunchArgument(
         "joy_params",

@@ -24,14 +24,9 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/dummy_imu_node.py
   scripts/fix_pointcloud_time_node.py
-  scripts/crawler_vel_bridge.py
-  scripts/arm_gz_bridge.py
   scripts/odom_tf_bridge.py
-  scripts/demo_joints.py
-  scripts/teleop_joints.py
   scripts/arm_cmd_bridge.py
   scripts/arm_mock_driver.py
-  scripts/arm_teleop.py
   scripts/ffmpeg_to_foxglove_video.py
   scripts/odom_selector.py
   DESTINATION lib/${PROJECT_NAME}
