@@ -4,7 +4,8 @@
 {
   mode: "client",
   connect: {
-    endpoints: ["quic/127.0.0.1:7447"]    // 同一マシン上の zenohd ルーターに接続
+    // 7447 が利用不可な場合でも 17447 にフォールバックできるよう冗長化
+    endpoints: ["tcp/127.0.0.1:7447", "tcp/127.0.0.1:17447"]
   },
   scouting: {
     multicast: { enabled: false }          // Wi-Fi へのマルチキャスト漏れ防止

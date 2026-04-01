@@ -56,6 +56,7 @@
             export ROS_VERSION=2
             export RMW_IMPLEMENTATION=rmw_zenoh_cpp
             export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
+            export LD_LIBRARY_PATH="${ros.rmw-zenoh-cpp}/lib:${ros.rmw-zenoh-cpp}/lib64:${ros.zenoh-cpp-vendor}/lib:${ros.zenoh-cpp-vendor}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
             # ── Zenoh 設定 ──
             ZENOH_CFG="$PWD/zenoh_ope.json5"

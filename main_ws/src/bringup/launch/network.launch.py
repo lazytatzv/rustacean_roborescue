@@ -1,4 +1,5 @@
 import os
+import shlex
 
 from ament_index_python.packages import (
     PackageNotFoundError,
@@ -12,7 +13,7 @@ from launch.actions import ExecuteProcess, SetEnvironmentVariable
 def generate_launch_description():
     # bringupパッケージのshareディレクトリから設定ファイルの絶対パスを動的に取得
     bringup_dir = get_package_share_directory("bringup")
-    # zenohd (router daemon) 用の設定: mode=router, listen quic/0.0.0.0:7447
+    # zenohd (router daemon) 用の設定: mode=router, listen tcp/0.0.0.0:7447
     zenoh_router_config = os.path.join(bringup_dir, "config", "zenoh_router.json5")
     # ロボット側 ROS2 ノード用の設定: mode=client, connect 127.0.0.1:7447
     # zenohd と同じ router config を使うとポート競合するため別ファイルを使う
@@ -36,6 +37,27 @@ def generate_launch_description():
         ld_parts.append(current_ld_library_path)
     patched_ld_library_path = ":".join(ld_parts)
 
+    router_cmd = (
+        "set -e; "
+        "if ss -ltn '( sport = :7447 )' | grep -q ':7447'; then "
+        "  if ss -ltnp '( sport = :7447 )' 2>/dev/null | grep -q 'zenohd'; then "
+        "    echo '[network.launch] zenoh router already running on :7447, skip local zenohd'; "
+        "    exit 0; "
+        "  fi; "
+        "  echo '[network.launch] :7447 is busy by non-zenoh process, starting zenohd on :17447'; "
+        "  _tmp_cfg=$(mktemp); "
+        "  trap 'rm -f \"$_tmp_cfg\"' EXIT; "
+        "  sed 's#tcp/0\\.0\\.0\\.0:7447#tcp/0.0.0.0:17447#g' "
+        + shlex.quote(zenoh_router_config)
+        + " > \"$_tmp_cfg\"; "
+        "  exec zenohd --config \"$_tmp_cfg\"; "
+        "else "
+        "  exec zenohd --config "
+        + shlex.quote(zenoh_router_config)
+        + "; "
+        "fi"
+    )
+
     actions = [
         # ==========================================
         # 1. RMW (ミドルウェア) の環境変数を強制上書き
@@ -51,14 +73,9 @@ def generate_launch_description():
         # QUIC でリッスンし、オペレータ PC からの接続を受け付ける。
         # SHM は zenohd 側でも有効にする必要があるため --config で渡す。
         ExecuteProcess(
-            cmd=[
-                "zenohd",
-                "--config",
-                zenoh_router_config,
-            ],
+            cmd=["bash", "-lc", router_cmd],
             output="screen",
-            respawn=True,  # 万が一プロセスが死んでも自動復帰（レスキュー用必須設定）
-            respawn_delay=2.0,
+            respawn=False,
             name="zenoh_router_daemon",
         ),
     ]

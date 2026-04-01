@@ -358,16 +358,27 @@
             unset _detected_nixgl
 
             # --- ライブラリパス ---
-            export LD_LIBRARY_PATH="${roboRescueEnv}/lib:${roboRescueEnv}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            # rmw_zenoh_cpp は symlinkJoin 経由だと .so 探索に失敗するケースがあるため
+            # 該当パッケージの実体パスを明示的に先頭へ追加する。
+            export LD_LIBRARY_PATH="${ros.rmw-zenoh-cpp}/lib:${ros.rmw-zenoh-cpp}/lib64:${ros.zenoh-cpp-vendor}/lib:${ros.zenoh-cpp-vendor}/lib64:${roboRescueEnv}/lib:${roboRescueEnv}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             #export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
             export CMAKE_PREFIX_PATH="${roboRescueEnv}:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
 
             # --- ROS 2 RMW (Zenoh) ---
             export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-            if [ -f "$PWD/main_ws/src/bringup/config/zenoh_robot.json5" ]; then
-              export RMW_ZENOH_CONFIG_URI="file://$PWD/main_ws/src/bringup/config/zenoh_robot.json5"
+            # どの cwd から nix develop しても見つかるように解決する
+            _repo_root=""
+            if command -v git >/dev/null 2>&1; then
+              _repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
             fi
+            if [ -z "$_repo_root" ] && [ -f "$PWD/flake.nix" ]; then
+              _repo_root="$PWD"
+            fi
+            if [ -n "$_repo_root" ] && [ -f "$_repo_root/main_ws/src/bringup/config/zenoh_robot.json5" ]; then
+              export RMW_ZENOH_CONFIG_URI="file://$_repo_root/main_ws/src/bringup/config/zenoh_robot.json5"
+            fi
+            unset _repo_root
 
             # --- Gazebo Harmonic (gz sim) リソースパス ---
             export GZ_SIM_RESOURCE_PATH="${roboRescueEnv}/share:$GZ_SIM_RESOURCE_PATH"

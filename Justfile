@@ -25,6 +25,14 @@ dev:
   @echo "Starting nix dev shell (interactive). Use Ctrl-D to exit."
   nix develop --accept-flake-config || true
 
+# One command robot bringup (auto enters nix shell, sources overlay, launches system)
+robot-up:
+  nix develop --accept-flake-config --command bash -lc 'cd main_ws && source install/setup.bash && exec ros2 launch bringup system.launch.py'
+
+# Minimal-mode robot bringup for communication-first recovery/debug
+robot-up-min:
+  nix develop --accept-flake-config --command bash -lc 'cd main_ws && source install/setup.bash && exec ros2 launch bringup system.launch.py use_audio:=false use_lidar:=false use_camera:=false use_crawler:=false use_arm:=false use_flipper:=false use_imu:=false use_nav2:=false'
+
 
 # TEST
 # devcontainerは普段は使っていない
