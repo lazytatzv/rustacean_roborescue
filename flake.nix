@@ -253,6 +253,7 @@
           ros.rosidl-default-generators
           ros.std-msgs ros.sensor-msgs ros.geometry-msgs ros.nav-msgs
           ros.visualization-msgs ros.std-srvs ros.example-interfaces
+          ros.rcl
           ros.rclcpp ros.rclcpp-components
           ros.tf2 ros.tf2-msgs ros.tf2-ros ros.tf2-ros-py ros.tf2-py
           ros.tf2-eigen ros.tf2-sensor-msgs ros.tf2-geometry-msgs
