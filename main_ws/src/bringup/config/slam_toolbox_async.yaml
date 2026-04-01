@@ -11,13 +11,18 @@ slam_toolbox:
     # ── SLAMモード ──
     # 本当にこれで良いかは謎
     mode: mapping # 初期地図作成用に mapping
+    use_bond: false
 
-    # /scan は pointcloud_to_laserscan 側と合わせて reliable で受ける。
+    # /scan は Gazebo からの LaserScan 直ブリッジで受ける。
     qos_overrides:
       /scan:
         subscription:
-          reliability: best_effort
+          reliability: reliable
           durability: volatile
+
+    # CPU負荷が高い環境でのタイムジャンプ対策
+    minimum_time_interval: 0.5
+    transform_publish_period: 0.1
 
     # ── Solver設定 ──
     solver_plugin: solver_plugins::CeresSolver

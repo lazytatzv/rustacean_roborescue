@@ -211,12 +211,13 @@
     </plugin>
   </gazebo>
 
-  <!-- LiDAR (CPU/GPUどちらでも動く設定) -->
+  <!-- LiDAR: Gazebo の LaserScan を /scan で直接出す -->
   <gazebo reference="velodyne">
-    <sensor name="vlp16" type="lidar">
+    <sensor name="vlp16" type="gpu_lidar">
       <pose>0 0 0 0 0 0</pose>
-      <topic>velodyne_points</topic>
+      <topic>/scan</topic>
       <update_rate>8</update_rate>
+      <always_on>true</always_on>
       <lidar>
         <scan>
           <horizontal>

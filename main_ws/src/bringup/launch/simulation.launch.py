@@ -19,7 +19,7 @@ from launch.actions import (
     SetEnvironmentVariable,
     TimerAction,
 )
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -131,6 +131,8 @@ def generate_launch_description():
                 package="ros_gz_sim",
                 executable="create",
                 arguments=[
+                    "-world",
+                    "rescue_field",
                     "-topic",
                     "/robot_description",
                     "-name",
@@ -148,7 +150,7 @@ def generate_launch_description():
     )
 
     # ── Gazebo ↔ ROS 2 ブリッジ ───────────────────────────────────────────────
-    # joint_statesはGazeboのJointStatePublisherプラグインがROS2に直接publish
+    # LiDAR は Gazebo 側の LaserScan を ROS 2 に直接橋渡しする。
     bridge = TimerAction(
         period=5.0,
         actions=[
@@ -159,7 +161,7 @@ def generate_launch_description():
                 arguments=[
                     "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
                     "/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-                    "/velodyne_points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked",
+                    "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
                     "/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU",
                     "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
                     "/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model",
@@ -181,27 +183,6 @@ def generate_launch_description():
         ],
     )
 
-    # ── PointCloud → LaserScan ────────────────────────────────────────────────
-    pointcloud_to_laserscan = TimerAction(
-        period=6.0,
-        actions=[
-            Node(
-                package="pointcloud_to_laserscan",
-                executable="pointcloud_to_laserscan_node",
-                remappings=[("cloud_in", "/velodyne_points"), ("scan", "/scan")],
-                parameters=[
-                    os.path.join(bringup_dir, "config", "pointcloud_to_laserscan.yaml"),
-                    {
-                        "qos_overrides./scan.publisher.reliability": "reliable",
-                        "qos_overrides./scan.publisher.durability": "volatile",
-                    },
-                    {"use_sim_time": True},
-                ],
-                condition=UnlessCondition(headless),
-            )
-        ],
-    )
-
     # ── SLAM Toolbox ──────────────────────────────────────────────────────────
     slam_toolbox = TimerAction(
         period=8.0,
@@ -213,13 +194,43 @@ def generate_launch_description():
                 parameters=[
                     os.path.join(bringup_dir, "config", "slam_toolbox_async.yaml"),
                     {
-                        "qos_overrides./scan.subscription.reliability": "best_effort",
+                        "qos_overrides./scan.subscription.reliability": "reliable",
                         "qos_overrides./scan.subscription.durability": "volatile",
                     },
                     {"use_sim_time": True},
                 ],
                 condition=IfCondition(
                     PythonExpression(["'", use_slam, "' == 'true' and '", headless, "' != 'true'"])
+                ),
+            )
+        ],
+    )
+
+    # ── SLAM Lifecycle Manager (slam_toolbox を自動 activate) ───────────────
+    slam_lifecycle_manager = TimerAction(
+        period=9.0,
+        actions=[
+            Node(
+                package="nav2_lifecycle_manager",
+                executable="lifecycle_manager",
+                name="lifecycle_manager_slam",
+                output="screen",
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "autostart": True,
+                        "bond_timeout": 0.0,
+                        "node_names": ["slam_toolbox"],
+                    }
+                ],
+                condition=IfCondition(
+                    PythonExpression([
+                        "'",
+                        use_slam,
+                        "' == 'true' and '",
+                        headless,
+                        "' != 'true'",
+                    ])
                 ),
             )
         ],
@@ -268,8 +279,8 @@ def generate_launch_description():
             spawn_entity,
             bridge,
             odom_tf_bridge,
-            pointcloud_to_laserscan,
             slam_toolbox,
+            slam_lifecycle_manager,
             nav2,
             rviz,
         ]

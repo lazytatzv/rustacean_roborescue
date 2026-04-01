@@ -41,8 +41,8 @@ Visualization Manager:
       Value: true
       Topic:
         Value: /scan
-        Reliability: Best Effort
-        Durability: Volatile
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
       Queue Size: 100
       Size (m): 0.05
       Color Transformer: Intensity
@@ -56,7 +56,7 @@ Visualization Manager:
       Value: false
       Topic:
         Value: /velodyne_points
-        Reliability: Best Effort
+        Reliability Policy: Best Effort
       Size (Pixels): 3
       Color Transformer: Intensity
       Style: Points
