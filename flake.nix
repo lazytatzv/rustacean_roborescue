@@ -358,10 +358,16 @@
             unset _detected_nixgl
 
             # --- ライブラリパス ---
-            export LD_LIBRARY_PATH="${roboRescueEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export LD_LIBRARY_PATH="${roboRescueEnv}/lib:${roboRescueEnv}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             #export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
             export CMAKE_PREFIX_PATH="${roboRescueEnv}:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
+
+            # --- ROS 2 RMW (Zenoh) ---
+            export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+            if [ -f "$PWD/main_ws/src/bringup/config/zenoh_robot.json5" ]; then
+              export RMW_ZENOH_CONFIG_URI="file://$PWD/main_ws/src/bringup/config/zenoh_robot.json5"
+            fi
 
             # --- Gazebo Harmonic (gz sim) リソースパス ---
             export GZ_SIM_RESOURCE_PATH="${roboRescueEnv}/share:$GZ_SIM_RESOURCE_PATH"
