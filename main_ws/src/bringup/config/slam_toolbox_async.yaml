@@ -12,8 +12,7 @@ slam_toolbox:
     # 本当にこれで良いかは謎
     mode: mapping # 初期地図作成用に mapping
 
-    # /scan は pointcloud_to_laserscan 側が Best Effort で publish するため、
-    # SLAM 側 subscription も合わせる。
+    # /scan は pointcloud_to_laserscan 側と合わせて reliable で受ける。
     qos_overrides:
       /scan:
         subscription:

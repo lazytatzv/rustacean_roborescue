@@ -216,11 +216,11 @@
     <sensor name="vlp16" type="lidar">
       <pose>0 0 0 0 0 0</pose>
       <topic>velodyne_points</topic>
-      <update_rate>10</update_rate>
+      <update_rate>8</update_rate>
       <lidar>
         <scan>
           <horizontal>
-            <samples>1800</samples>
+            <samples>360</samples>
             <resolution>1</resolution>
             <min_angle>-3.14159</min_angle>
             <max_angle>3.14159</max_angle>

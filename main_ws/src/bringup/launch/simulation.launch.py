@@ -139,8 +139,6 @@ def generate_launch_description():
                     "0.1",
                 ],
                 output="screen",
-                respawn=True,
-                respawn_delay=2.0,
                 additional_env={
                     "GZ_PARTITION": "roborescue",
                     "IGN_PARTITION": "roborescue",
@@ -194,7 +192,7 @@ def generate_launch_description():
                 parameters=[
                     os.path.join(bringup_dir, "config", "pointcloud_to_laserscan.yaml"),
                     {
-                        "qos_overrides./scan.publisher.reliability": "best_effort",
+                        "qos_overrides./scan.publisher.reliability": "reliable",
                         "qos_overrides./scan.publisher.durability": "volatile",
                     },
                     {"use_sim_time": True},
