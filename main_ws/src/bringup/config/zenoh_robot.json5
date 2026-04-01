@@ -1,0 +1,15 @@
+// ロボット側 ROS2 ノード用 Zenoh セッション設定
+// network.launch.py から RMW_ZENOH_CONFIG_URI で渡される
+// zenohd (zenoh_router.json5) とは別ファイル — ノードは client として zenohd に接続する
+{
+  mode: "client",
+  connect: {
+    endpoints: ["quic/127.0.0.1:7447"]    // 同一マシン上の zenohd ルーターに接続
+  },
+  scouting: {
+    multicast: { enabled: false }          // Wi-Fi へのマルチキャスト漏れ防止
+  },
+  transport: {
+    shared_memory: { enabled: true }       // 同一マシン内ノード間で SHM 転送
+  }
+}

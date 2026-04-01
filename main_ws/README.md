@@ -1,107 +1,82 @@
-# main_ws — ROS 2 ワークスペース
+# main_ws — ROS 2 Workspace
 
-レスキューロボット「Rustacean RoboRescue」の ROS 2 Jazzy ワークスペース。
-Rust (rclrs) + C++ (rclcpp) + Python (rclpy) のマルチ言語構成。
+`main_ws` is the robot-side ROS 2 workspace for Rustacean RoboRescue. It contains the code that runs on the robot, the simulation bringup, and the vendored dependencies needed to build everything reproducibly.
 
-## パッケージ構成
+For a package-by-package inventory, see [docs/PACKAGES.md](../docs/PACKAGES.md).
 
-### 制御系 (`src/control/`)
+## Workspace Layout
 
-| パッケージ | 言語 | 概要 |
-|-----------|------|------|
-| `joy_controller` | C++ | PS4 コントローラ → 各ドライバへの指令変換 (STOP/DRIVE/ARM 3モード) |
-| `arm_controller` | Rust | Jacobian ベース速度 IK (適応 DLS + 特異点回避 + 関節リミット) |
+| Group | Packages |
+|------|----------|
+| `audio_bridge/` | `audio_bridge` |
+| `bringup/` | `bringup` |
+| `control/` | `joy_controller`, `arm_controller` |
+| `custom_interfaces/` | `custom_interfaces` |
+| `extras/` | `h264_republisher` |
+| `hardware_drivers/` | `arm_driver`, `crawler_driver`, `flipper_driver`, `sensor_gateway` |
+| `perception/` | `qr_detector`, `qr_detector_cpp`, `omron_bridge` |
+| `external/` | Vendored ROS interfaces and third-party libraries such as `rclrs`, `rosidl_generator_rs`, `spark_fast_lio`, `dynamixel_hardware_interface`, and `kiss_icp` |
 
-### ハードウェアドライバ (`src/hardware_drivers/`)
+## Key Launch Entry Points
 
-| パッケージ | 言語 | 概要 |
-|-----------|------|------|
-| `crawler_driver` | C++ | Roboclaw モータドライバ (差動駆動 + PID + `/cmd_vel` 対応) |
-| `flipper_driver` | C++ | Dynamixel フリッパ (Wheel Mode + WatchDog 安全機構) |
-| `arm_driver` | Rust | Dynamixel 6-DOF アーム + グリッパ (SyncWrite/Read + 自動再接続) |
-| `sensor_gateway` | Rust | STM32 → BNO055 IMU パーサー (CSV → sensor_msgs/Imu + 自動再接続) |
+| Launch file | Purpose |
+|-------------|---------|
+| `bringup/launch/system.launch.py` | Real robot bringup with drivers, control, cameras, audio, and optional Nav2 |
+| `bringup/launch/simulation.launch.py` | Gazebo simulation with SLAM / Nav2 toggles |
+| `bringup/launch/control.launch.py` | Joystick control and arm command path |
+| `bringup/launch/camera.launch.py` | Camera drivers, FFmpeg transport, and QR detection |
+| `bringup/launch/audio.launch.py` | Opus-based audio bridge |
+| `bringup/launch/nav2.launch.py` | Navigation-only bringup |
+| `bringup/launch/network.launch.py` | Zenoh configuration for robot-side networking |
+| `bringup/launch/display.launch.py` | RViz and visualization helpers |
+| `bringup/launch/test_arm.launch.py` / `test_ik.launch.py` | Arm and IK verification helpers |
 
-### 認識系 (`src/perception/`)
-
-| パッケージ | 言語 | 概要 |
-|-----------|------|------|
-| `qr_detector` | Python | WeChatQRCode による QR コード検出 + 圧縮画像配信 |
-| `vision_processor` | Rust | QR コードデバッグツール (スタンドアロン、ROS ノードではない) |
-
-### 統合 (`src/bringup/`)
-
-| 内容 | 説明 |
-|------|------|
-| Launch ファイル | `system.launch.py`, `simulation.launch.py`, `nav2.launch.py`, `perception.launch.py`, `control.launch.py`, `network.launch.py`, `camera.launch.py`, `display.launch.py` |
-| 設定 YAML | Nav2, SLAM, Velodyne, spark_fast_lio, ノード別パラメータ等 |
-| URDF/Xacro | `robot.urdf.xacro` (シミュレーション用), `sekirei.urdf` (アーム IK 用) |
-| Gazebo SDF | `rescue_field.sdf` (10×10m レスキューフィールド) |
-| RViz Config | `simulation.rviz` (Nav2 + SLAM 表示), `display.rviz` (モデル表示) |
-| ブリッジスクリプト | `arm_gz_bridge.py`, `odom_tf_bridge.py`, `crawler_vel_bridge.py`, `dummy_imu_node.py`, `fix_pointcloud_time_node.py` |
-| Zenoh 設定 | `zenoh_router.json5`, `zenoh_ope.json5` |
-
-### カスタムメッセージ (`src/custom_interfaces/`)
-
-| メッセージ | 用途 |
-|-----------|------|
-| `CrawlerVelocity.msg` | 左右クローラ速度 (m1_vel, m2_vel) |
-| `FlipperVelocity.msg` | 4 フリッパ速度配列 (flipper_vel[]) |
-| `GripperCommand.msg` | グリッパ目標位置 + 電流制限 |
-| `GripperStatus.msg` | グリッパ状態 (IDLE/MOVING/GRIPPING/OVERLOAD/ERROR) |
-
-### 外部サブモジュール (`src/external/`)
-
-| サブモジュール | 用途 |
-|---------------|------|
-| `ros2_rust/` | rclrs — Rust 用 ROS 2 クライアントライブラリ |
-| `rosidl_rust/` | rosidl_generator_rs — Rust メッセージ生成器 |
-| `spark-fast-lio/` | FAST-LIO2 ベース LiDAR 慣性オドメトリ |
-| `common_interfaces/` | 標準 ROS 2 メッセージ (std_msgs, sensor_msgs 等) |
-| `rcl_interfaces/` | ROS 2 パラメータ/サービスインターフェース |
-
-## ビルド
+## Build
 
 ```bash
-# Nix 環境に入る
+# Enter the Nix shell
 nix develop --impure
 
-# フルビルド
+# Build the full workspace
 cd main_ws
 just forge
 
-# Rust バインディングのみ再生成
-just forge-bindings
+# Build with colcon directly when needed
+colcon build --merge-install
 
-# コード品質チェック (format + lint + test)
+# Run checks and tests
 just check
-
-# テスト
 just test
 ```
 
-## 起動
+## Run
 
 ```bash
+cd main_ws
 source install/setup.bash
 
-# 実機起動 (全ノード)
+# Real robot bringup
 ros2 launch bringup system.launch.py
 
-# 自律走行付き
+# Real robot with Nav2
 ros2 launch bringup system.launch.py use_nav2:=true
 
-# シミュレーション
+# Simulation
 ros2 launch bringup simulation.launch.py
 
-# Nav2 付きシミュレーション
-ros2 launch bringup simulation.launch.py use_nav2:=true
+# Simulation with SLAM and Nav2
+ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=true
 ```
 
-## 設計方針
+## Notes On Implementation
 
-- **低レイヤーは Rust**: ハードウェアドライバ (arm_driver, sensor_gateway) は Rust (rclrs) で型安全・メモリ安全に実装
-- **リアルタイム制御は C++**: クローラ/フリッパドライバ、コントローラは C++ (rclcpp) で実装
-- **認識系は Python**: QR 検出は OpenCV + Python で実用性重視
-- **SLAM/オドメトリは C++ 既存ライブラリ**: spark_fast_lio (FAST-LIO2), slam_toolbox
+- Low-level drivers such as `arm_driver` and `sensor_gateway` are implemented in Rust for safety and recoverability.
+- Time-sensitive motion control such as `crawler_driver` and `flipper_driver` remains in C++.
+- Perception utilities are split between Python and C++ depending on the amount of image processing and composable-node integration needed.
+- The workspace includes vendored ROS interface packages and third-party libraries so the build can run without depending on a moving upstream checkout.
 
-詳細は [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) を参照。
+Related docs:
+
+- [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
+- [docs/OPERATION.md](../docs/OPERATION.md)
+- [docs/PACKAGES.md](../docs/PACKAGES.md)

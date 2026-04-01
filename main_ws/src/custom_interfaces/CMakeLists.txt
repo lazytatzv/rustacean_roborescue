@@ -11,13 +11,16 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
 
 # define custom messages
 rosidl_generate_interfaces(${PROJECT_NAME}
+		msg/AudioChunk.msg
 		msg/CrawlerVelocity.msg
 		msg/FlipperVelocity.msg
 		msg/GripperCommand.msg
 		msg/GripperStatus.msg
+		DEPENDENCIES std_msgs
 )
 
 install(

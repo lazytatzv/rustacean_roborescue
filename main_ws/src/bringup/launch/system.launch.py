@@ -9,6 +9,7 @@
 
 import os
 
+import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
@@ -19,8 +20,19 @@ from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 
 
+def _load_launch_config(bringup_dir: str) -> dict:
+    config_path = os.path.join(bringup_dir, "config", "launch_config.yaml")
+    with open(config_path) as f:
+        return yaml.safe_load(f)
+
+
+def _b(val: bool) -> str:
+    return "true" if val else "false"
+
+
 def generate_launch_description():
     bringup_dir = get_package_share_directory("bringup")
+    cfg = _load_launch_config(bringup_dir)
 
     # 各サブLaunchファイルのパス
     network_launch = os.path.join(bringup_dir, "launch", "network.launch.py")
@@ -31,12 +43,44 @@ def generate_launch_description():
     audio_launch = os.path.join(bringup_dir, "launch", "audio.launch.py")
 
     use_nav2 = DeclareLaunchArgument(
-        "use_nav2", default_value="false", description="Nav2 自律走行を有効にする"
+        "use_nav2",
+        default_value=_b(cfg.get("use_nav2", False)),
+        description="Nav2 自律走行を有効にする",
     )
     use_audio = DeclareLaunchArgument(
         "use_audio",
-        default_value="true",
+        default_value=_b(cfg.get("use_audio", True)),
         description="Start audio (webrtc signaling + robot node)",
+    )
+    use_lidar = DeclareLaunchArgument(
+        "use_lidar",
+        default_value=_b(cfg.get("use_lidar", True)),
+        description="LiDAR + FAST-LIO + SLAM を有効にする",
+    )
+    use_camera = DeclareLaunchArgument(
+        "use_camera",
+        default_value=_b(cfg.get("use_camera", True)),
+        description="カメラ + QR 検出を有効にする",
+    )
+    use_crawler = DeclareLaunchArgument(
+        "use_crawler",
+        default_value=_b(cfg.get("use_crawler", True)),
+        description="Roboclaw 走行ドライバを有効にする",
+    )
+    use_arm = DeclareLaunchArgument(
+        "use_arm",
+        default_value=_b(cfg.get("use_arm", True)),
+        description="アームドライバ + IK を有効にする",
+    )
+    use_flipper = DeclareLaunchArgument(
+        "use_flipper",
+        default_value=_b(cfg.get("use_flipper", True)),
+        description="フリッパドライバを有効にする",
+    )
+    use_imu = DeclareLaunchArgument(
+        "use_imu",
+        default_value=_b(cfg.get("use_imu", True)),
+        description="STM32 IMU (sensor_gateway) を有効にする",
     )
 
     # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
@@ -50,6 +94,8 @@ def generate_launch_description():
         executable="robot_state_publisher",
         name="robot_state_publisher",
         output="screen",
+        respawn=True,
+        respawn_delay=3.0,
         parameters=[
             {
                 "robot_description": robot_description,
@@ -78,6 +124,13 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_nav2,
+            use_audio,
+            use_lidar,
+            use_camera,
+            use_crawler,
+            use_arm,
+            use_flipper,
+            use_imu,
             # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
             robot_state_publisher_node,
             # 1. Foxglove Bridge (WebSocket :8765)
@@ -89,22 +142,31 @@ def generate_launch_description():
             # オーディオ (signaling + robot webrtc)
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(audio_launch),
-                launch_arguments={
-                    "use_audio": LaunchConfiguration("use_audio")
-                }.items(),
+                launch_arguments={"use_audio": LaunchConfiguration("use_audio")}.items(),
             ),
             # 認識・SLAM系の起動
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(perception_launch),
-                launch_arguments={"use_slam": "true", "use_rviz": "false"}.items(),
+                launch_arguments={
+                    "use_slam": LaunchConfiguration("use_lidar"),
+                    "use_lidar": LaunchConfiguration("use_lidar"),
+                    "use_rviz": "false",
+                }.items(),
             ),
             # カメラの起動 (qr_detector が /camera/image_raw を必要とする)
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(camera_launch),
+                launch_arguments={"use_camera": LaunchConfiguration("use_camera")}.items(),
             ),
             # 制御系の起動
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(control_launch),
+                launch_arguments={
+                    "use_crawler": LaunchConfiguration("use_crawler"),
+                    "use_arm": LaunchConfiguration("use_arm"),
+                    "use_flipper": LaunchConfiguration("use_flipper"),
+                    "use_imu": LaunchConfiguration("use_imu"),
+                }.items(),
             ),
             # Nav2 自律走行（オプション）
             IncludeLaunchDescription(

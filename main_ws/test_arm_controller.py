@@ -48,9 +48,7 @@ class ArmTester(Node):
         self.test_phase = 0
         self.phase_start = None
 
-        self.sub = self.create_subscription(
-            JointState, "/arm_joint_commands", self._on_result, 10
-        )
+        self.sub = self.create_subscription(JointState, "/arm_joint_commands", self._on_result, 10)
 
         # Publish joint_states at 50 Hz to keep the controller fed
         self.js_timer = self.create_timer(0.02, self._pub_joint_states)
@@ -142,20 +140,12 @@ class ArmTester(Node):
                     f"{n} msgs, {n_nonzero_vel} with non-zero vel, "
                     f"{n_nonzero_pos} with non-zero pos"
                 )
-                self.get_logger().info(
-                    f"  Peak |vel|: {best_vel:.6f}, Peak |pos|: {best_pos:.6f}"
-                )
-                self.get_logger().info(
-                    f"  Last vel: {[f'{v:.6f}' for v in last['vel']]}"
-                )
-                self.get_logger().info(
-                    f"  Last pos: {[f'{p:.6f}' for p in last['pos']]}"
-                )
+                self.get_logger().info(f"  Peak |vel|: {best_vel:.6f}, Peak |pos|: {best_pos:.6f}")
+                self.get_logger().info(f"  Last vel: {[f'{v:.6f}' for v in last['vel']]}")
+                self.get_logger().info(f"  Last pos: {[f'{p:.6f}' for p in last['pos']]}")
                 self.get_logger().info(f"  Names: {last['names']}")
             else:
-                self.get_logger().warn(
-                    f"  Phase {self.test_phase} '{name}': NO messages received!"
-                )
+                self.get_logger().warn(f"  Phase {self.test_phase} '{name}': NO messages received!")
 
             self.test_phase += 1
             self.phase_start = None
@@ -214,9 +204,7 @@ def main():
         "end_link:=link_tip",
     ]
     print(f"Starting arm_controller: {' '.join(arm_cmd)}")
-    arm_proc = subprocess.Popen(
-        arm_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
+    arm_proc = subprocess.Popen(arm_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Wait for arm_controller to initialize
     time.sleep(2.0)

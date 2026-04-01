@@ -17,9 +17,7 @@ class FixPointCloudTimeNode(Node):
         self.output_topic = self.get_parameter("output_topic").value
 
         self.pub = self.create_publisher(PointCloud2, self.output_topic, 10)
-        self.sub = self.create_subscription(
-            PointCloud2, self.input_topic, self.on_cloud, 10
-        )
+        self.sub = self.create_subscription(PointCloud2, self.input_topic, self.on_cloud, 10)
 
         self.get_logger().info(
             f"Fixing point time field: {self.input_topic} -> {self.output_topic}"
@@ -33,9 +31,7 @@ class FixPointCloudTimeNode(Node):
             return
 
         try:
-            points = list(
-                point_cloud2.read_points(msg, field_names=None, skip_nans=False)
-            )
+            points = list(point_cloud2.read_points(msg, field_names=None, skip_nans=False))
         except Exception as exc:  # pragma: no cover
             self.get_logger().warn(f"Failed to read point cloud: {exc}")
             return

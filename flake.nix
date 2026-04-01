@@ -1,6 +1,23 @@
 {
   description = "Rustacean RoboRescue — レスキューロボット開発環境";
 
+  # ── Binary cache ─────────────────────────────────────────────────────────
+  # CI・ローカルともにこのキャッシュを参照することで nix-ros-overlay の
+  # 再ビルドを避け、初回でも数分でシェルに入れるようにする。
+  # GitHub Actions では `--accept-flake-config` を渡すことで有効になる。
+  nixConfig = {
+    extra-substituters = [
+      "https://roborescue-nix.cachix.org"
+      "https://nix-community.cachix.org"
+      "https://ros.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U="
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo="
+    ];
+  };
+
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";
@@ -66,6 +83,12 @@
           pkg-config
           ffmpeg
 
+          # --- GStreamer (audio_bridge: Opus 双方向音声) ---
+          gst_all_1.gstreamer
+          gst_all_1.gst-plugins-base  # audioconvert, audioresample, appsrc/sink, opusenc/dec
+          gst_all_1.gst-plugins-good  # pulsesrc, pulsesink
+          python3Packages.pygobject3  # gi.repository.Gst (GStreamer Python バインディング)
+
           # --- colcon ---
           colcon
           python3Packages.colcon-cargo
@@ -124,8 +147,10 @@
           ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
           ros.image-transport
           ros.compressed-image-transport
-          ros.ffmpeg-image-transport  # H.264 compression support
-          ros.v4l2-camera             # Optimized camera driver
+          ros.ffmpeg-image-transport       # H.264 compression support
+          ros.ffmpeg-image-transport-msgs  # FFMPEGPacket メッセージ型
+          ros.foxglove-msgs                # foxglove.CompressedVideo スキーマ (Foxglove Studio ネイティブH264)
+          ros.v4l2-camera                  # Optimized camera driver
           ros.camera-info-manager
           ros.rclcpp-components
 
@@ -220,6 +245,52 @@
         # C++ ライブラリ (ROS 外)
         cppLibs = with pkgs; [ eigen orocos-kdl ];
 
+        # ── CI 専用 ROS 依存 ────────────────────────────────────────────────
+        # Gazebo / RViz2 / Nav2 / SLAM など GUI・シミュレーション系を除外し
+        # ビルド・テストに必要な最小セットだけを含める。
+        # これにより Nix closure が大幅に小さくなりキャッシュヒット率が上がる。
+        ciRosDeps = [
+          ros.rosidl-default-generators
+          ros.std-msgs ros.sensor-msgs ros.geometry-msgs ros.nav-msgs
+          ros.visualization-msgs ros.std-srvs ros.example-interfaces
+          ros.rcl
+          ros.rclcpp ros.rclcpp-components
+          ros.tf2 ros.tf2-msgs ros.tf2-ros ros.tf2-ros-py ros.tf2-py
+          ros.tf2-eigen ros.tf2-sensor-msgs ros.tf2-geometry-msgs
+          ros.orocos-kdl-vendor ros.eigen3-cmake-module ros.message-filters
+          ros.cv-bridge ros.image-transport ros.compressed-image-transport
+          ros.camera-info-manager ros.image-transport
+          ros.ffmpeg-image-transport ros.v4l2-camera
+          ros.joy ros.joy-linux
+          ros.usb-cam
+          ros.dynamixel-workbench-toolbox ros.dynamixel-sdk ros.dynamixel-interfaces
+          ros.hardware-interface ros.pluginlib ros.realtime-tools ros.control-msgs
+          ros.generate-parameter-library
+          ros.urdfdom ros.urdfdom-headers ros.control-toolbox ros.angles ros.filters
+          ros.tinyxml2-vendor ros.console-bridge-vendor ros.diagnostic-updater
+          ros.backward-ros ros.kdl-parser
+          ros.pal-statistics ros.pal-statistics-msgs
+          ros.controller-interface ros.controller-manager ros.transmission-interface
+          ros.joint-limits
+          ros.xacro ros.robot-state-publisher ros.urdf ros.urdf-parser-plugin
+          ros.joint-state-publisher
+          ros.velodyne ros.velodyne-driver ros.velodyne-pointcloud
+          ros.pointcloud-to-laserscan
+          ros.pcl-ros ros.pcl-conversions ros.pcl-msgs
+          ros.laser-geometry ros.interactive-markers ros.resource-retriever
+          ros.map-msgs ros.point-cloud-transport
+          ros.libstatistics-collector
+          ros.ament-cmake ros.ros-core
+          ros.rmw-zenoh-cpp
+          # Nav2: インターフェース層のみ (巨大な実行バイナリは除外)
+          ros.nav2-msgs ros.nav2-core ros.nav2-util ros.nav2-common
+        ];
+
+        ciEnv = pkgs.symlinkJoin {
+          name = "roborescue-ci-env";
+          paths = ciRosDeps ++ cppLibs;
+        };
+
         # ROS + C++ ライブラリを1ディレクトリに圧縮
         roboRescueEnv = pkgs.symlinkJoin {
           name = "roborescue-compressed-env";
@@ -235,7 +306,7 @@
           name = "RoboRescue Env";
 
           # rosDeps を直接渡すと PATH が爆発するので圧縮環境のみ渡す
-          packages = buildTools ++ [ roboRescueEnv pythonEnv ];
+          packages = buildTools ++ [ roboRescueEnv pythonEnv nixgl.packages.${system}.nixGLIntel ];
 
           shellHook = ''
             # --- ROS 2 ---
@@ -264,14 +335,27 @@
             export CXXFLAGS="-fopenmp $CXXFLAGS"
             export LDFLAGS="-fopenmp $LDFLAGS"
 
-            # --- GPU ドライバ パススルー (非-NixOS NVIDIA) ---
-            # Nix の Mesa はホスト NVIDIA カーネルドライバにアクセスできないため、
-            # GUI (gz sim, rviz2, rqt) は nixGL 経由で起動する必要がある。
-            # ヘッドレスモード (headless:=true) では不要。
-            alias gz="nixGL gz"
-            alias rviz2="nixGL rviz2"
-            alias rqt="nixGL rqt"
-            alias rqt_graph="nixGL rqt_graph"
+            # --- GPU ドライバ パススルー (非-NixOS) ---
+            # Intel/AMD (Mesa): nixGLIntel を nixGL として使う (pure, cachix safe)
+            # NVIDIA: impure が必要なため flake には含めない。
+            #   → nix run --impure github:nix-community/nixGL -- <cmd> を使うか
+            #     NIXGL_CMD 環境変数で上書きする。
+            _detected_nixgl=""
+            if lspci 2>/dev/null | grep -qi nvidia; then
+              echo "⚠️  NVIDIA GPU detected. nixGL is not bundled (requires --impure)."
+              echo "   Set: export NIXGL_CMD='nix run --impure github:nix-community/nixGL --'"
+              _detected_nixgl="''${NIXGL_CMD:-}"
+            else
+              _detected_nixgl="nixGLIntel"
+            fi
+            if [ -n "$_detected_nixgl" ]; then
+              alias nixGL="$_detected_nixgl"
+              alias gz="$_detected_nixgl gz"
+              alias rviz2="$_detected_nixgl rviz2"
+              alias rqt="$_detected_nixgl rqt"
+              alias rqt_graph="$_detected_nixgl rqt_graph"
+            fi
+            unset _detected_nixgl
 
             # --- ライブラリパス ---
             export LD_LIBRARY_PATH="${roboRescueEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -291,11 +375,71 @@
         # Lightweight devShell for running pre-commit and Python linters.
         # Use a plain nixpkgs import (pkgsPlain) to avoid overlay evaluation
         # issues from nixgl/ros overlays.
-        devShells.precommit = (import nixpkgs { inherit system; }).mkShell {
-          name = "RoboRescue Precommit Shell";
-          packages = with (import nixpkgs { inherit system; }); [ python3 python3Packages.pre-commit python3Packages.ruff python3Packages.black python3Packages.isort python3Packages.cpplint python3Packages.numpy ];
+        devShells.precommit =
+          let pkgsPlain = import nixpkgs { inherit system; };
+          in pkgsPlain.mkShell {
+            name = "RoboRescue Precommit Shell";
+            packages = with pkgsPlain; [
+              python3
+              pre-commit          # top-level package
+              python3Packages.ruff
+              python3Packages.black
+              python3Packages.isort
+              # cpplint は language:python フックなので pre-commit が venv で管理
+              # cppcheck / numpy は不要
+              clang-tools         # clang-format (language:system フックが要求)
+            ];
+            shellHook = ''
+              echo "Entering Pre-commit devShell: use 'pre-commit run --all-files'"
+            '';
+          };
+
+        # CI 専用 devShell ─ GitHub Actions 上で使用する軽量シェル。
+        # Gazebo / RViz2 / Nav2 など GUI・シミュレーション系を含まないため
+        # Nix closure が小さく、magic-nix-cache / Cachix のヒット率が高い。
+        devShells.ci = pkgs.mkShell {
+          name = "RoboRescue CI";
+          packages = [
+            # --- Rust ---
+            rustNightly
+            pkgs.cargo-audit
+            pkgs.cargo-tarpaulin
+
+            # --- C++ ビルド ---
+            pkgs.cmake pkgs.ninja pkgs.pkg-config pkgs.mold
+            pkgs.clang pkgs.clang-tools pkgs.llvmPackages.libclang
+            pkgs.boost pkgs.vtk pkgs.pcl
+            pkgs.ccache
+
+            # --- colcon / ROS ビルドインフラ ---
+            pkgs.colcon
+            pkgs.python3Packages.colcon-cargo
+            pkgs.python3Packages.colcon-ros-cargo
+            pkgs.cargo-ament-build
+            pkgs.python3
+            pkgs.python3Packages.numpy
+
+            # --- GStreamer (audio_bridge) ---
+            pkgs.gst_all_1.gstreamer
+            pkgs.gst_all_1.gst-plugins-base
+            pkgs.python3Packages.pygobject3
+
+            # --- ROS 2 (軽量セット) ---
+            ciEnv
+          ];
+
           shellHook = ''
-            echo "Entering Pre-commit devShell: use 'pre-commit run --all-files'"
+            export ROS_DISTRO="${ROS_VERSION}"
+            export ROS_VERSION=2
+            export RUST_SRC_PATH="${rustNightly}/lib/rustlib/src/rust/library"
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            export CC="ccache clang"
+            export CXX="ccache clang++"
+            export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+            export CMAKE_PREFIX_PATH="${ciEnv}:$CMAKE_PREFIX_PATH"
+            export AMENT_PREFIX_PATH="${ciEnv}:$AMENT_PREFIX_PATH"
+            export LD_LIBRARY_PATH="${ciEnv}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export PYTHONPATH="${ciEnv}/${pkgs.python3.sitePackages}''${PYTHONPATH:+:$PYTHONPATH}"
           '';
         };
       }

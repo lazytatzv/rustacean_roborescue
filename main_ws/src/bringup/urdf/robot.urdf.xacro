@@ -13,15 +13,38 @@
   <material name="silver"><color rgba="0.7 0.7 0.7 1"/></material>
   <material name="white"><color rgba="1 1 1 1"/></material>
 
+  <!-- Dummy inertial for links that are only visual placeholders -->
+  <xacro:macro name="dummy_inertial" params="mass:=0.01 i:=1e-5">
+    <inertial>
+      <mass value="${mass}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="${i}" ixy="0" ixz="0" iyy="${i}" iyz="0" izz="${i}"/>
+    </inertial>
+  </xacro:macro>
+
   <!-- ======================== Base ======================== -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}"/>
+  </joint>
+
   <link name="base_link">
     <visual><geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry><material name="silver"/></visual>
+    <collision><geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry></collision>
+    <inertial>
+      <mass value="15.0"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="0.175" ixy="0" ixz="0" iyy="0.600" iyz="0" izz="0.725"/>
+    </inertial>
   </link>
 
   <!-- Flippers (RPY based on Mesh Z-axis as length) -->
   <xacro:macro name="flipper" params="name x_offset y_offset flip_rpy">
     <link name="${name}">
       <visual><origin xyz="0 0 0" rpy="${flip_rpy}"/><geometry><mesh filename="package://bringup/meshes/flipper.STL" scale="${mesh_scale}"/></geometry><material name="white"/></visual>
+      <xacro:dummy_inertial/>
     </link>
     <joint name="${name}_joint" type="revolute">
       <origin xyz="${x_offset} ${y_offset} ${-base_height/2}" rpy="0 0 0"/>
@@ -39,37 +62,195 @@
   <!-- ======================== Arm (6DOF Full Restoration) ======================== -->
   <link name="arm_base_link">
     <visual><origin xyz="-0.08 -0.081 0" rpy="1.57 0 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm1.STL" scale="${mesh_scale}"/></geometry><material name="white"/></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_base_link_joint" type="fixed"><origin xyz="-0.2 0 ${base_height/2 + 0.06}"/><parent link="base_link"/><child link="arm_base_link"/></joint>
 
   <link name="arm1_link">
     <visual><origin xyz="0 0 0.004" rpy="1.57 0 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm2.STL" scale="${mesh_scale}"/></geometry></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_joint1" type="revolute"><origin xyz="0 0 0"/><axis xyz="0 0 1"/><parent link="arm_base_link"/><child link="arm1_link"/><limit effort="10" lower="-3.14" upper="3.14" velocity="1.571"/></joint>
 
   <link name="arm2_link">
     <visual><origin xyz="0 0 0" rpy="1.57 0 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm3.STL" scale="${mesh_scale}"/></geometry></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_joint2" type="revolute"><origin xyz="0 -0.048 0.078"/><axis xyz="0 1 0"/><parent link="arm1_link"/><child link="arm2_link"/><limit effort="20" lower="-3.14" upper="0" velocity="1.571"/></joint>
 
   <link name="arm3_link">
     <visual><origin xyz="0 0 0" rpy="1.57 0 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm4.STL" scale="${mesh_scale}"/></geometry></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_joint3" type="revolute"><origin xyz="0.45 0.007 0.084"/><axis xyz="0 1 0"/><parent link="arm2_link"/><child link="arm3_link"/><limit effort="20" lower="0" upper="3.14" velocity="1.571"/></joint>
 
   <link name="arm4_link">
     <visual><origin xyz="0 0 0" rpy="1.57 3.14 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm5.STL" scale="${mesh_scale}"/></geometry></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_joint4" type="revolute"><origin xyz="-0.5 0.012 0"/><axis xyz="0 1 0"/><parent link="arm3_link"/><child link="arm4_link"/><limit effort="10" lower="-4.71" upper="0" velocity="1.571"/></joint>
 
   <link name="arm5_link">
     <visual><origin xyz="0 0 0" rpy="1.57 3.14 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm6.STL" scale="${mesh_scale}"/></geometry></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_joint5" type="revolute"><origin xyz="0.06525 0.028 0.029647"/><axis xyz="0 0 1"/><parent link="arm4_link"/><child link="arm5_link"/><limit effort="5" lower="-1.57" upper="1.57" velocity="1.571"/></joint>
 
   <link name="arm6_link">
     <visual><origin xyz="0 0 0" rpy="0 3.14 0"/><geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm7_ver2.STL" scale="${mesh_scale}"/></geometry></visual>
+    <xacro:dummy_inertial/>
   </link>
   <joint name="arm_joint6" type="revolute"><origin xyz="0.07425 0 -0.03"/><axis xyz="1 0 0"/><parent link="arm5_link"/><child link="arm6_link"/><limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/></joint>
+
+
+  <!-- ======================== Simulation: Drive Wheels ======================== -->
+  <!-- クローラを diff_drive で近似する仮想ホイール (シミュレーション専用) -->
+  <xacro:macro name="drive_wheel" params="name y_offset">
+    <link name="${name}">
+      <visual>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="silver"/>
+      </visual>
+      <collision>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="1.0"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="0 ${y_offset} ${-base_height/2}"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:drive_wheel name="left_wheel"  y_offset="${track_width/2}"/>
+  <xacro:drive_wheel name="right_wheel" y_offset="${-track_width/2}"/>
+
+  <!-- ======================== Simulation: Sensors ======================== -->
+  <link name="velodyne">
+    <visual>
+      <geometry><cylinder radius="0.05" length="0.07"/></geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.05" length="0.07"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.8"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+  <joint name="velodyne_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="velodyne"/>
+    <origin xyz="0.15 0 ${base_height/2 + 0.05}"/>
+  </joint>
+
+  <!-- Gripper (parallel link, 2x Dynamixel) -->
+  <link name="gripper_left_link">
+    <xacro:dummy_inertial/>
+  </link>
+  <link name="gripper_right_link">
+    <xacro:dummy_inertial/>
+  </link>
+  <joint name="gripper_joint7" type="revolute">
+    <origin xyz="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="arm6_link"/>
+    <child link="gripper_left_link"/>
+    <limit effort="5" lower="-1.57" upper="1.57" velocity="1.0"/>
+  </joint>
+  <joint name="gripper_joint8" type="revolute">
+    <origin xyz="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="arm6_link"/>
+    <child link="gripper_right_link"/>
+    <limit effort="5" lower="-1.57" upper="1.57" velocity="1.0"/>
+  </joint>
+
+  <link name="imu_link">
+    <xacro:dummy_inertial/>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0"/>
+  </joint>
+
+  <!-- ======================== Gazebo Plugins ======================== -->
+  <!-- DiffDrive: /cmd_vel → 走行、/odom → オドメトリ出力 -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${track_width}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <!-- TFはodom_tf_bridge.pyが発行するためここでは無効 -->
+      <publish_odom_tf>false</publish_odom_tf>
+    </plugin>
+  </gazebo>
+
+  <!-- JointStatePublisher: アーム・フリッパの状態を/joint_statesへ -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+      <update_rate>50</update_rate>
+    </plugin>
+  </gazebo>
+
+  <!-- LiDAR: Gazebo の生点群を /velodyne_points として出す -->
+  <gazebo reference="velodyne">
+    <sensor name="vlp16" type="lidar">
+      <pose>0 0 0 0 0 0</pose>
+      <topic>/velodyne_points</topic>
+      <update_rate>8</update_rate>
+      <always_on>true</always_on>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>16</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.261799</min_angle>
+            <max_angle>0.261799</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.1</min>
+          <max>100.0</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <visualize>false</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- IMU -->
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <pose>0 0 0 0 0 0</pose>
+      <topic>imu/data</topic>
+      <update_rate>100</update_rate>
+      <always_on>true</always_on>
+    </sensor>
+  </gazebo>
 
 </robot>

@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -11,13 +11,9 @@ def generate_launch_description() -> LaunchDescription:
 
     config_path = DeclareLaunchArgument(
         "config_path",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "spark_fast_lio_min.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "spark_fast_lio_min.yaml"]),
     )
-    lidar_topic_raw = DeclareLaunchArgument(
-        "lidar_topic_raw", default_value="/velodyne_points"
-    )
+    lidar_topic_raw = DeclareLaunchArgument("lidar_topic_raw", default_value="/velodyne_points")
     # timestamp_unit=0 (SEC) により fix ノード不要。戻す場合は
     # use_time_fix:=true lidar_topic:=/velodyne_points_fixed
     lidar_topic = DeclareLaunchArgument("lidar_topic", default_value="/velodyne_points")
@@ -35,15 +31,11 @@ def generate_launch_description() -> LaunchDescription:
     use_velodyne = DeclareLaunchArgument("use_velodyne", default_value="false")
     velodyne_driver_params = DeclareLaunchArgument(
         "velodyne_driver_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "velodyne_driver.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "velodyne_driver.yaml"]),
     )
     velodyne_pointcloud_params = DeclareLaunchArgument(
         "velodyne_pointcloud_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "velodyne_pointcloud.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "velodyne_pointcloud.yaml"]),
     )
     velodyne_calibration = DeclareLaunchArgument(
         "velodyne_calibration",
@@ -64,9 +56,7 @@ def generate_launch_description() -> LaunchDescription:
     use_time_fix = DeclareLaunchArgument("use_time_fix", default_value="false")
     time_fix_params = DeclareLaunchArgument(
         "time_fix_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "fix_pointcloud_time.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "fix_pointcloud_time.yaml"]),
     )
 
     use_dummy_imu = DeclareLaunchArgument("use_dummy_imu", default_value="false")
@@ -75,12 +65,13 @@ def generate_launch_description() -> LaunchDescription:
         default_value=PathJoinSubstitution([bringup_share, "config", "dummy_imu.yaml"]),
     )
 
+    use_lidar = DeclareLaunchArgument(
+        "use_lidar", default_value="true", description="LiDAR + FAST-LIO パイプラインを有効にする"
+    )
     use_slam = DeclareLaunchArgument("use_slam", default_value="true")
     slam_params = DeclareLaunchArgument(
         "slam_params",
-        default_value=PathJoinSubstitution(
-            [bringup_share, "config", "slam_toolbox_async.yaml"]
-        ),
+        default_value=PathJoinSubstitution([bringup_share, "config", "slam_toolbox_async.yaml"]),
     )
     slam_node_exec = DeclareLaunchArgument(
         "slam_node_exec", default_value="async_slam_toolbox_node"
@@ -97,7 +88,8 @@ def generate_launch_description() -> LaunchDescription:
         remappings=[
             ("lidar", LaunchConfiguration("lidar_topic")),
             ("imu", LaunchConfiguration("imu_topic")),
-            ("odometry", "/odom"),  # Nav2 は /odom を期待
+            # /spark_lio/odom に出力し、odom_selector が /odom に中継する
+            ("odometry", "/spark_lio/odom"),
         ],
         parameters=[
             LaunchConfiguration("config_path"),
@@ -107,6 +99,66 @@ def generate_launch_description() -> LaunchDescription:
                 "common.lidar_frame": LaunchConfiguration("lidar_frame"),
             },
         ],
+        condition=IfCondition(LaunchConfiguration("use_lidar")),
+    )
+
+    kiss_icp_node = Node(
+        package="kiss_icp",
+        executable="kiss_icp_node",
+        name="kiss_icp",
+        output="screen",
+        remappings=[
+            ("pointcloud_topic", LaunchConfiguration("lidar_topic_raw")),
+        ],
+        parameters=[
+            {
+                "base_frame": LaunchConfiguration("base_frame"),
+                "lidar_odom_frame": LaunchConfiguration("map_frame"),
+                "publish_odom_tf": False,  # odom_selector が TF を担当
+                "invert_odom_tf": False,
+            }
+        ],
+        condition=IfCondition(LaunchConfiguration("use_lidar")),
+        respawn=True,
+        respawn_delay=3.0,
+    )
+
+    odom_selector_node = Node(
+        package="bringup",
+        executable="odom_selector.py",
+        name="odom_selector",
+        output="screen",
+        parameters=[
+            {
+                "base_frame": LaunchConfiguration("base_frame"),
+                "odom_frame": LaunchConfiguration("map_frame"),
+                # use_imu=false 時は IMU health が届かないため、タイムアウトで自動 KISS-ICP へ
+                "health_timeout_s": 5.0,
+            }
+        ],
+        condition=IfCondition(LaunchConfiguration("use_lidar")),
+        respawn=True,
+        respawn_delay=2.0,
+    )
+
+    # LiDAR なし時のフォールバック: odom→base_link を単位変換で配信
+    # ロボットの TF ツリーが途切れないよう最低限の TF を保証する
+    odom_base_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="odom_base_fallback_tf",
+        arguments=[
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            LaunchConfiguration("map_frame"),
+            LaunchConfiguration("base_frame"),
+        ],
+        output="screen",
+        condition=UnlessCondition(LaunchConfiguration("use_lidar")),
     )
 
     lidar_static_tf = Node(
@@ -124,6 +176,7 @@ def generate_launch_description() -> LaunchDescription:
             LaunchConfiguration("lidar_frame"),
         ],
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_lidar")),
     )
 
     velodyne_driver_node = Node(
@@ -201,6 +254,8 @@ def generate_launch_description() -> LaunchDescription:
             },
         ],
         condition=IfCondition(LaunchConfiguration("use_slam")),
+        respawn=True,
+        respawn_delay=5.0,
     )
 
     rviz_node = Node(
@@ -213,6 +268,7 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription(
         [
+            use_lidar,
             config_path,
             lidar_topic_raw,
             lidar_topic,
@@ -249,7 +305,10 @@ def generate_launch_description() -> LaunchDescription:
             time_fix_node,
             dummy_imu_node,
             spark_node,
+            kiss_icp_node,
+            odom_selector_node,
             lidar_static_tf,
+            odom_base_static_tf,
             slam_node,
             rviz_node,
         ]

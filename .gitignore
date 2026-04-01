@@ -9,7 +9,6 @@ main_ws/src/**/Cargo.lock
 install/
 build/
 log/
-COLCON_IGNORE
 
 # --- Python ---
 __pycache__/
@@ -30,3 +29,6 @@ __pycache__/
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+
+*.png

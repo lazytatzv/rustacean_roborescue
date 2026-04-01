@@ -19,7 +19,7 @@ common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATO
 
 # ignore
 # スペース区切りで追加
-ignore_list := "kiss_icp h264_republisher"
+ignore_list := ""
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
 # nix特有のwarnフィルター
@@ -46,7 +46,7 @@ forge: forge-bindings
 reforge: clean forge
 
 launch:
-	ros2 launch bringup launch.py
+	cd /home/tatsv/working/rustacean_roborescue/main_ws && source install/setup.bash && ros2 launch bringup launch.py
 
 # ── Code Quality ──
 
@@ -78,3 +78,8 @@ ready:
 
 mm:
 	mmdc -i topology/system_topology.mmd -o system_topology.png -s 3
+
+
+# メモ
+sim:
+	cd /home/tatsv/working/rustacean_roborescue/main_ws && source install/setup.bash && export LIBGL_ALWAYS_SOFTWARE=1 && export MESA_GL_VERSION_OVERRIDE=3.3 && export MESA_GLSL_VERSION_OVERRIDE=330 && export QT_QPA_PLATFORM=xcb && export GZ_PARTITION=roborescue && export IGN_PARTITION=roborescue && export GZ_IP=127.0.0.1 && export IGN_IP=127.0.0.1 && ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=false use_gz_gui:=false use_rviz:=true use_sim_time:=true spawn_delay_sec:=15.0

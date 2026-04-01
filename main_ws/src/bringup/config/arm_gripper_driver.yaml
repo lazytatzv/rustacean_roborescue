@@ -1,7 +1,7 @@
 # アームとグリッパーの統合設定 (同じRS485バスに接続)
 arm_gripper_driver:
   ros__parameters:
-    port_name: "/dev/ttyUSB0"
+    port_name: "/dev/dynamixel_arm"  # udev: deploy/99-robot.rules の dynamixel_arm symlink
     baud_rate: 1000000 # アーム側の高速通信に合わせるのが一般的
 
     # 腕ジョイント設定: 名称とIDの対応
@@ -13,3 +13,18 @@ arm_gripper_driver:
     gripper_joint: "gripper_joint"
     gripper_id: 10
     gripper_max_current: 500 # 握力制限 [mA]
+
+    # ──────────────────────────────────────────────────────────────
+    # ゼロ点オフセット [rad]: physical_angle = urdf_angle + offset
+    #
+    # Dynamixel tick 2048 が URDF joint 0 rad と一致しない場合に設定。
+    # 測定方法:
+    #   1. アームを URDF ゼロ姿勢 (arm_joint2=0 = 水平, 等) に手動で合わせる
+    #   2. `ros2 topic echo /joint_states` で報告される角度を読む
+    #   3. offset = -(報告値)  [報告値がゼロになるように打ち消す]
+    #
+    # Dynamixel Wizard で Homing Offset レジスタ (addr 20) を設定済みの場合は
+    # すべて 0.0 のままで問題ない。
+    # ──────────────────────────────────────────────────────────────
+    arm_offsets: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # [j1, j2, j3, j4, j5, j6]
+    gripper_offset: 0.0

@@ -4,7 +4,7 @@ bt_navigator:
   ros__parameters:
     use_sim_time: false # Launchで上書き
     global_frame: map
-    robot_base_frame: base_footprint
+    robot_base_frame: base_link
     odom_topic: /odom
     bt_loop_duration: 10
     default_server_timeout: 20
@@ -51,7 +51,7 @@ controller_server:
           update_frequency: 5.0
           publish_frequency: 2.0
           global_frame: odom
-          robot_base_frame: base_footprint
+          robot_base_frame: base_link
           rolling_window: true
           width: 3
           height: 3
@@ -88,7 +88,7 @@ planner_server:
           update_frequency: 1.0
           publish_frequency: 1.0
           global_frame: map
-          robot_base_frame: base_footprint
+          robot_base_frame: base_link
           footprint: "[[0.30, 0.175], [0.30, -0.175], [-0.30, -0.175], [-0.30, 0.175]]"
           resolution: 0.05
           track_unknown_space: true

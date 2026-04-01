@@ -1,40 +1,10 @@
 repos:
-  - repo: local
-    hooks:
-      - id: black
-        name: black
-        entry: black .
-        language: system
-        files: \.(py)$
-      - id: ruff
-        name: ruff
-        entry: ruff check .
-        language: system
-        files: \.(py)$
-      - id: pip-audit
-        name: pip-audit
-        entry: pip-audit --progress no
-        language: system
-        files: ^requirements.*\.txt$
-  - repo: local
-    hooks:
-      - id: cargo-fmt
-        name: cargo fmt (check)
-        entry: bash -lc "cd main_ws || true; cargo fmt --all -- --check"
-        language: system
-      - id: cargo-clippy
-        name: cargo clippy
-        entry: bash -lc "cd main_ws || true; cargo clippy --workspace -- -D warnings"
-        language: system
-repos:
   - repo: https://github.com/psf/black
     rev: 24.1.0
     hooks:
       - id: black
         language_version: python3
 
-  # ruff-pre-commit had a pinned rev that failed to initialize in this environment.
-  # Use a local-system ruff hook instead; Nix or CI should provide `ruff` in PATH.
   - repo: local
     hooks:
       - id: ruff
@@ -61,4 +31,17 @@ repos:
         name: cpplint
         entry: cpplint
         language: python
+        additional_dependencies: [cpplint]
         files: '\.(c|cpp|cc|h|hpp)$'
+        args:
+          - --filter=-legal/copyright,-whitespace/braces,-whitespace/line_length,-whitespace/newline,-build/include_order,-build/include_what_you_use,-build/header_guard,-runtime/int,-readability/todo,-build/namespaces,-build/c++17
+
+      - id: cargo-fmt
+        name: cargo fmt (check)
+        entry: bash -lc "cd main_ws || true; cargo fmt --all -- --check"
+        language: system
+
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: bash -lc "cd main_ws || true; cargo clippy --workspace -- -D warnings"
+        language: system

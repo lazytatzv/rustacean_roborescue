@@ -75,17 +75,19 @@ QrDetectorNode::QrDetectorNode(const rclcpp::NodeOptions &options) : Node("qr_de
                         .durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
 
   // ---- Subscriber ----------------------------------------------------
+  // 相対トピック名を使用 → namespace で自動ルーティング
+  // 例: namespace=camera_arm なら /camera_arm/image_raw を購読
   image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-      "/camera/image_raw", sensor_qos,
+      "image_raw", sensor_qos,
       std::bind(&QrDetectorNode::image_callback, this, std::placeholders::_1));
 
   // ---- Publishers ----------------------------------------------------
-  qr_pub_ = this->create_publisher<std_msgs::msg::String>("/qr_codes", 10);
+  qr_pub_ = this->create_publisher<std_msgs::msg::String>("qr_codes", 10);
 
   if (publish_compressed_)
   {
     compressed_pub_ =
-        this->create_publisher<sensor_msgs::msg::CompressedImage>("/image/compressed", sensor_qos);
+        this->create_publisher<sensor_msgs::msg::CompressedImage>("image/compressed", sensor_qos);
   }
 
   RCLCPP_INFO(this->get_logger(), "qr_detector started (interval=%d, jpeg_q=%d, compressed=%d)",

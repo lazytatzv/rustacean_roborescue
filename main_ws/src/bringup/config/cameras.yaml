@@ -1,0 +1,109 @@
+# カメラ設定リスト
+# カメラを追加する場合はここにエントリを追加するだけ。
+# namespace は "camera_<name>" になる (例: camera_front, camera_arm)
+#
+# 共通フィールド:
+#   name        : カメラ識別名 (namespace に使用)
+#   driver      : v4l2 | realsense | theta_s  (デフォルト: v4l2)
+#   use_qr      : QR コード検出を有効にするか (デフォルト: false)
+#   image_topic : QR検出・ffmpegが購読するトピック名 (namespace相対)
+#                 v4l2/theta_s → image_raw / realsense → color/image_raw
+#
+# v4l2 固有:
+#   device      : v4l2 デバイスパス
+#   width/height: 解像度
+#   fps         : フレームレート
+#   frame_id    : TF フレーム名
+#   encoder     : ffmpeg エンコーダ (libx264 / h264_v4l2m2m など)
+#   bitrate     : エンコードビットレート [bps]
+#
+# theta_s 固有 (RICOH THETA S、USB UVC/MJPEGモード):
+#   device      : v4l2 デバイスパス
+#   width/height: 解像度 (デフォルト: 1280x720)
+#   fps         : フレームレート (デフォルト: 15)
+#   frame_id    : TF フレーム名
+#   encoder     : ffmpeg エンコーダ
+#   bitrate     : エンコードビットレート [bps] (デフォルト: 4000000)
+#
+# realsense 固有:
+#   serial      : シリアル番号 (空文字 = 自動検出)
+#   enable_color: カラーストリーム有効 (デフォルト: true)
+#   enable_depth: 深度ストリーム有効 (デフォルト: false)
+#   enable_pose : T265 オドメトリ有効 (デフォルト: false)
+#   color_width/color_height/color_fps: カラー解像度
+#   depth_width/depth_height/depth_fps: 深度解像度
+
+cameras:
+  # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
+  - name: front
+    driver: v4l2
+    device: /dev/video0
+    width: 640
+    height: 480
+    fps: 30
+    frame_id: front_camera_link
+    use_qr: false
+    encoder: libx264
+    bitrate: 2000000
+
+  - name: back
+    driver: v4l2
+    device: /dev/video1
+    width: 640
+    height: 480
+    fps: 30
+    frame_id: back_camera_link
+    use_qr: false
+    encoder: libx264
+    bitrate: 2000000
+
+  - name: left
+    driver: v4l2
+    device: /dev/video2
+    width: 640
+    height: 480
+    fps: 30
+    frame_id: left_camera_link
+    use_qr: false
+    encoder: libx264
+    bitrate: 2000000
+
+  - name: right
+    driver: v4l2
+    device: /dev/video3
+    width: 640
+    height: 480
+    fps: 30
+    frame_id: right_camera_link
+    use_qr: false
+    encoder: libx264
+    bitrate: 2000000
+
+  # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
+  # 事前にライブストリーミングモードを有効化すること: https://theta360.com/en/support/
+  - name: theta
+    driver: theta_s
+    device: /dev/video4
+    width: 1280
+    height: 720
+    fps: 15
+    frame_id: theta_camera_link
+    use_qr: false
+    encoder: libx264
+    bitrate: 4000000
+
+  # ── RealSense ─────────────────────────────────────────────────────────────
+  - name: arm
+    driver: realsense
+    serial: ""            # 複数台使う場合はシリアル番号を指定
+    enable_color: true
+    enable_depth: true
+    color_width: 640
+    color_height: 480
+    color_fps: 30
+    depth_width: 640
+    depth_height: 480
+    depth_fps: 30
+    use_qr: true
+    encoder: libx264
+    bitrate: 1000000

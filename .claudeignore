@@ -1,0 +1,28 @@
+# ROS 2 Workspace Directories
+build/
+install/
+log/
+
+# ROS 2 Data & Logs
+*.db3
+*.pcd
+*.mcap
+*.yaml.save
+*.rviz.autosave
+
+# C++ Build Artifacts
+*.o
+*.so
+*.a
+compile_commands.json
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store

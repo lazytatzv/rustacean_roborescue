@@ -18,16 +18,15 @@
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster">
     </plugin>
-    <!-- Sensors/IMU system: GPU (nixGL) が必要。headless では無効。
-         GUI モード起動時は有効化すること:
+        <!-- Sensors/IMU system: lidarはOGRE必須。MESA_GL_VERSION_OVERRIDE=3.3 で
+          ソフトウェアレンダリング環境でも動作する。 -->
     <plugin filename="gz-sim-sensors-system"
             name="gz::sim::systems::Sensors">
-      <render_engine>ogre2</render_engine>
+       <render_engine>ogre</render_engine>
     </plugin>
     <plugin filename="gz-sim-imu-system"
             name="gz::sim::systems::Imu">
     </plugin>
-    -->
     <plugin filename="gz-sim-contact-system"
             name="gz::sim::systems::Contact">
     </plugin>

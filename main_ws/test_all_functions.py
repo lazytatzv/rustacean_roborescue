@@ -178,7 +178,7 @@ class ComprehensiveTester(Node):
         self.procs.append(proc)
         joy_pub = self.create_publisher(Joy, "/joy", 10)
         crawler_col = MsgCollector()
-        sub_crawler = self.create_subscription(
+        _sub_crawler = self.create_subscription(
             CrawlerVelocity, "/crawler_driver", crawler_col.callback, 10
         )
         self.spin_for(3.0)
@@ -224,9 +224,7 @@ class ComprehensiveTester(Node):
         js_pub = self.create_publisher(JointState, "/joint_states", 10)
         twist_pub = self.create_publisher(Twist, "/arm_cmd_vel", 10)
         cmd_col = MsgCollector()
-        self.create_subscription(
-            JointState, "/arm_joint_commands", cmd_col.callback, 10
-        )
+        self.create_subscription(JointState, "/arm_joint_commands", cmd_col.callback, 10)
 
         def pub_js():
             msg = JointState()

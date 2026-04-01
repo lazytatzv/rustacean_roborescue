@@ -38,21 +38,22 @@ class POIWriter:
                 w.writerow(['"Prelim1"'])
                 w.writerow(["detection,time,type,name,x,y,z,robot,mode"])
 
-    def add_heat_detection(
+    def add_detection(
         self,
-        name: str = "0",
-        x: float = 0.0,
-        y: float = 0.0,
-        z: float = 0.0,
+        det_type: str,
+        name: str,
+        x: float,
+        y: float,
+        z: float,
         robot: str = "robot1",
         mode: str = "A",
-    ):
+    ) -> str:
         self.sequence += 1
         now = datetime.now().strftime("%H:%M:%S")
         row = [
             self.sequence,
             now,
-            "heat_sig",
+            det_type,
             name,
             f"{x:.3f}",
             f"{y:.3f}",
@@ -64,3 +65,14 @@ class POIWriter:
             w = csv.writer(f)
             w.writerow(row)
         return str(self.filepath)
+
+    def add_heat_detection(
+        self,
+        name: str = "0",
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        robot: str = "robot1",
+        mode: str = "A",
+    ):
+        return self.add_detection("heat_sig", name, x, y, z, robot, mode)

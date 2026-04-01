@@ -17,16 +17,10 @@ class DummyImuNode(Node):
         self.declare_parameter("gravity_mps2", 9.80665)
 
         topic = self.get_parameter("topic").get_parameter_value().string_value
-        self.frame_id = (
-            self.get_parameter("frame_id").get_parameter_value().string_value
-        )
+        self.frame_id = self.get_parameter("frame_id").get_parameter_value().string_value
         rate_hz = self.get_parameter("rate_hz").get_parameter_value().double_value
-        self.use_gravity = (
-            self.get_parameter("use_gravity").get_parameter_value().bool_value
-        )
-        self.gravity = (
-            self.get_parameter("gravity_mps2").get_parameter_value().double_value
-        )
+        self.use_gravity = self.get_parameter("use_gravity").get_parameter_value().bool_value
+        self.gravity = self.get_parameter("gravity_mps2").get_parameter_value().double_value
 
         self.pub = self.create_publisher(Imu, topic, 10)
         period = 1.0 / max(rate_hz, 1.0)

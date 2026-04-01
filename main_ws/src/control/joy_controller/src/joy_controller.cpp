@@ -126,9 +126,6 @@ class JoyController : public rclcpp::Node
     const bool ps_pressed = (ps == 1 && prev_ps_ == 0);
     const bool options_pressed = (options == 1 && prev_options_ == 0);
     const bool share_pressed = (share == 1 && prev_share_ == 0);
-    const bool unlock_estop_latched = (options == 1 && share == 1);
-    const bool unlock_combo_pressed =
-        unlock_estop_latched && !(prev_options_ == 1 && prev_share_ == 1);
 
     // PS is a dedicated hard-stop trigger.
     if (ps_pressed)
@@ -140,37 +137,44 @@ class JoyController : public rclcpp::Node
       estop_publisher_->publish(estop_msg);
       RCLCPP_WARN(this->get_logger(), "⛔ EMERGENCY STOP");
     }
-    else if (estop_latched_)
+    else if (options_pressed)
     {
-      // Clear requires OPTIONS+SHARE combo to avoid accidental release.
-      if (unlock_combo_pressed)
+      // OPTIONS → DRIVE (E-Stop 中でも解除して復帰)
+      if (estop_latched_)
       {
         estop_latched_ = false;
         auto estop_msg = std_msgs::msg::Bool();
         estop_msg.data = false;
         estop_publisher_->publish(estop_msg);
-        RCLCPP_INFO(this->get_logger(), "✅ E-STOP CLEARED (OPTIONS+SHARE)");
+        RCLCPP_INFO(this->get_logger(), "✅ E-STOP CLEARED → DRIVE");
       }
-    }
-    else
-    {
-      if (options_pressed)
+      else
       {
-        mode_ = Mode::DRIVE;
         RCLCPP_INFO(this->get_logger(), "Mode: DRIVE");
       }
-      else if (share_pressed)
+      mode_ = Mode::DRIVE;
+    }
+    else if (share_pressed)
+    {
+      // SHARE → ARM / JOINT (E-Stop 中でも解除して復帰)
+      if (estop_latched_)
       {
-        if (mode_ == Mode::ARM)
-        {
-          mode_ = Mode::JOINT;
-          RCLCPP_INFO(this->get_logger(), "Mode: JOINT (Direct Control)");
-        }
-        else
-        {
-          mode_ = Mode::ARM;
-          RCLCPP_INFO(this->get_logger(), "Mode: ARM (IK Control)");
-        }
+        estop_latched_ = false;
+        auto estop_msg = std_msgs::msg::Bool();
+        estop_msg.data = false;
+        estop_publisher_->publish(estop_msg);
+        RCLCPP_INFO(this->get_logger(), "✅ E-STOP CLEARED → ARM");
+        mode_ = Mode::ARM;
+      }
+      else if (mode_ == Mode::ARM)
+      {
+        mode_ = Mode::JOINT;
+        RCLCPP_INFO(this->get_logger(), "Mode: JOINT (Direct Control)");
+      }
+      else
+      {
+        mode_ = Mode::ARM;
+        RCLCPP_INFO(this->get_logger(), "Mode: ARM (IK Control)");
       }
     }
 

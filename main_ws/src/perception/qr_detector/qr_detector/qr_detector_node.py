@@ -16,6 +16,7 @@ import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CompressedImage, Image
@@ -31,6 +32,11 @@ class QrDetectorNode(Node):
         self.declare_parameter("publish_compressed", True)
         self.declare_parameter("jpeg_quality", 60)
         self.declare_parameter("detection_interval", 1)  # process every N-th frame
+        self.declare_parameter("enable_poi_export", False)
+        self.declare_parameter("poi_output_dir", "/tmp/robocup_outputs")
+        self.declare_parameter("team_name", "RustaceanRescue")
+        self.declare_parameter("country", "Japan")
+        self.declare_parameter("robot_name", "robot1")
 
         model_dir = self.get_parameter("model_dir").get_parameter_value().string_value
         self._publish_compressed: bool = (
@@ -42,6 +48,15 @@ class QrDetectorNode(Node):
         self._detection_interval: int = (
             self.get_parameter("detection_interval").get_parameter_value().integer_value
         )
+        self._enable_poi_export: bool = (
+            self.get_parameter("enable_poi_export").get_parameter_value().bool_value
+        )
+        self._poi_output_dir: str = (
+            self.get_parameter("poi_output_dir").get_parameter_value().string_value
+        )
+        self._team_name: str = self.get_parameter("team_name").get_parameter_value().string_value
+        self._country: str = self.get_parameter("country").get_parameter_value().string_value
+        self._robot_name: str = self.get_parameter("robot_name").get_parameter_value().string_value
 
         # Resolve model directory
         if not model_dir:
@@ -50,9 +65,7 @@ class QrDetectorNode(Node):
                 pkg_share = get_package_share_directory("qr_detector")
                 model_dir = os.path.join(pkg_share, "models")
             except Exception:
-                model_dir = os.path.join(
-                    os.path.dirname(__file__), "..", "..", "models"
-                )
+                model_dir = os.path.join(os.path.dirname(__file__), "..", "..", "models")
 
         # ---- WeChatQRCode detector -----------------------------------------
         detect_proto = os.path.join(model_dir, "detect.prototxt")
@@ -69,6 +82,23 @@ class QrDetectorNode(Node):
         )
         self.get_logger().info("WeChatQRCode detector initialized")
 
+        self._robot_x: float = 0.0
+        self._robot_y: float = 0.0
+        self._robot_z: float = 0.0
+
+        self._poi_writer = None
+        if self._enable_poi_export:
+            try:
+                from omron_bridge.poi_writer import POIWriter
+
+                self._poi_writer = POIWriter(
+                    out_dir=self._poi_output_dir,
+                    team_name=self._team_name,
+                    country=self._country,
+                )
+            except Exception as e:
+                self.get_logger().warn(f"POIWriter not available: {e}")
+
         # ---- cv_bridge -----------------------------------------------------
         self._bridge = CvBridge()
 
@@ -79,13 +109,13 @@ class QrDetectorNode(Node):
             durability=DurabilityPolicy.VOLATILE,
         )
 
-        # ---- Subscriber ----------------------------------------------------
-        self.create_subscription(
-            Image, "/camera/image_raw", self._image_callback, sensor_qos
-        )
+        # ---- Subscribers ---------------------------------------------------
+        self.create_subscription(Image, "/camera/image_raw", self._image_callback, sensor_qos)
+        self.create_subscription(Odometry, "/odom", self._odom_cb, sensor_qos)
 
         # ---- Publishers ----------------------------------------------------
         self._qr_pub = self.create_publisher(String, "/qr_codes", 10)
+        self._poi_pub = self.create_publisher(String, "/poi_detections", 10)
 
         if self._publish_compressed:
             self._compressed_pub = self.create_publisher(
@@ -100,6 +130,11 @@ class QrDetectorNode(Node):
             f"qr_detector started (interval={self._detection_interval}, "
             f"jpeg_q={self._jpeg_quality}, compressed={self._publish_compressed})"
         )
+
+    def _odom_cb(self, msg: Odometry) -> None:
+        self._robot_x = msg.pose.pose.position.x
+        self._robot_y = msg.pose.pose.position.y
+        self._robot_z = msg.pose.pose.position.z
 
     # -----------------------------------------------------------------------
     def _image_callback(self, msg: Image) -> None:
@@ -127,16 +162,28 @@ class QrDetectorNode(Node):
             self._qr_pub.publish(qr_msg)
             self.get_logger().info(f"QR detected: {content}")
 
+            if self._enable_poi_export:
+                poi_notice = String()
+                poi_notice.data = f"ar_code,{content}"
+                self._poi_pub.publish(poi_notice)
+                if self._poi_writer is not None:
+                    try:
+                        path = self._poi_writer.add_detection(
+                            "ar_code",
+                            content[:32],
+                            self._robot_x,
+                            self._robot_y,
+                            self._robot_z,
+                            robot=self._robot_name,
+                        )
+                        self.get_logger().info(f"POI written: {path}")
+                    except Exception as e:
+                        self.get_logger().error(f"POI write error: {e}")
+
             # Draw bounding box on frame for compressed output
-            if (
-                self._compressed_pub is not None
-                and points is not None
-                and i < len(points)
-            ):
+            if self._compressed_pub is not None and points is not None and i < len(points):
                 pts = points[i].astype(np.int32).reshape(-1, 2)
-                cv2.polylines(
-                    frame, [pts], isClosed=True, color=(0, 255, 0), thickness=2
-                )
+                cv2.polylines(frame, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
                 cv2.putText(
                     frame,
                     content[:40],
@@ -152,9 +199,7 @@ class QrDetectorNode(Node):
             comp_msg = CompressedImage()
             comp_msg.header = msg.header
             comp_msg.format = "jpeg"
-            _, buf = cv2.imencode(
-                ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._jpeg_quality]
-            )
+            _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._jpeg_quality])
             comp_msg.data = buf.tobytes()
             self._compressed_pub.publish(comp_msg)
 

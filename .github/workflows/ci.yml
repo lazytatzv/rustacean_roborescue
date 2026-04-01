@@ -1,318 +1,374 @@
-name: CI (main-heavy)
+name: CI
+
+# Nixを用いたビルドチェック等
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main]
   workflow_dispatch:
+
+# 同じブランチへの連続 push は古いランをキャンセルする
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Job graph:
+#
+#   lint
+#   rust ──┐
+#   cpp  ──┴── coverage
+#
+# lint, rust, cpp は並列実行でフィードバックを最速にする。
+# ─────────────────────────────────────────────────────────────────────────────
+
 jobs:
-  lint-and-checks:
-    name: Lint & Checks
+  # ───────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    env:
+      # GithubのVariableに登録してある
+      # CachixのAuth tokenはサイトで生成
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    timeout-minutes: 20
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      # Nix インストールは DeterminateSystems で統一
+      - uses: DeterminateSystems/nix-installer-action@v22
+
+
+      # Cachix: チーム専用の永続バイナリキャッシュ
+      # CACHIX_AUTH_TOKEN を repo secrets に設定すること
+      - uses: cachix/cachix-action@v14
+        if: env.CACHIX_AUTH_TOKEN != ''
+        continue-on-error: true
         with:
-          python-version: '3.10'
+          name: roborescue-nix
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
 
-      - name: Install dev deps
+      - name: Run pre-commit (全ファイル)
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          # cargo-fmt / cargo-clippy は rust job で別途チェックするためスキップ
+          SKIP=cargo-fmt,cargo-clippy \
+          nix develop .#precommit --fallback --accept-flake-config --command \
+            pre-commit run --all-files --show-diff-on-failure
 
-      - name: Install system C/C++ tooling
-        run: |
-          sudo apt-get update && sudo apt-get install -y clang-format clang-tidy cppcheck || true
+      - name: pre-commit による変更がないか確認
+        run: git diff --exit-code
 
-      - name: Byte-compile Python files
-        run: |
-          set -e
-          find . -name "*.py" -not -path "./.git/*" -print0 | xargs -0 -n1 python -m py_compile
-
-      - name: Run ruff
-        run: |
-          ruff check .
-
-      - name: Run pre-commit
-        run: |
-          pre-commit run --all-files --show-diff-on-failure
-
-      - name: Fail if pre-commit made changes
-        run: |
-          set -e
-          if ! git diff --exit-code --quiet; then
-            echo "pre-commit made changes. Please run 'pre-commit run --all-files' locally and include the fixes in your commit." >&2
-            git --no-pager status --porcelain
-            exit 1
-          else
-            echo "No pre-commit changes detected."
-          fi
-
-      - name: Run C++ linters
-        run: |
-          set -e
-          git ls-files '*.c' '*.cpp' '*.cc' '*.h' '*.hpp' | xargs -r cpplint || true
-          cppcheck --enable=warning,style,performance --inconclusive --std=c++17 main_ws/src || true
-
-  build-and-test:
-    name: Nix Build + Tests
-    runs-on: ubuntu-22.04
-    timeout-minutes: 120
-    needs: lint-and-checks
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Nix
-        run: |
-          curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
-          . $HOME/.nix-profile/etc/profile.d/nix.sh
-
-      - name: Optional: configure Cachix (if available)
-        if: ${{ secrets.CACHIX_AUTH != '' }}
-        run: |
-          curl -sL https://cachix.org/install.sh | sh
-          cachix authtoken ${{ secrets.CACHIX_AUTH }}
-          cachix use rustacean-roborescue || true
-
-      - name: Cache cargo registry and target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            main_ws/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Cache pip and pytest caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.cache/pytest
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Cache Nix & dev-shell artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/nix
-            ~/.nix-profile
-            ~/.local/share/nix
-          key: ${{ runner.os }}-nix-${{ hashFiles('flake.nix') }}-${{ hashFiles('flake.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-nix-
-
-      - name: Cache colcon build artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            main_ws/build
-            main_ws/install
-          key: ${{ runner.os }}-colcon-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}-${{ hashFiles('flake.nix') }}
-          restore-keys: |
-            ${{ runner.os }}-colcon-
-
-      - name: Show Nix and environment
-        run: |
-          . $HOME/.nix-profile/etc/profile.d/nix.sh
-          nix --version
-          uname -a
-
-      - name: Enter Nix dev shell and run build + tests
-        env:
-          RUST_BACKTRACE: 1
-        run: |
-          . $HOME/.nix-profile/etc/profile.d/nix.sh
-          nix develop --accept-flake-config --command bash -lc '
-            set -euo pipefail
-            echo "Running colcon build (selected packages)..."
-            cd main_ws
-            colcon build --packages-select h264_republisher --merge-install || true
-
-            echo "Run cargo unit tests for arm_controller (pure Rust tests)..."
-            cd src/control/arm_controller
-            cargo test --verbose || true
-
-            echo "Run Python integration tests (if any)"
-            cd ../../..
-            if [ -f test_arm_controller.py ]; then
-              python3 -m pytest -q test_arm_controller.py || true
-            fi
-          '
-
-      - name: Upload build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-logs
-          path: |
-            main_ws/build
-            main_ws/log
-
+  # ───────────────────────────────────────────────────────────────────────────
   rust:
-    name: Rust (fmt + clippy + test)
+    name: Rust
     runs-on: ubuntu-latest
-    needs: [lint-and-checks]
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache cargo registry and target (Rust job)
-        uses: actions/cache@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: cachix/cachix-action@v14
+        if: env.CACHIX_AUTH_TOKEN != ''
+        continue-on-error: true
+        with:
+          name: roborescue-nix
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      # Cargo レジストリ + target ディレクトリをキャッシュ。
+      # flake.lock を key に含めることで Rust toolchain 更新時に自動破棄される。
+      - uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             main_ws/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            cargo-${{ runner.os }}-
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v10
+      # colcon ビルド成果物 (ROS2パッケージ) をキャッシュ。cpp ジョブと共用。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            main_ws/build
+            main_ws/install
+          key: colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            colcon-${{ runner.os }}-
 
-      - name: Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@v4
-
-      - name: Build ROS 2 message bindings
+      # just forge に相当するビルド
+      - name: forge (Build all packages)
         run: |
-          nix develop --impure -c bash -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            colcon build --merge-install --symlink-install \
+
+            # 1. 環境変数のセットアップ
+            export COLCON_ROS_SKIP_INSTALL_CHECK=1
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
+
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            # Nix環境特有の警告を抑制
+            filter_cmd=\"grep -v 'doesn.t contain any .local_setup... files' || true\"
+
+            # 2. ジェネレーター単体をビルド (forge-bindings相当)
+            colcon build \
               --packages-up-to rosidl_generator_rs \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
-              2>&1 | grep -v 'local_setup' || true
-            source install/setup.bash
-            colcon build --merge-install --symlink-install \
-              --packages-select custom_interfaces \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
-              2>&1 | grep -v 'local_setup' || true
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF
+
+            # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+
+            colcon build \
+              --merge-install --symlink-install \
+              --event-handlers console_cohesion+ \
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -DBUILD_TESTING=OFF \
+                -G Ninja \
+              --packages-ignore h264_republisher vision_processor dynamixel_hardware_interface
+
           "
+
+      - name: Upload build logs (失敗時)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: colcon-logs-rust
+          path: main_ws/log
 
       - name: cargo fmt --check
         run: |
-          nix develop --impure -c bash -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws && cargo fmt --all -- --check
           "
 
-      - name: cargo clippy
+      - name: cargo clippy (warnings = errors)
         run: |
-          nix develop --impure -c bash -c "
-            cd main_ws && source install/setup.bash && \
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             cargo clippy --workspace -- -D warnings
           "
 
       - name: cargo test
         run: |
-          nix develop --impure -c bash -c "
-            cd main_ws && source install/setup.bash && \
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
             cargo test --workspace
           "
 
+      - name: cargo audit (セキュリティ脆弱性チェック)
+        run: |
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws && cargo audit
+          "
+
+  # ───────────────────────────────────────────────────────────────────────────
   cpp:
-    name: C++ (colcon build)
+    name: C++
     runs-on: ubuntu-latest
-    needs: [lint-and-checks]
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache colcon build/install (C++ job)
-        uses: actions/cache@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: cachix/cachix-action@v14
+        if: env.CACHIX_AUTH_TOKEN != ''
+        continue-on-error: true
+        with:
+          name: roborescue-nix
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      # ccache + colcon ビルド成果物をキャッシュ。
+      # flake.lock を key に含めることで ROS パッケージ更新時に自動破棄される。
+      - uses: actions/cache@v4
         with:
           path: |
+            ~/.cache/ccache
             main_ws/build
             main_ws/install
-          key: ${{ runner.os }}-colcon-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}-${{ hashFiles('flake.nix') }}
+          key: colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-colcon-
+            colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            colcon-${{ runner.os }}-
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v10
-
-      - name: Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@v4
-
-      - name: colcon build (C++ packages)
+      # just forge に完全一致するビルド
+      - name: forge (just forge 相当)
         run: |
-          nix develop --impure -c bash -c "
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
             cd main_ws
-            colcon build --merge-install --symlink-install \
-              --cmake-args -DROSIDL_GENERATOR_RUST=ON -G Ninja \
-              --packages-ignore kiss_icp \
-              2>&1 | grep -v 'local_setup' || true
+
+            # 1. 環境変数のセットアップ
+            export COLCON_ROS_SKIP_INSTALL_CHECK=1
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
+
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            # Nix環境特有の警告を抑制
+            filter_cmd=\"grep -v 'doesn.t contain any .local_setup... files' || true\"
+
+            # 2. ジェネレーター単体をビルド (forge-bindings相当)
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF
+
+            # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+
+            colcon build \
+              --merge-install --symlink-install \
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -DBUILD_TESTING=OFF \
+                -G Ninja \
+              --packages-ignore h264_republisher vision_processor dynamixel_hardware_interface
+
           "
 
-  coverage:
-    name: Coverage and upload
-    runs-on: ubuntu-22.04
-    needs: [build-and-test, rust, cpp]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Upload build logs (失敗時)
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          python-version: '3.10'
+          name: colcon-logs
+          path: main_ws/log
 
-      - name: Install dev deps
+  # ───────────────────────────────────────────────────────────────────────────
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    timeout-minutes: 60
+    needs: [rust, cpp]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: cachix/cachix-action@v14
+        if: env.CACHIX_AUTH_TOKEN != ''
+        continue-on-error: true
+        with:
+          name: roborescue-nix
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            main_ws/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            cargo-${{ runner.os }}-
+
+      # colcon ビルド成果物 (ROS2パッケージ) をキャッシュ。cpp/rust ジョブと共用。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            main_ws/build
+            main_ws/install
+          key: colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/package.xml') }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            colcon-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            colcon-${{ runner.os }}-
+
+      - name: forge (Build all packages)
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
 
-      - name: Run Python coverage (pytest)
+            # 1. 環境変数のセットアップ
+            export COLCON_ROS_SKIP_INSTALL_CHECK=1
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CARGO_BUILD_RUSTFLAGS=\"-C link-arg=-fuse-ld=mold\"
+
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            gen_cmake=\"\$install_dir/share/rosidl_generator_rs/cmake\"
+            # Nix環境特有の警告を抑制
+            filter_cmd=\"grep -v 'doesn.t contain any .local_setup... files' || true\"
+
+            # 2. ジェネレーター単体をビルド (forge-bindings相当)
+            colcon build \
+              --packages-up-to rosidl_generator_rs \
+              --merge-install --symlink-install \
+              --cmake-args -G Ninja -DBUILD_TESTING=OFF
+
+            # 3. 依存パスを強制エクスポートした状態で全体をビルド (forge相当)
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+
+            colcon build \
+              --merge-install --symlink-install \
+              --cmake-args \
+                -DROSIDL_GENERATOR_RUST=ON \
+                -Drosidl_generator_rs_DIR=\"\$gen_cmake\" \
+                -DBUILD_TESTING=OFF \
+                -G Ninja \
+              --packages-ignore h264_republisher vision_processor dynamixel_hardware_interface
+
+          "
+
+      - name: Rust カバレッジ (tarpaulin)
         run: |
-          set -e
-          if [ -f main_ws/test_all_functions.py ]; then
-            python -m pytest --cov=main_ws --cov-report=xml:coverage-python.xml -q || true
-          else
-            echo "No python tests found; skipping"
-          fi
+          nix develop .#ci --fallback --accept-flake-config --command bash -euo pipefail -c "
+            cd main_ws
+            install_dir=\$(pwd)/install
+            py_path=\"\$install_dir/lib/python3.12/site-packages\"
+            export AMENT_PREFIX_PATH=\"\$install_dir\${AMENT_PREFIX_PATH:+:\$AMENT_PREFIX_PATH}\"
+            export PYTHONPATH=\"\$py_path\${PYTHONPATH:+:\$PYTHONPATH}\"
+            export PATH=\"\$install_dir/lib/rosidl_generator_rs:\$PATH\"
+            cargo tarpaulin --workspace --out Xml --output-file tarpaulin-report.xml
+          "
 
-      - name: Install cargo-tarpaulin
-        run: |
-          set -e
-          cargo install cargo-tarpaulin || true
-
-      - name: Run Rust coverage (tarpaulin)
-        run: |
-          set -e
-          if [ -f main_ws/Cargo.toml ] || [ -f Cargo.toml ]; then
-            . $HOME/.nix-profile/etc/profile.d/nix.sh || true
-            nix develop --impure -c bash -lc '
-              set -euo pipefail
-              cd main_ws || true
-              cargo tarpaulin --workspace --out Xml || true
-            '
-          else
-            echo "No Rust workspace found; skipping tarpaulin"
-          fi
-
-      - name: Upload coverage to Codecov
-        if: secrets.CODECOV_TOKEN != ''
+      - name: Codecov へアップロード
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: |
-            coverage-python.xml
-            tarpaulin-report.xml
-          flags: unittests
+          files: main_ws/tarpaulin-report.xml
           fail_ci_if_error: false
