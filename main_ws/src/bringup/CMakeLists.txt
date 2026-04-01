@@ -27,6 +27,7 @@ install(PROGRAMS
   scripts/crawler_vel_bridge.py
   scripts/arm_gz_bridge.py
   scripts/odom_tf_bridge.py
+  scripts/odom_selector.py
   scripts/demo_joints.py
   scripts/teleop_joints.py
   DESTINATION lib/${PROJECT_NAME}
