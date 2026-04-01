@@ -38,24 +38,31 @@ def generate_launch_description():
     patched_ld_library_path = ":".join(ld_parts)
 
     router_cmd = (
-        "set -e; "
-        "if ss -ltn '( sport = :7447 )' | grep -q ':7447'; then "
-        "  if ss -ltnp '( sport = :7447 )' 2>/dev/null | grep -q 'zenohd'; then "
-        "    echo '[network.launch] zenoh router already running on :7447, skip local zenohd'; "
-        "    exit 0; "
-        "  fi; "
-        "  echo '[network.launch] :7447 is busy by non-zenoh process, starting zenohd on :17447'; "
-        "  _tmp_cfg=$(mktemp); "
-        "  trap 'rm -f \"$_tmp_cfg\"' EXIT; "
-        "  sed 's#tcp/0\\.0\\.0\\.0:7447#tcp/0.0.0.0:17447#g' "
+        "while true; do "
+        "  if ss -ltn '( sport = :7447 )' | grep -q ':7447'; then "
+        "    if ss -ltnp '( sport = :7447 )' 2>/dev/null | grep -q 'zenohd'; then "
+        "      echo '[network.launch] zenoh router detected on :7447, monitoring...'; "
+        "      sleep 3; "
+        "      continue; "
+        "    fi; "
+        "    echo '[network.launch] :7447 busy by non-zenoh process, launching local zenohd on :17447'; "
+        "    _tmp_cfg=$(mktemp); "
+        "    sed 's#tcp/0\\.0\\.0\\.0:7447#tcp/0.0.0.0:17447#g' "
         + shlex.quote(zenoh_router_config)
         + " > \"$_tmp_cfg\"; "
-        "  exec zenohd --config \"$_tmp_cfg\"; "
-        "else "
-        "  exec zenohd --config "
+        "    zenohd --config \"$_tmp_cfg\" || true; "
+        "    rm -f \"$_tmp_cfg\"; "
+        "    echo '[network.launch] local zenohd(:17447) exited, retrying in 2s'; "
+        "    sleep 2; "
+        "    continue; "
+        "  fi; "
+        "  echo '[network.launch] launching local zenohd on :7447'; "
+        "  zenohd --config "
         + shlex.quote(zenoh_router_config)
-        + "; "
-        "fi"
+        + " || true; "
+        "  echo '[network.launch] local zenohd(:7447) exited, retrying in 2s'; "
+        "  sleep 2; "
+        "done"
     )
 
     actions = [
