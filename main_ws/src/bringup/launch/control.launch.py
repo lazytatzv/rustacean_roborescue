@@ -2,7 +2,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import (
     LaunchConfiguration,
@@ -13,14 +13,9 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def _load_robot_description() -> str:
+def _load_robot_description(dxl_model_folder: str) -> str:
     """URDF を読み込み DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER を実パスに置換して返す。"""
     urdf_path = os.path.join(get_package_share_directory("bringup"), "urdf", "sekirei.urdf")
-    dxl_model_folder = os.path.join(
-        get_package_share_directory("dynamixel_hardware_interface"),
-        "param",
-        "dxl_model",
-    )
     with open(urdf_path) as f:
         return f.read().replace("DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER", dxl_model_folder)
 
@@ -80,8 +75,32 @@ def generate_launch_description() -> LaunchDescription:
         ),
     )
 
+    ros2_control_available = True
+    ros2_control_warning = None
+    robot_description = ""
+    try:
+        dxl_model_folder = os.path.join(
+            get_package_share_directory("dynamixel_hardware_interface"),
+            "param",
+            "dxl_model",
+        )
+        robot_description = _load_robot_description(dxl_model_folder)
+    except Exception as e:
+        ros2_control_available = False
+        ros2_control_warning = LogInfo(
+            msg=(
+                "[WARN][control.launch] dynamixel_hardware_interface unavailable; "
+                f"falling back to arm_backend=direct ({e})"
+            )
+        )
+
     use_ros2_control = PythonExpression(
-        ["'", LaunchConfiguration("arm_backend"), "' == 'ros2_control'"]
+        [
+            "'",
+            LaunchConfiguration("arm_backend"),
+            "' == 'ros2_control' and ",
+            str(ros2_control_available),
+        ]
     )
 
     hw_respawn = {"respawn": True, "respawn_delay": 3.0}
@@ -154,9 +173,11 @@ def generate_launch_description() -> LaunchDescription:
                     "'",
                     LaunchConfiguration("use_arm"),
                     "' == 'true'",
-                    " and '",
+                    " and ('",
                     LaunchConfiguration("arm_backend"),
-                    "' != 'ros2_control'",
+                    "' != 'ros2_control' or not ",
+                    str(ros2_control_available),
+                    ")",
                 ]
             )
         ),
@@ -164,7 +185,6 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # ── ros2_control モード ───────────────────────────────────────────────
-    robot_description = _load_robot_description()
     controllers_yaml = os.path.join(
         get_package_share_directory("bringup"),
         "config",
@@ -264,6 +284,8 @@ def generate_launch_description() -> LaunchDescription:
             arg_arm_gripper_driver_params,
             arg_joy_params,
             arg_arm_backend,
+            # 依存不足時のフォールバック告知
+            *([ros2_control_warning] if ros2_control_warning is not None else []),
             # 共通
             crawler_driver_node,
             flipper_driver_node,
