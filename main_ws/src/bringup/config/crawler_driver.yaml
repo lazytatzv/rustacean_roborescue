@@ -1,6 +1,7 @@
 crawler_driver:
   ros__parameters:
     serial_port: "/dev/roboclaw" # ここはudevで名前を縛る必要がある
+    baud_rate: 115200 # Roboclaw本体設定に合わせる
     crawler_circumference: 0.39
     counts_per_rev: 256
     gearhead_ratio: 66

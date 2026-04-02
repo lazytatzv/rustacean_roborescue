@@ -32,7 +32,7 @@ constexpr uint8_t CMD_READ_MAIN_VOLTAGE = 90;
 constexpr uint8_t CMD_READ_STATUS = 24;
 constexpr uint8_t CMD_SET_M1_MAX_CURRENT = 133;
 constexpr uint8_t CMD_SET_M2_MAX_CURRENT = 134;
-constexpr int SERIAL_BAUD_RATE = 38400;
+constexpr int DEFAULT_SERIAL_BAUD_RATE = 115200;
 
 // ──────────────────────────────────────────────
 // Roboclaw status flags (command 24)
@@ -72,14 +72,14 @@ class RoboclawDriver
   RoboclawDriver() : io_(), serial_(io_) {}
 
   /// シリアルポートを開く。失敗した場合は false を返す (例外を投げない)
-  bool connect(const std::string &port)
+  bool connect(const std::string &port, int baud_rate)
   {
     boost::system::error_code ec;
     serial_.open(port, ec);
     if (ec) return false;
 
     using spb = boost::asio::serial_port_base;
-    serial_.set_option(spb::baud_rate(SERIAL_BAUD_RATE));
+    serial_.set_option(spb::baud_rate(baud_rate));
     serial_.set_option(spb::character_size(8));
     serial_.set_option(spb::parity(spb::parity::none));
     serial_.set_option(spb::stop_bits(spb::stop_bits::one));
@@ -295,6 +295,7 @@ class CrawlerDriver : public rclcpp::Node
   CrawlerDriver() : Node("crawler_driver")
   {
     this->declare_parameter<std::string>("serial_port", "/dev/roboclaw");
+    declare_parameter("baud_rate", DEFAULT_SERIAL_BAUD_RATE);
     declare_parameter("crawler_circumference", 0.39);
     declare_parameter("counts_per_rev", 256);
     declare_parameter("gearhead_ratio", 66);
@@ -385,6 +386,7 @@ class CrawlerDriver : public rclcpp::Node
   // ── パラメータ ────────────────────────────────────────────────────────────
   double counts_per_meter_;
   int watchdog_timeout_ms_;
+  int baud_rate_;
   double track_width_;
   double m1_kp_, m1_ki_, m1_kd_;
   int m1_qpps_;
@@ -432,6 +434,7 @@ class CrawlerDriver : public rclcpp::Node
     const int gearhead_ratio = get_parameter("gearhead_ratio").as_int();
     const int pulley_ratio = get_parameter("pulley_ratio").as_int();
     watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
+    baud_rate_ = get_parameter("baud_rate").as_int();
     track_width_ = get_parameter("track_width").as_double();
 
     m1_kp_ = get_parameter("m1_kp").as_double();
@@ -450,6 +453,13 @@ class CrawlerDriver : public rclcpp::Node
 
     counts_per_meter_ = (counts_per_rev * gearhead_ratio * pulley_ratio) / circumference;
     last_cmd_time_ = now();
+
+    if (baud_rate_ <= 0)
+    {
+      RCLCPP_WARN(get_logger(), "Invalid baud_rate=%d. Falling back to %d", baud_rate_,
+                  DEFAULT_SERIAL_BAUD_RATE);
+      baud_rate_ = DEFAULT_SERIAL_BAUD_RATE;
+    }
   }
 
   void tryConnect()
@@ -457,10 +467,11 @@ class CrawlerDriver : public rclcpp::Node
     if (hw_connected_) return;
 
     const std::string port = get_parameter("serial_port").as_string();
-    if (!roboclaw_.connect(port))
+    if (!roboclaw_.connect(port, baud_rate_))
     {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
-                           "Failed to connect to Roboclaw on %s. Retrying...", port.c_str());
+                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...", port.c_str(),
+                           baud_rate_);
       return;
     }
 
@@ -468,7 +479,7 @@ class CrawlerDriver : public rclcpp::Node
     connect_timer_->cancel();
     last_cmd_time_ = now();
     initHardware();
-    RCLCPP_INFO(get_logger(), "Connected to Roboclaw on %s", port.c_str());
+    RCLCPP_INFO(get_logger(), "Connected to Roboclaw on %s @ %d bps", port.c_str(), baud_rate_);
   }
 
   void initHardware()

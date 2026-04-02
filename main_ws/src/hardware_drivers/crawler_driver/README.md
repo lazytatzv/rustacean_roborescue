@@ -44,6 +44,7 @@ ros2 topic pub /crawler_driver custom_interfaces/msg/CrawlerVelocity "{m1_vel: 1
 | パラメータ名            | デフォルト値    | 説明                                |
 |-------------------------|-----------------|-------------------------------------|
 | `serial_port`           | `/dev/roboclaw` | シリアルポートのパス                |
+| `baud_rate`             | `115200`        | Roboclaw シリアルボーレート         |
 | `crawler_circumference` | `0.39`          | クローラーの円周（m）               |
 | `counts_per_rev`        | `256`           | 1回転あたりのエンコーダーカウント数 |
 | `gearhead_ratio`        | `66`            | 減速機の比率                        |
