@@ -162,6 +162,8 @@ def generate_launch_description():
             arg_use_flipper,
             arg_use_imu,
             # network.launch.py 側でも再設定するが、初期化順で取りこぼさないよう先に注入する
+            SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
+            SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0"),
             SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
             SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
             # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)

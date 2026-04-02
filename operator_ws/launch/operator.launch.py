@@ -20,6 +20,8 @@ def generate_launch_description():
     zenoh_config_uri = f"file://{zenoh_config_path}"
 
     set_rmw = SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp")
+    set_ros_domain = SetEnvironmentVariable("ROS_DOMAIN_ID", "0")
+    set_ros_localhost_only = SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0")
     # Keep waiting for router instead of failing the initial one-shot check.
     set_router_check_attempts = SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1")
     set_zenoh_uri = SetEnvironmentVariable("RMW_ZENOH_CONFIG_URI", zenoh_config_uri)
@@ -117,6 +119,8 @@ def generate_launch_description():
     ld = LaunchDescription()
     # environment first
     ld.add_action(set_rmw)
+    ld.add_action(set_ros_domain)
+    ld.add_action(set_ros_localhost_only)
     ld.add_action(set_router_check_attempts)
     ld.add_action(set_zenoh_uri)
     ld.add_action(use_audio)

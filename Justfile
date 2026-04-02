@@ -33,6 +33,14 @@ robot-up:
 robot-up-min:
   nix develop --accept-flake-config --command bash -lc 'cd main_ws && source install/setup.bash && while true; do echo "[robot-up-min] launching minimal system"; ros2 launch bringup system.launch.py use_audio:=false use_lidar:=false use_camera:=false use_crawler:=false use_arm:=false use_flipper:=false use_imu:=false use_nav2:=false; code=$?; echo "[robot-up-min] launch exited code=$code; retry in 3s"; sleep 3; done'
 
+# One command operator bringup with fixed Zenoh env (lightweight mode)
+operator-up-min:
+  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 launch launch/operator.launch.py use_foxglove:=false use_audio:=false use_joy:=true'
+
+# Quick operator-side graph check under the same fixed env
+operator-topic-list:
+  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 topic list'
+
 
 # TEST
 # devcontainerは普段は使っていない
