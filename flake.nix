@@ -76,6 +76,7 @@
 
           # --- Python ---
           python3
+          uv
           python3Packages.numpy
           python3Packages.opencv4     # qr_detector / vision_processor
           python3Packages.black
@@ -420,7 +421,7 @@
 
         devShells.operator = pkgs.mkShell {
           name = "RoboRescue Operator";
-          packages = [ operatorEnv ];
+          packages = [ operatorEnv pkgs.uv ];
 
           shellHook = ''
             export ROS_DISTRO="${ROS_VERSION}"
