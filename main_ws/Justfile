@@ -45,8 +45,8 @@ forge: forge-bindings
 
 reforge: clean forge
 
-launch:
-	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && ros2 launch bringup system.launch.py
+launch *launch_args:
+	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && ros2 launch bringup system.launch.py {{launch_args}}
 
 # ── Code Quality ──
 

@@ -71,6 +71,12 @@ class RoboclawDriver
  public:
   RoboclawDriver() : io_(), serial_(io_) {}
 
+  void disconnect()
+  {
+    boost::system::error_code ec;
+    if (serial_.is_open()) serial_.close(ec);
+  }
+
   /// シリアルポートを開く。失敗した場合は false を返す (例外を投げない)
   bool connect(const std::string &port, int baud_rate)
   {
@@ -596,8 +602,12 @@ class CrawlerDriver : public rclcpp::Node
   void stopMotors()
   {
     if (!hw_connected_) return;
-    roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
-    roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
+    const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
+    const bool ok2 = roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
+    if (!ok1 || !ok2)
+    {
+      handleCommFailure("failed to send zero-velocity stop command");
+    }
   }
 
   void sendMotorCommands(double m1_vel, double m2_vel)
@@ -627,10 +637,14 @@ class CrawlerDriver : public rclcpp::Node
     const auto m1 = static_cast<int32_t>(m1_cmd_qpps_ * m1_stall_.scale);
     const auto m2 = static_cast<int32_t>(m2_cmd_qpps_ * m2_stall_.scale);
 
-    if (!roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1))
-      RCLCPP_ERROR(get_logger(), "Failed to send M1 command");
-    if (!roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, m2))
-      RCLCPP_ERROR(get_logger(), "Failed to send M2 command");
+    const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
+    const bool ok2 = roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, m2);
+    if (!ok1) RCLCPP_ERROR(get_logger(), "Failed to send M1 command");
+    if (!ok2) RCLCPP_ERROR(get_logger(), "Failed to send M2 command");
+    if (!ok1 || !ok2)
+    {
+      handleCommFailure("motor command write failure");
+    }
   }
 
   void driver_callback(const custom_interfaces::msg::CrawlerVelocity &msg)
@@ -660,6 +674,25 @@ class CrawlerDriver : public rclcpp::Node
                            "Watchdog: no command for %.0f ms, stopping motors", elapsed);
       stopMotors();
     }
+  }
+
+  void handleCommFailure(const char *reason)
+  {
+    if (!hw_connected_) return;
+
+    hw_connected_ = false;
+    telemetry_.valid = false;
+    m1_cmd_qpps_ = 0;
+    m2_cmd_qpps_ = 0;
+    m1_stall_ = StallState{};
+    m2_stall_ = StallState{};
+
+    roboclaw_.disconnect();
+    if (connect_timer_) connect_timer_->reset();
+
+    RCLCPP_ERROR(get_logger(),
+                 "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
+                 reason);
   }
 };
 

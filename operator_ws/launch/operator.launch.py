@@ -26,10 +26,11 @@ def generate_launch_description():
     set_router_check_attempts = SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1")
     set_zenoh_uri = SetEnvironmentVariable("RMW_ZENOH_CONFIG_URI", zenoh_config_uri)
     # NOTE: In this environment, rmw_zenoh_cpp can ignore RMW_ZENOH_CONFIG_URI and fall back
-    # to tcp/localhost:7447. Force the remote router endpoint explicitly.
+    # to tcp/localhost:7447. Force endpoint settings explicitly.
+    # Use peer mode so operator nodes can still start even when robot router is temporarily down.
     set_zenoh_override = SetEnvironmentVariable(
         "ZENOH_CONFIG_OVERRIDE",
-        'mode="client";connect/endpoints=["tcp/10.42.0.1:7447"];scouting/multicast/enabled=false',
+        'mode="peer";connect/endpoints=["tcp/10.42.0.1:7447"];scouting/multicast/enabled=false',
     )
 
     use_audio = DeclareLaunchArgument(

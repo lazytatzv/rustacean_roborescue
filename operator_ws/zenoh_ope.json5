@@ -1,10 +1,7 @@
 {
-  // Operator typically only needs to connect to the robot's zenohd.
-  // Use "client" to avoid accepting incoming Zenoh connections on the operator.
-  // Change to "peer" only if you want the operator to be a full peer (listen/route).
-
-  // Routerを使った方が安定すると考えるためpeerは使わない
-  mode: "client",
+  // Peer mode lets operator-side ROS nodes boot even if robot zenohd is temporarily down.
+  // It will still try to connect to configured robot endpoint.
+  mode: "peer",
   // TCP優先の単一運用（接続安定性重視）
   // operator から robot へ接続する用途のため localhost は含めない。
   connect: {
