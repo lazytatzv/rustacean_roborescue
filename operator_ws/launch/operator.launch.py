@@ -25,6 +25,12 @@ def generate_launch_description():
     # Keep waiting for router instead of failing the initial one-shot check.
     set_router_check_attempts = SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1")
     set_zenoh_uri = SetEnvironmentVariable("RMW_ZENOH_CONFIG_URI", zenoh_config_uri)
+    # NOTE: In this environment, rmw_zenoh_cpp can ignore RMW_ZENOH_CONFIG_URI and fall back
+    # to tcp/localhost:7447. Force the remote router endpoint explicitly.
+    set_zenoh_override = SetEnvironmentVariable(
+        "ZENOH_CONFIG_OVERRIDE",
+        'mode="client";connect/endpoints=["tcp/10.42.0.1:7447"];scouting/multicast/enabled=false',
+    )
 
     use_audio = DeclareLaunchArgument(
         "use_audio", default_value="true", description="音声ノードを起動するか"
@@ -123,6 +129,7 @@ def generate_launch_description():
     ld.add_action(set_ros_localhost_only)
     ld.add_action(set_router_check_attempts)
     ld.add_action(set_zenoh_uri)
+    ld.add_action(set_zenoh_override)
     ld.add_action(use_audio)
     ld.add_action(use_joy)
     ld.add_action(use_foxglove)

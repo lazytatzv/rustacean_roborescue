@@ -35,11 +35,11 @@ robot-up-min:
 
 # One command operator bringup with fixed Zenoh env (lightweight mode)
 operator-up-min:
-  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 launch launch/operator.launch.py use_foxglove:=false use_audio:=false use_joy:=true'
+  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/10.42.0.1:7447\"];scouting/multicast/enabled=false" && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 launch launch/operator.launch.py use_foxglove:=false use_audio:=false use_joy:=true'
 
 # Quick operator-side graph check under the same fixed env
 operator-topic-list:
-  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 topic list'
+  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/10.42.0.1:7447\"];scouting/multicast/enabled=false" && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 topic list'
 
 
 # TEST
