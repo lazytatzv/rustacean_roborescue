@@ -40,6 +40,20 @@ def _camera_available(cam: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def _video_device_realpath_key(dev_path: str) -> str:
+    """同一物理カメラの重複起動を避けるための識別キーを返す。"""
+    base = os.path.basename(dev_path)
+    if not base.startswith("video"):
+        return ""
+    sysfs_dev = os.path.join("/sys/class/video4linux", base, "device")
+    if not os.path.exists(sysfs_dev):
+        return ""
+    try:
+        return os.path.realpath(sysfs_dev)
+    except Exception:
+        return ""
+
+
 def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
     """v4l2 ドライバのコンポーザブルノードリストを返す。"""
     composable = [
@@ -214,11 +228,30 @@ def generate_launch_description():
         print("[camera.launch] WARNING: no cameras defined in cameras.yaml")
 
     actions = [arg_use_camera]
+    seen_v4l2_phys = set()
     for cam in cameras:
         available, reason = _camera_available(cam)
         if not available:
             actions.append(LogInfo(msg=f"[WARN][camera.launch] skip camera: {reason}"))
             continue
+
+        driver = cam.get("driver", "v4l2")
+        if driver in ("v4l2", "theta_s"):
+            dev = cam.get("device", "")
+            key = _video_device_realpath_key(dev)
+            if key:
+                if key in seen_v4l2_phys:
+                    actions.append(
+                        LogInfo(
+                            msg=(
+                                "[WARN][camera.launch] skip camera: "
+                                f"{cam.get('name', 'unknown')}: duplicate physical v4l2 device {dev}"
+                            )
+                        )
+                    )
+                    continue
+                seen_v4l2_phys.add(key)
+
         actions.extend(_make_camera_group(cam, qr_model_dir, use_camera_cfg))
 
     return LaunchDescription(actions)

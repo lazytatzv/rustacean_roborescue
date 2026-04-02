@@ -12,7 +12,7 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, LogInfo
+from launch.actions import IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command
@@ -135,6 +135,9 @@ def generate_launch_description():
 
         actions = [
             LogInfo(msg="[system.launch] starting with fail-safe guards"),
+            # network.launch.py 側でも再設定するが、初期化順で取りこぼさないよう先に注入する
+            SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
+            SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
             # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
             *robot_state_publisher_actions,
             # 1. Foxglove Bridge (WebSocket :8765)
