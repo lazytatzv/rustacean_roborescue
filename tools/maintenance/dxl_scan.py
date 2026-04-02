@@ -41,7 +41,7 @@ def _run_protocols(
     protocols: Iterable[float],
     min_id: int,
     max_id: int,
-) -> int:
+) -> tuple[bool, int]:
     any_found = False
 
     for proto in protocols:
@@ -50,7 +50,7 @@ def _run_protocols(
             found = _scan_ids(device, baud, proto, min_id, max_id)
         except RuntimeError as e:
             print(f"[dxl-scan] error: {e}", file=sys.stderr)
-            return 2
+            return False, 2
 
         if not found:
             print("[dxl-scan] no IDs found")
@@ -60,7 +60,7 @@ def _run_protocols(
         for dxl_id, model in found:
             print(f"FOUND id={dxl_id} model={model}")
 
-    return 0 if any_found else 1
+    return any_found, (0 if any_found else 1)
 
 
 def main() -> int:
@@ -69,8 +69,19 @@ def main() -> int:
     parser.add_argument("--baud", type=int, default=1000000, help="Baud rate")
     parser.add_argument("--protocol", type=float, default=2.0, choices=[1.0, 2.0], help="Protocol")
     parser.add_argument("--both-protocols", action="store_true", help="Scan protocol 2.0 and 1.0")
+    parser.add_argument(
+        "--bauds",
+        type=int,
+        nargs="+",
+        help="Scan multiple baud rates (space-separated), e.g. --bauds 1000000 57600 115200",
+    )
     parser.add_argument("--min-id", type=int, default=1, help="Minimum Dynamixel ID")
     parser.add_argument("--max-id", type=int, default=252, help="Maximum Dynamixel ID")
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Return success even if no IDs are found",
+    )
     args = parser.parse_args()
 
     if args.min_id < 0 or args.max_id > 252 or args.min_id > args.max_id:
@@ -78,7 +89,21 @@ def main() -> int:
         return 2
 
     protocols = [2.0, 1.0] if args.both_protocols else [args.protocol]
-    return _run_protocols(args.device, args.baud, protocols, args.min_id, args.max_id)
+    bauds = args.bauds if args.bauds else [args.baud]
+
+    any_found_total = False
+    for baud in bauds:
+        found, code = _run_protocols(args.device, baud, protocols, args.min_id, args.max_id)
+        any_found_total = any_found_total or found
+        if code == 2:
+            return 2
+
+    if any_found_total:
+        return 0
+    if args.allow_empty:
+        print("[dxl-scan] no IDs found across all scans (allow-empty enabled)")
+        return 0
+    return 1
 
 
 if __name__ == "__main__":
