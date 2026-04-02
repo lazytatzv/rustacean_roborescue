@@ -54,3 +54,18 @@ check-lint:
 # flake.nixを更新したら定期的にやっておく
 cachix:
   cachix watch-exec roborescue-nix -- nix develop --command true
+
+
+install-rust:
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+
+# udev rules deployment (roboclaw/stm32/dynamixel symlinks)
+udev-install:
+  sudo install -m 0644 deploy/99-robot.rules /etc/udev/rules.d/99-robot.rules
+  sudo udevadm control --reload-rules
+  sudo udevadm trigger
+  @echo "udev rules installed and reloaded: /etc/udev/rules.d/99-robot.rules"
+
+udev-status:
+  ls -l /dev/roboclaw /dev/stm32 /dev/dynamixel_flipper /dev/dynamixel_arm 2>/dev/null || true
