@@ -19,7 +19,7 @@ common_args := "--merge-install --symlink-install --cmake-args -DROSIDL_GENERATO
 
 # ignore
 # スペース区切りで追加
-ignore_list := ""
+ignore_list := "dynamixel_hardware_interface"
 ignore_args := if ignore_list != "" { "--packages-ignore " + ignore_list } else { "" }
 
 # nix特有のwarnフィルター
