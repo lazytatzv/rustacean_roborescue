@@ -194,8 +194,8 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
     shared_memory: { enabled: true },
     link: {
       tls: {
-        listen_private_key_file: "quic/server.key",
-        listen_certificate_file: "quic/server.crt"
+        listen_private_key: "quic/server.key",
+        listen_certificate: "quic/server.crt"
       }
     }
   }

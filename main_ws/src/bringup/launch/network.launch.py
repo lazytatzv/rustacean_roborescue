@@ -94,18 +94,19 @@ def _build_network_actions(context):
                 )
             )
 
+    fd, tcp_only_cfg = tempfile.mkstemp(prefix="zenoh_router_tcp_fallback_", suffix=".json5")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(
+            '{\n'
+            '  mode: "router",\n'
+            '  listen: { endpoints: ["tcp/0.0.0.0:7447"] },\n'
+            '  scouting: { multicast: { enabled: false } },\n'
+            '  transport: { shared_memory: { enabled: true } }\n'
+            '}\n'
+        )
+
     router_config_for_launch = zenoh_router_config
     if not quic_available:
-        fd, tcp_only_cfg = tempfile.mkstemp(prefix="zenoh_router_tcp_fallback_", suffix=".json5")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(
-                '{\n'
-                '  mode: "router",\n'
-                '  listen: { endpoints: ["tcp/0.0.0.0:7447"] },\n'
-                '  scouting: { multicast: { enabled: false } },\n'
-                '  transport: { shared_memory: { enabled: true } }\n'
-                '}\n'
-            )
         router_config_for_launch = tcp_only_cfg
 
     router_cmd = (
@@ -120,16 +121,29 @@ def _build_network_actions(context):
         "    sed 's#:7447#:17447#g' "
         + shlex.quote(router_config_for_launch)
         + " > \"$_tmp_cfg\"; "
-        "    zenohd --config \"$_tmp_cfg\" || true; "
+        "    if ! zenohd --config \"$_tmp_cfg\"; then "
+        "      echo '[network.launch] zenohd config failed on :17447; retrying TCP-only profile'; "
+        "      _tmp_tcp=$(mktemp); "
+        "      sed 's#:7447#:17447#g' "
+        + shlex.quote(tcp_only_cfg)
+        + " > \"$_tmp_tcp\"; "
+        "      zenohd --config \"$_tmp_tcp\" || true; "
+        "      rm -f \"$_tmp_tcp\"; "
+        "    fi; "
         "    rm -f \"$_tmp_cfg\"; "
         "    echo '[network.launch] local zenohd(:17447) exited, retrying in 2s'; "
         "    sleep 2; "
         "    continue; "
         "  fi; "
         "  echo '[network.launch] launching local zenohd (QUIC preferred, TCP fallback) on :7447'; "
-        "  zenohd --config "
+        "  if ! zenohd --config "
         + shlex.quote(router_config_for_launch)
+        + "; then "
+        "    echo '[network.launch] zenohd config failed on :7447; retrying TCP-only profile'; "
+        "    zenohd --config "
+        + shlex.quote(tcp_only_cfg)
         + " || true; "
+        "  fi; "
         "  echo '[network.launch] local zenohd(:7447) exited, retrying in 2s'; "
         "  sleep 2; "
         "done"
