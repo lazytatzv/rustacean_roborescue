@@ -132,18 +132,27 @@ journalctl -u roborescue -f
 
 ```json5
 {
-  mode: "client",
-  connect: { endpoints: ["quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/10.42.0.1:17447", "tcp/10.42.0.1:17447"] },  // ← Robot IP を変更
+  mode: "peer",
+  connect: { endpoints: ["tcp/10.42.0.1:7447"] },  // ← Robot IP を変更
   scouting: { multicast: { enabled: false } },
   transport: { shared_memory: { enabled: true } }
 }
 ```
+
+`operator.launch.py` では `ZENOH_CONFIG_OVERRIDE` により同等の設定を強制しています。
+これにより、`RMW_ZENOH_CONFIG_URI` が無視される環境でも localhost 誤接続を回避できます。
 
 ### 4.2 起動
 
 ```bash
 cd operator_ws
 ros2 launch launch/operator.launch.py
+```
+
+軽量起動で接続確認だけしたい場合は、リポジトリルートで以下を使えます:
+
+```bash
+just operator-up-min
 ```
 
 ### 4.3 Foxglove Studio の設定
@@ -160,15 +169,19 @@ ros2 launch launch/operator.launch.py
 ### 5.1 アーキテクチャ概要
 
 ロボットとオペレータ間の ROS 2 通信は `rmw_zenoh_cpp` (Zenoh) を使います。
-通信ポリシーは **QUIC 優先 / TCP フォールバック** です。QUIC が使えない場合でも TCP に自動で切り替えて可用性を維持します。
+ロボット側 router は **QUIC + TCP 待受** です。
+オペレータ側は接続安定性を優先し、運用では **TCP 固定 (`tcp/<ROBOT_IP>:7447`)** を使います。
+
+運用上の実態として、オペレータ側は `tcp/<ROBOT_IP>:7447` の単一接続を固定し、
+`ZENOH_CONFIG_OVERRIDE` で確実に同設定を適用します。
 
 ロボット側では `zenohd` が router として動作し、ROS 2 ノードは `zenoh_robot.json5` を使って client として接続します。オペレータ側は `zenoh_ope.json5` でロボット側 router に接続します。
 
 ```
 Operator PC                                   Robot NUC
   RMW_ZENOH_CONFIG_URI=zenoh_ope.json5          zenohd (router daemon)
-  mode: client                                    zenoh_router.json5
-  connect: quic/tcp <ROBOT_IP>:7447,17447 ───►  listen: quic/tcp 0.0.0.0:7447
+  mode: peer                                      zenoh_router.json5
+  connect: tcp <ROBOT_IP>:7447 ───────────────►  listen: quic/tcp 0.0.0.0:7447
                                                        ▲
                                                   ROS2 ノード群
                                                     zenoh_robot.json5
@@ -215,14 +228,14 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
 
 ```json5
 {
-  mode: "client",
-  connect: { endpoints: ["quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/10.42.0.1:17447", "tcp/10.42.0.1:17447"] },  // Robot IP
+  mode: "peer",
+  connect: { endpoints: ["tcp/10.42.0.1:7447"] },  // Robot IP
   scouting: { multicast: { enabled: false } },
   transport: { shared_memory: { enabled: true } }
 }
 ```
 
-- `mode: "client"`: ロボット側 router に接続するクライアントとして動作
+- `mode: "peer"`: router 一時停止中でも operator ノード自体は起動を継続しやすい
 - `connect.endpoints`: **ロボットの IP アドレスに変更必須**
 
 ### 5.4 環境変数の設定
@@ -232,6 +245,8 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
 ```bash
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export RMW_ZENOH_CONFIG_URI=file:///path/to/zenoh_xxx.json5
+export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
+export ZENOH_CONFIG_OVERRIDE='mode="peer";connect/endpoints=["tcp/<ROBOT_IP>:7447"];scouting/multicast/enabled=false'
 ```
 
 手動でターミナルから ROS 2 コマンドを実行する場合は、上記を事前に設定してください。
@@ -240,9 +255,7 @@ export RMW_ZENOH_CONFIG_URI=file:///path/to/zenoh_xxx.json5
 
 ```bash
 # トピック一覧が表示されれば接続成功
-RMW_IMPLEMENTATION=rmw_zenoh_cpp \
-RMW_ZENOH_CONFIG_URI=file://$(pwd)/operator_ws/zenoh_ope.json5 \
-ros2 topic list
+just operator-topic-list
 
 # /joy がリストに含まれるか確認（joy_nodeが動いていれば）
 ros2 topic echo /joy --once
@@ -396,8 +409,9 @@ sudo usermod -aG dialout $USER
 - `RMW_IMPLEMENTATION=rmw_zenoh_cpp` が設定されているか確認。
 - `operator_ws/zenoh_ope.json5` の IP アドレスが正しいか確認。
 - ロボット側で `zenohd` が起動しているか確認: `ps aux | grep zenohd`
-- ファイアウォールで UDP/7447 (QUIC) と TCP/7447 (fallback) が開いているか確認。
-- 7447 が競合する環境では 17447 へのフォールバック接続を確認。
+- ファイアウォールで TCP/7447 が開いているか確認。
+- ロボット側で待受を確認: `ss -ltnp | grep 7447`
+- `Connection refused` の場合はロボット側 `zenohd` 未起動または別プロセス競合。
 
 ### 10.2 `/joy` がロボットに届かない
 
@@ -428,7 +442,16 @@ sudo usermod -aG dialout $USER
 - USB ケーブルの接続を確認。
 - `lsusb` でデバイスが認識されているか確認。
 
-### 10.7 Gazebo が起動しない / SEGV する
+### 10.7 クローラ片側が止まらない / 暴走気味になる
+
+- 最優先で機体を浮かせ、E-Stop と電源遮断を即実行できる状態で検証する。
+- 直前ログに `ACK timeout` / `Write error: Input/output error` がある場合、コードより先に通信断を疑う。
+- `crawler_driver` は通信断を検知すると fail-safe で切断扱いに入り、再接続を試行する。
+- `main_ws/src/bringup/config/crawler_driver.yaml` で `debug_io: true` を有効化し、
+  `cmd_vel`, qpps 指令値, 実速度, 通信断イベントを確認する。
+- 配線入れ替えで症状が左右反転するかを確認し、物理系 (モータ/ギア) と上流 (配線/コントローラ/通信) を切り分ける。
+
+### 10.8 Gazebo が起動しない / SEGV する
 
 - `rescue_field.sdf` の `gz-sim-sensors-system` は `render_engine=ogre` を使います。GUI や OpenGL 周りが不安定な環境では `simulation.launch.py headless:=true` か `use_gz_gui:=false` で起動してください。
 - それでも落ちる場合は、`nixGL` / Mesa の設定が合っているか、Gazebo が正しい GPU/ソフトウェアレンダリング経路で起動しているかを確認してください。

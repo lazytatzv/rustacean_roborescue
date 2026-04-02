@@ -335,6 +335,9 @@ class CrawlerDriver : public rclcpp::Node
 
     // ── テレメトリ周期 ────────────────────────────────────────────────────
     declare_parameter("telemetry_hz", 10);
+    // ── デバッグ出力 ──────────────────────────────────────────────────────
+    declare_parameter("debug_io", false);
+    declare_parameter("debug_log_period_ms", 200);
     // ── ハード接続リトライ間隔 ────────────────────────────────────────────
     declare_parameter("connect_retry_sec", 3.0);
 
@@ -393,6 +396,8 @@ class CrawlerDriver : public rclcpp::Node
   double counts_per_meter_;
   int watchdog_timeout_ms_;
   int baud_rate_;
+  bool debug_io_;
+  int debug_log_period_ms_;
   double track_width_;
   double m1_kp_, m1_ki_, m1_kd_;
   int m1_qpps_;
@@ -441,6 +446,8 @@ class CrawlerDriver : public rclcpp::Node
     const int pulley_ratio = get_parameter("pulley_ratio").as_int();
     watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
     baud_rate_ = get_parameter("baud_rate").as_int();
+    debug_io_ = get_parameter("debug_io").as_bool();
+    debug_log_period_ms_ = get_parameter("debug_log_period_ms").as_int();
     track_width_ = get_parameter("track_width").as_double();
 
     m1_kp_ = get_parameter("m1_kp").as_double();
@@ -466,6 +473,8 @@ class CrawlerDriver : public rclcpp::Node
                   DEFAULT_SERIAL_BAUD_RATE);
       baud_rate_ = DEFAULT_SERIAL_BAUD_RATE;
     }
+
+    if (debug_log_period_ms_ <= 0) debug_log_period_ms_ = 200;
   }
 
   void tryConnect()
@@ -479,6 +488,12 @@ class CrawlerDriver : public rclcpp::Node
                            "Failed to connect to Roboclaw on %s @ %d bps. Retrying...", port.c_str(),
                            baud_rate_);
       return;
+    }
+
+    if (debug_io_)
+    {
+      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d", port.c_str(),
+                  baud_rate_);
     }
 
     hw_connected_ = true;
@@ -637,6 +652,16 @@ class CrawlerDriver : public rclcpp::Node
     const auto m1 = static_cast<int32_t>(m1_cmd_qpps_ * m1_stall_.scale);
     const auto m2 = static_cast<int32_t>(m2_cmd_qpps_ * m2_stall_.scale);
 
+    if (debug_io_)
+    {
+      RCLCPP_INFO_THROTTLE(
+          get_logger(), *get_clock(), debug_log_period_ms_,
+          "[debug_io] cmd_vel=(%.3f, %.3f) qpps_raw=(%d, %d) qpps_out=(%d, %d) actual=(%d, %d)"
+          " stall=(%.2f, %.2f)",
+          m1_vel, m2_vel, m1_cmd_qpps_, m2_cmd_qpps_, m1, m2, telemetry_.m1_speed_qpps,
+          telemetry_.m2_speed_qpps, m1_stall_.scale, m2_stall_.scale);
+    }
+
     const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
     const bool ok2 = roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, m2);
     if (!ok1) RCLCPP_ERROR(get_logger(), "Failed to send M1 command");
@@ -693,6 +718,13 @@ class CrawlerDriver : public rclcpp::Node
     RCLCPP_ERROR(get_logger(),
                  "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
                  reason);
+
+    if (debug_io_)
+    {
+      RCLCPP_ERROR(get_logger(),
+                   "[debug_io] link dropped: last_cmd_qpps=(%d, %d) last_actual_qpps=(%d, %d)",
+                   m1_cmd_qpps_, m2_cmd_qpps_, telemetry_.m1_speed_qpps, telemetry_.m2_speed_qpps);
+    }
   }
 };
 
