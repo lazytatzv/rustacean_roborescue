@@ -238,11 +238,14 @@
           ros.map-msgs                 # Map 表示
           ros.qt-gui
           ros.qt-gui-py-common
+          ros.qt-dotgraph
           ros.python-qt-binding
           ros.rqt
           ros.rqt-gui
           ros.rqt-gui-py
+          ros.rqt-gui-cpp
           ros.rqt-py-common
+          ros.qt-gui-cpp
           ros.rqt-common-plugins
           ros.rqt-topic
           ros.rqt-publisher
@@ -254,6 +257,8 @@
           ros.rqt-action
           ros.rqt-shell
           ros.rqt-py-console
+          ros.rqt-image-view
+          ros.image-view
           ros.ros2topic
           ros.ros2service
           ros.ros2node
