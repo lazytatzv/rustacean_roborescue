@@ -93,7 +93,7 @@ ros2 launch bringup system.launch.py
 | ノード | パッケージ | 役割 |
 |--------|-----------|------|
 | `robot_state_publisher` | robot_state_publisher | URDF → TF |
-| `zenoh_router_daemon` | zenohd | Zenoh ルーター (QUIC/7447) |
+| `zenoh_router_daemon` | zenohd | Zenoh ルーター (QUIC優先/TCPフォールバック, 7447/17447) |
 | `spark_fast_lio` | spark-fast-lio | LiDAR-IMU オドメトリ |
 | `slam_toolbox` | slam_toolbox | SLAM 地図生成 |
 | `v4l2_camera` | v4l2_camera | USB カメラ (H.264 エンコード) |
@@ -104,6 +104,9 @@ ros2 launch bringup system.launch.py
 | `sensor_gateway` | sensor_gateway | STM32 IMU ブリッジ |
 | `joy_controller` | joy_controller | PS4 テレオペ処理 |
 | `arm_controller` | arm_controller | アーム逆運動学 (IK) |
+
+`launch_config.yaml` のデフォルトは部分接続向けです（`use_arm=false`, `use_flipper=false`, `use_imu=false`）。
+機器を接続したら必要な項目だけ `true` に戻して起動してください。
 
 ### 3.4 systemd による自動起動（本番デプロイ）
 
@@ -130,7 +133,7 @@ journalctl -u roborescue -f
 ```json5
 {
   mode: "client",
-  connect: { endpoints: ["quic/10.42.0.1:7447"] },  // ← Robot IP を変更
+  connect: { endpoints: ["quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/10.42.0.1:17447", "tcp/10.42.0.1:17447"] },  // ← Robot IP を変更
   scouting: { multicast: { enabled: false } },
   transport: { shared_memory: { enabled: true } }
 }
@@ -156,8 +159,8 @@ ros2 launch launch/operator.launch.py
 
 ### 5.1 アーキテクチャ概要
 
-ロボットとオペレータ間の ROS 2 通信は `rmw_zenoh_cpp` (Zenoh / QUIC) を使います。
-従来の DDS (UDP マルチキャスト) の代わりに QUIC を用いることで、Wi-Fi 環境でのパケットロスに強い通信を実現します。
+ロボットとオペレータ間の ROS 2 通信は `rmw_zenoh_cpp` (Zenoh) を使います。
+通信ポリシーは **QUIC 優先 / TCP フォールバック** です。QUIC が使えない場合でも TCP に自動で切り替えて可用性を維持します。
 
 ロボット側では `zenohd` が router として動作し、ROS 2 ノードは `zenoh_robot.json5` を使って client として接続します。オペレータ側は `zenoh_ope.json5` でロボット側 router に接続します。
 
@@ -165,12 +168,12 @@ ros2 launch launch/operator.launch.py
 Operator PC                                   Robot NUC
   RMW_ZENOH_CONFIG_URI=zenoh_ope.json5          zenohd (router daemon)
   mode: client                                    zenoh_router.json5
-  connect: quic/<ROBOT_IP>:7447 ──────────────►  listen: quic/0.0.0.0:7447
+  connect: quic/tcp <ROBOT_IP>:7447,17447 ───►  listen: quic/tcp 0.0.0.0:7447
                                                        ▲
                                                   ROS2 ノード群
                                                     zenoh_robot.json5
                                                     mode: client
-                                                    connect: quic/127.0.0.1:7447
+                                                    connect: quic/tcp 127.0.0.1:7447,17447
 ```
 
 重要: **ロボット側の ROS 2 ノードは `zenoh_robot.json5` を使い、`zenohd` とは別プロセスとして動作します**。
@@ -185,16 +188,26 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
 ```json5
 {
   mode: "router",
-  listen: { endpoints: ["quic/0.0.0.0:7447"] },
+  listen: { endpoints: ["quic/0.0.0.0:7447", "tcp/0.0.0.0:7447"] },
   scouting: { multicast: { enabled: false } },
-  transport: { shared_memory: { enabled: true } }
+  transport: {
+    shared_memory: { enabled: true },
+    link: {
+      tls: {
+        listen_private_key_file: "quic/server.key",
+        listen_certificate_file: "quic/server.crt"
+      }
+    }
+  }
 }
 ```
 
 - `mode: "router"`: ロボット側は router として動作し、クライアントからの接続を受け付ける
-- `quic/0.0.0.0:7447`: 全 NIC で QUIC 接続を待受
+- `quic/0.0.0.0:7447`, `tcp/0.0.0.0:7447`: QUIC 優先 + TCP フォールバックで待受
 - `multicast: false`: Wi-Fi 環境でのブロードキャスト漏れを防止
 - `shared_memory: true`: 同一マシン上のノード間は SHM (共有メモリ) で高速転送
+- `network.launch.py` は QUIC 証明書 (`quic/server.crt`, `quic/server.key`) がない場合に自己署名証明書を自動生成します
+- 7447 が他プロセスに占有されている場合は、ローカル zenohd を 17447 で起動して継続します
 
 ### 5.3 オペレータ側 Zenoh 設定
 
@@ -203,7 +216,7 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
 ```json5
 {
   mode: "client",
-  connect: { endpoints: ["quic/10.42.0.1:7447"] },  // Robot IP
+  connect: { endpoints: ["quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/10.42.0.1:17447", "tcp/10.42.0.1:17447"] },  // Robot IP
   scouting: { multicast: { enabled: false } },
   transport: { shared_memory: { enabled: true } }
 }
@@ -340,25 +353,26 @@ PS4 コントローラで操作します。
 ロボット (NUC) の USB/UART デバイスを固定名で認識させるため、udev ルールを設定します。
 
 ```bash
-sudo cp deploy/99-robot.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
-sudo udevadm trigger
+sudo just udev-install
 ```
+
+`just udev-install` は `deploy/99-robot.rules` を `/etc/udev/rules.d/99-robot.rules` に配置し、ルール再読み込みまで行います。
 
 ### 9.2 デバイス対応表
 
 | デバイス名 | 接続先 | 用途 |
 |-----------|--------|------|
 | `/dev/roboclaw` | Roboclaw モータコントローラ (USB-UART) | クローラ左右モータ |
-| `/dev/ttyUSB_flipper` (`/dev/dynamixel`) | Dynamixel U2D2 (フリッパ用) | フリッパ 4 軸 (ID 1–4) |
-| `/dev/ttyUSB_arm` | Dynamixel U2D2 (アーム用) | アーム 6 軸 (ID 21–26) + グリッパ (ID 10) |
+| `/dev/dynamixel_flipper` | Dynamixel U2D2 (フリッパ用) | フリッパ 4 軸 (ID 1–4) |
+| `/dev/dynamixel_arm` | Dynamixel U2D2 (アーム用) | アーム 6 軸 (ID 21–26) + グリッパ (ID 10) |
 | `/dev/stm32` | STM32 マイコン (USB-UART) | BNO055 IMU データ |
 
 ### 9.3 デバイスの確認
 
 ```bash
 # デバイスが認識されているか確認
-ls -la /dev/roboclaw /dev/ttyUSB_flipper /dev/ttyUSB_arm /dev/stm32
+just udev-status
+ls -la /dev/roboclaw /dev/dynamixel_flipper /dev/dynamixel_arm /dev/stm32
 
 # シリアル通信テスト (IMU の例)
 cat /dev/stm32
@@ -382,7 +396,8 @@ sudo usermod -aG dialout $USER
 - `RMW_IMPLEMENTATION=rmw_zenoh_cpp` が設定されているか確認。
 - `operator_ws/zenoh_ope.json5` の IP アドレスが正しいか確認。
 - ロボット側で `zenohd` が起動しているか確認: `ps aux | grep zenohd`
-- ファイアウォールで UDP/7447 が開いているか確認。
+- ファイアウォールで UDP/7447 (QUIC) と TCP/7447 (fallback) が開いているか確認。
+- 7447 が競合する環境では 17447 へのフォールバック接続を確認。
 
 ### 10.2 `/joy` がロボットに届かない
 
