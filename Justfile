@@ -88,3 +88,10 @@ udev-status:
   @echo ""
   @echo "== by-id serial links =="
   ls -l /dev/serial/by-id 2>/dev/null || true
+
+# Dynamixel ID scan utilities (uv-managed)
+dxl-scan-flipper *extra_args:
+  uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols {{extra_args}}
+
+dxl-scan-arm *extra_args:
+  uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols {{extra_args}}

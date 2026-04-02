@@ -1,0 +1,12 @@
+[project]
+name = "roborescue-maintenance-tools"
+version = "0.1.0"
+description = "Utility scripts for hardware bring-up and diagnostics"
+requires-python = ">=3.10"
+dependencies = [
+  "dynamixel-sdk>=3.8.4",
+  "pyserial>=3.5",
+]
+
+[tool.uv]
+package = false
