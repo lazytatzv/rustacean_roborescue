@@ -5,8 +5,8 @@
 
   // Routerを使った方が安定すると考えるためpeerは使わない
   mode: "client",
-  // 主ポート 7447 が使えない場合は 17447 へ自動フォールバック
-  connect: { endpoints: ["tcp/10.42.0.1:7447", "tcp/10.42.0.1:17447"] }, // Robot IP (change as needed)
+  // QUIC優先 + TCPフォールバック（可用性重視）
+  connect: { endpoints: ["quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/10.42.0.1:17447", "tcp/10.42.0.1:17447"] }, // Robot IP (change as needed)
   scouting: { multicast: { enabled: false } },
   transport: { shared_memory: { enabled: true } }
 }

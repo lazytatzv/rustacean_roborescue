@@ -1,5 +1,7 @@
 import os
 import shlex
+import subprocess
+import tempfile
 
 from ament_index_python.packages import (
     PackageNotFoundError,
@@ -7,17 +9,18 @@ from ament_index_python.packages import (
     get_package_share_directory,
 )
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, SetEnvironmentVariable
+from launch.actions import (
+    ExecuteProcess,
+    LogInfo,
+    OpaqueFunction,
+    SetEnvironmentVariable,
+)
 
 
-def generate_launch_description():
+def _build_network_actions(context):
     # bringupパッケージのshareディレクトリから設定ファイルの絶対パスを動的に取得
     bringup_dir = get_package_share_directory("bringup")
-    # zenohd (router daemon) 用の設定: mode=router, listen tcp/0.0.0.0:7447
-    zenoh_router_config = os.path.join(bringup_dir, "config", "zenoh_router.json5")
-    # ロボット側 ROS2 ノード用の設定: mode=client, connect 127.0.0.1:7447
-    # zenohd と同じ router config を使うとポート競合するため別ファイルを使う
-    zenoh_robot_config = os.path.join(bringup_dir, "config", "zenoh_robot.json5")
+    actions = []
 
     # Nix環境では rmw_zenoh_cpp の .so が LD_LIBRARY_PATH に
     # 自動で入らないケースがあるため、起動時に補完する。
@@ -37,6 +40,72 @@ def generate_launch_description():
         ld_parts.append(current_ld_library_path)
     patched_ld_library_path = ":".join(ld_parts)
 
+    if patched_ld_library_path:
+        actions.append(
+            SetEnvironmentVariable("LD_LIBRARY_PATH", patched_ld_library_path)
+        )
+
+    zenoh_router_config = os.path.join(bringup_dir, "config", "zenoh_router.json5")
+    zenoh_robot_config = os.path.join(bringup_dir, "config", "zenoh_robot.json5")
+
+    if not os.path.isfile(zenoh_router_config) or not os.path.isfile(zenoh_robot_config):
+        raise RuntimeError("[network.launch] zenoh HA config files are missing")
+
+    quic_dir = os.path.join(bringup_dir, "config", "quic")
+    cert = os.path.join(quic_dir, "server.crt")
+    key = os.path.join(quic_dir, "server.key")
+    os.makedirs(quic_dir, exist_ok=True)
+
+    quic_available = True
+    if not os.path.isfile(cert) or not os.path.isfile(key):
+        try:
+            subprocess.run(
+                [
+                    "openssl",
+                    "req",
+                    "-x509",
+                    "-newkey",
+                    "rsa:2048",
+                    "-sha256",
+                    "-nodes",
+                    "-days",
+                    "3650",
+                    "-subj",
+                    "/CN=roborescue-zenoh-quic",
+                    "-keyout",
+                    key,
+                    "-out",
+                    cert,
+                ],
+                check=True,
+            )
+            actions.append(LogInfo(msg="[network.launch] generated self-signed QUIC TLS cert/key"))
+        except Exception as e:
+            quic_available = False
+            actions.append(
+                LogInfo(
+                    msg=(
+                        "[network.launch] failed to prepare QUIC TLS assets; "
+                        "router will run TCP-only for availability: "
+                        + str(e)
+                    )
+                )
+            )
+
+    router_config_for_launch = zenoh_router_config
+    if not quic_available:
+        fd, tcp_only_cfg = tempfile.mkstemp(prefix="zenoh_router_tcp_fallback_", suffix=".json5")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(
+                '{\n'
+                '  mode: "router",\n'
+                '  listen: { endpoints: ["tcp/0.0.0.0:7447"] },\n'
+                '  scouting: { multicast: { enabled: false } },\n'
+                '  transport: { shared_memory: { enabled: true } }\n'
+                '}\n'
+            )
+        router_config_for_launch = tcp_only_cfg
+
     router_cmd = (
         "while true; do "
         "  if ss -ltn '( sport = :7447 )' | grep -q ':7447'; then "
@@ -47,8 +116,8 @@ def generate_launch_description():
         "    fi; "
         "    echo '[network.launch] :7447 busy by non-zenoh process, launching local zenohd on :17447'; "
         "    _tmp_cfg=$(mktemp); "
-        "    sed 's#tcp/0\\.0\\.0\\.0:7447#tcp/0.0.0.0:17447#g' "
-        + shlex.quote(zenoh_router_config)
+        "    sed 's#:7447#:17447#g' "
+        + shlex.quote(router_config_for_launch)
         + " > \"$_tmp_cfg\"; "
         "    zenohd --config \"$_tmp_cfg\" || true; "
         "    rm -f \"$_tmp_cfg\"; "
@@ -56,16 +125,17 @@ def generate_launch_description():
         "    sleep 2; "
         "    continue; "
         "  fi; "
-        "  echo '[network.launch] launching local zenohd on :7447'; "
+        "  echo '[network.launch] launching local zenohd (QUIC preferred, TCP fallback) on :7447'; "
         "  zenohd --config "
-        + shlex.quote(zenoh_router_config)
+        + shlex.quote(router_config_for_launch)
         + " || true; "
         "  echo '[network.launch] local zenohd(:7447) exited, retrying in 2s'; "
         "  sleep 2; "
         "done"
     )
 
-    actions = [
+    actions.extend(
+        [
         # ==========================================
         # 1. RMW (ミドルウェア) の環境変数を強制上書き
         # ==========================================
@@ -79,19 +149,24 @@ def generate_launch_description():
         # ==========================================
         # 2. Zenohルーター (zenohd) のデーモン起動
         # ==========================================
-        # QUIC でリッスンし、オペレータ PC からの接続を受け付ける。
+        # QUIC優先/TCPフォールバック構成でルーターを起動する。
         # SHM は zenohd 側でも有効にする必要があるため --config で渡す。
         ExecuteProcess(
             cmd=["bash", "-lc", router_cmd],
             output="screen",
             respawn=False,
             name="zenoh_router_daemon",
+            cwd=os.path.join(bringup_dir, "config"),
         ),
-    ]
+        ]
+    )
 
-    if patched_ld_library_path:
-        actions.insert(
-            0, SetEnvironmentVariable("LD_LIBRARY_PATH", patched_ld_library_path)
-        )
+    return actions
 
-    return LaunchDescription(actions)
+
+def generate_launch_description():
+    return LaunchDescription(
+        [
+            OpaqueFunction(function=_build_network_actions),
+        ]
+    )

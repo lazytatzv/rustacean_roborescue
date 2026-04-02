@@ -1,7 +1,7 @@
 # ロボット起動設定
 # どのサブシステムを有効にするかをここで制御する。
 # ros2 launch bringup system.launch.py で読み込まれる。
-# コマンドライン引数で上書き可能: ros2 launch bringup system.launch.py use_lidar:=false
+# 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
 use_crawler: true
 use_arm: true
