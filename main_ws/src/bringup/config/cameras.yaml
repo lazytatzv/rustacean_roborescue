@@ -37,11 +37,12 @@ cameras:
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
   - name: front
     driver: v4l2
+    enabled: true
     device: /dev/video0
     width: 640
     height: 480
     fps: 15
-    pixel_format: MJPG
+    pixel_format: YUYV
     frame_id: front_camera_link
     use_qr: false
     encoder: libx264
@@ -49,11 +50,12 @@ cameras:
 
   - name: back
     driver: v4l2
+    enabled: true
     device: /dev/video1
     width: 640
     height: 480
     fps: 15
-    pixel_format: MJPG
+    pixel_format: YUYV
     frame_id: back_camera_link
     use_qr: false
     encoder: libx264
@@ -61,11 +63,12 @@ cameras:
 
   - name: left
     driver: v4l2
+    enabled: false
     device: /dev/video2
     width: 640
     height: 480
     fps: 15
-    pixel_format: MJPG
+    pixel_format: YUYV
     frame_id: left_camera_link
     use_qr: false
     encoder: libx264
@@ -73,11 +76,12 @@ cameras:
 
   - name: right
     driver: v4l2
+    enabled: false
     device: /dev/video3
     width: 640
     height: 480
     fps: 15
-    pixel_format: MJPG
+    pixel_format: YUYV
     frame_id: right_camera_link
     use_qr: false
     encoder: libx264
@@ -91,7 +95,7 @@ cameras:
     width: 1280
     height: 720
     fps: 15
-    enabled: true
+    enabled: false
     frame_id: theta_camera_link
     use_qr: false
     encoder: libx264
@@ -100,7 +104,7 @@ cameras:
   # ── RealSense ─────────────────────────────────────────────────────────────
   - name: arm
     driver: realsense
-    enabled: true
+    enabled: false
     serial: ""            # 複数台使う場合はシリアル番号を指定
     enable_color: true
     enable_depth: true

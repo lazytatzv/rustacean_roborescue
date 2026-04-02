@@ -51,7 +51,7 @@ def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
             parameters=[
                 {
                     "video_device": cam.get("device", "/dev/video0"),
-                    "pixel_format": cam.get("pixel_format", "MJPG"),
+                    "pixel_format": cam.get("pixel_format", "YUYV"),
                     "image_size": [cam.get("width", 640), cam.get("height", 480)],
                     "time_per_frame": [1, cam.get("fps", 30)],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),

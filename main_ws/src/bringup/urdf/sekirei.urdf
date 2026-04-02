@@ -259,7 +259,7 @@
     <ros2_control name="dynamixel_arm" type="system">
         <hardware>
             <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
-            <param name="port_name">/dev/ttyUSB0</param>
+            <param name="port_name">/dev/dynamixel_arm</param>
             <param name="baud_rate">1000000</param>
             <!-- launch ファイルが DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER を実パスに置換 -->
             <param name="dynamixel_model_folder">DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER</param>

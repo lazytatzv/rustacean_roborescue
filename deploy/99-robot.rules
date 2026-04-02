@@ -23,14 +23,15 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2404", SYMLINK+="r
 SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="stm32", MODE="0666"
 
 # ── Dynamixel U2D2 — フリッパ専用バス ───────────────────────────────────────
-# アームとフリッパは別バス (別 U2D2) のため、シリアル番号で区別する。
-# <SERIAL_FLIPPER> を `udevadm info -a /dev/ttyUSBx | grep serial` の値に変更。
+# アームとフリッパは同一 VID/PID のため、iSerial(ID_SERIAL_SHORT) で区別する。
+# lsusbでFTDI(0403:6014)が2本見えていても、ここ未設定だと名前固定はできない。
+# <SERIAL_FLIPPER> を実機値に置き換えること。
 
 # U2D2もidの整合性が取れていることを確認済み
 
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ATTRS{serial}=="<SERIAL_FLIPPER>", SYMLINK+="dynamixel_flipper", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="<SERIAL_FLIPPER>", SYMLINK+="dynamixel_flipper", MODE="0666"
 
 # ── Dynamixel U2D2 — アーム + グリッパ共用バス ──────────────────────────────
 # アームジョイント (ID 21-26) とグリッパ (ID 10) は同一 RS485 バス上。
 # <SERIAL_ARM> を実機の iSerial 値に変更。
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ATTRS{serial}=="<SERIAL_ARM>", SYMLINK+="dynamixel_arm", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="<SERIAL_ARM>", SYMLINK+="dynamixel_arm", MODE="0666"

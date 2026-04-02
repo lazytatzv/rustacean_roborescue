@@ -4,9 +4,9 @@
 # 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
 use_crawler: true
-use_arm: true
-use_flipper: true
-use_imu: true
+use_arm: false
+use_flipper: false
+use_imu: false
 use_lidar: true
 use_camera: true
 use_nav2: false

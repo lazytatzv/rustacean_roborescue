@@ -68,4 +68,11 @@ udev-install:
   @echo "udev rules installed and reloaded: /etc/udev/rules.d/99-robot.rules"
 
 udev-status:
+  @echo "== expected symlinks =="
   ls -l /dev/roboclaw /dev/stm32 /dev/dynamixel_flipper /dev/dynamixel_arm 2>/dev/null || true
+  @echo ""
+  @echo "== ttyUSB devices =="
+  ls -l /dev/ttyUSB* 2>/dev/null || true
+  @echo ""
+  @echo "== by-id serial links =="
+  ls -l /dev/serial/by-id 2>/dev/null || true
