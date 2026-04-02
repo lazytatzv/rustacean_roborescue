@@ -29,9 +29,9 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="s
 
 # U2D2もidの整合性が取れていることを確認済み
 
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="<SERIAL_FLIPPER>", SYMLINK+="dynamixel_flipper", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="FT5WINPD", SYMLINK+="dynamixel_flipper", MODE="0666"
 
 # ── Dynamixel U2D2 — アーム + グリッパ共用バス ──────────────────────────────
 # アームジョイント (ID 21-26) とグリッパ (ID 10) は同一 RS485 バス上。
 # <SERIAL_ARM> を実機の iSerial 値に変更。
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="<SERIAL_ARM>", SYMLINK+="dynamixel_arm", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="FT763IA0", SYMLINK+="dynamixel_arm", MODE="0666"
