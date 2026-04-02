@@ -1,9 +1,9 @@
 import os
 
 import yaml
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer, Node
@@ -21,6 +21,25 @@ def _load_cameras(bringup_share: str) -> list:
         return []
 
 
+def _camera_available(cam: dict) -> tuple[bool, str]:
+    if not bool(cam.get("enabled", True)):
+        return False, f"{cam.get('name', 'unknown')}: disabled by config"
+
+    driver = cam.get("driver", "v4l2")
+    if driver in ("v4l2", "theta_s"):
+        dev = cam.get("device", "")
+        if not dev or not os.path.exists(dev):
+            return False, f"{cam.get('name', 'unknown')}: missing video device {dev}"
+
+    if driver == "realsense":
+        try:
+            get_package_share_directory("realsense2_camera")
+        except PackageNotFoundError:
+            return False, f"{cam.get('name', 'unknown')}: realsense2_camera package not installed"
+
+    return True, ""
+
+
 def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
     """v4l2 ドライバのコンポーザブルノードリストを返す。"""
     composable = [
@@ -32,6 +51,7 @@ def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
             parameters=[
                 {
                     "video_device": cam.get("device", "/dev/video0"),
+                    "pixel_format": cam.get("pixel_format", "MJPG"),
                     "image_size": [cam.get("width", 640), cam.get("height", 480)],
                     "time_per_frame": [1, cam.get("fps", 30)],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
@@ -148,7 +168,7 @@ def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfi
         composable_node_descriptions=composable_nodes,
         output="screen",
         condition=IfCondition(use_camera_cfg),
-        respawn=True,
+        respawn=False,
         respawn_delay=3.0,
     )
 
@@ -171,7 +191,7 @@ def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfi
                     }
                 ],
                 condition=IfCondition(use_camera_cfg),
-                respawn=True,
+                respawn=False,
                 respawn_delay=3.0,
             )
         )
@@ -195,6 +215,10 @@ def generate_launch_description():
 
     actions = [arg_use_camera]
     for cam in cameras:
+        available, reason = _camera_available(cam)
+        if not available:
+            actions.append(LogInfo(msg=f"[WARN][camera.launch] skip camera: {reason}"))
+            continue
         actions.extend(_make_camera_group(cam, qr_model_dir, use_camera_cfg))
 
     return LaunchDescription(actions)

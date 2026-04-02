@@ -1,4 +1,5 @@
 import os
+import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -20,8 +21,55 @@ def _load_robot_description(dxl_model_folder: str) -> str:
         return f.read().replace("DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER", dxl_model_folder)
 
 
+def _load_device_path(config_path: str, root_key: str, param_key: str) -> str:
+    if not os.path.isfile(config_path):
+        return ""
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        params = data.get(root_key, {}).get("ros__parameters", {})
+        value = params.get(param_key, "")
+        return value if isinstance(value, str) else ""
+    except Exception:
+        return ""
+
+
 def generate_launch_description() -> LaunchDescription:
+    bringup_dir = get_package_share_directory("bringup")
     bringup_share = FindPackageShare("bringup")
+
+    crawler_cfg = os.path.join(bringup_dir, "config", "crawler_driver.yaml")
+    flipper_cfg = os.path.join(bringup_dir, "config", "flipper_driver.yaml")
+    sensor_cfg = os.path.join(bringup_dir, "config", "sensor_gateway.yaml")
+    arm_cfg = os.path.join(bringup_dir, "config", "arm_gripper_driver.yaml")
+
+    crawler_port = _load_device_path(crawler_cfg, "crawler_driver", "serial_port")
+    flipper_port = _load_device_path(flipper_cfg, "flipper_driver", "port_name")
+    sensor_port = _load_device_path(sensor_cfg, "sensor_gateway", "serial_port")
+    arm_port = _load_device_path(arm_cfg, "arm_gripper_driver", "port_name")
+
+    crawler_available = bool(crawler_port) and os.path.exists(crawler_port)
+    flipper_available = bool(flipper_port) and os.path.exists(flipper_port)
+    sensor_available = bool(sensor_port) and os.path.exists(sensor_port)
+    arm_available = bool(arm_port) and os.path.exists(arm_port)
+
+    availability_warnings = []
+    if crawler_port and not crawler_available:
+        availability_warnings.append(
+            LogInfo(msg=f"[WARN][control.launch] crawler device not found: {crawler_port} -> disabling crawler")
+        )
+    if flipper_port and not flipper_available:
+        availability_warnings.append(
+            LogInfo(msg=f"[WARN][control.launch] flipper device not found: {flipper_port} -> disabling flipper")
+        )
+    if sensor_port and not sensor_available:
+        availability_warnings.append(
+            LogInfo(msg=f"[WARN][control.launch] imu gateway device not found: {sensor_port} -> disabling imu gateway")
+        )
+    if arm_port and not arm_available:
+        availability_warnings.append(
+            LogInfo(msg=f"[WARN][control.launch] arm device not found: {arm_port} -> disabling arm drivers")
+        )
 
     # ── Launch arguments ──────────────────────────────────────────────────
     arg_crawler_params = DeclareLaunchArgument(
@@ -90,7 +138,7 @@ def generate_launch_description() -> LaunchDescription:
         ros2_control_warning = LogInfo(
             msg=(
                 "[WARN][control.launch] dynamixel_hardware_interface unavailable; "
-                f"falling back to arm_backend=direct ({e})"
+                "falling back to arm_backend=direct"
             )
         )
 
@@ -98,9 +146,26 @@ def generate_launch_description() -> LaunchDescription:
         [
             "'",
             LaunchConfiguration("arm_backend"),
-            "' == 'ros2_control' and ",
+            "' == 'ros2_control' and '",
+            LaunchConfiguration("use_arm"),
+            "' == 'true' and ",
             str(ros2_control_available),
+            " and ",
+            str(arm_available),
         ]
+    )
+
+    use_crawler_effective = PythonExpression(
+        ["'", LaunchConfiguration("use_crawler"), "' == 'true' and ", str(crawler_available)]
+    )
+    use_flipper_effective = PythonExpression(
+        ["'", LaunchConfiguration("use_flipper"), "' == 'true' and ", str(flipper_available)]
+    )
+    use_imu_effective = PythonExpression(
+        ["'", LaunchConfiguration("use_imu"), "' == 'true' and ", str(sensor_available)]
+    )
+    use_arm_effective = PythonExpression(
+        ["'", LaunchConfiguration("use_arm"), "' == 'true' and ", str(arm_available)]
     )
 
     hw_respawn = {"respawn": True, "respawn_delay": 3.0}
@@ -116,7 +181,7 @@ def generate_launch_description() -> LaunchDescription:
         name="crawler_driver",
         output="both",
         parameters=[LaunchConfiguration("crawler_params")],
-        condition=IfCondition(LaunchConfiguration("use_crawler")),
+        condition=IfCondition(use_crawler_effective),
         **hw_respawn,
     )
     flipper_driver_node = Node(
@@ -125,7 +190,7 @@ def generate_launch_description() -> LaunchDescription:
         name="flipper_driver",
         output="both",
         parameters=[LaunchConfiguration("flipper_params")],
-        condition=IfCondition(LaunchConfiguration("use_flipper")),
+        condition=IfCondition(use_flipper_effective),
         **flipper_respawn,
     )
     sensor_gateway_node = Node(
@@ -134,7 +199,7 @@ def generate_launch_description() -> LaunchDescription:
         name="sensor_gateway",
         output="both",
         parameters=[LaunchConfiguration("sensor_gw_params")],
-        condition=IfCondition(LaunchConfiguration("use_imu")),
+        condition=IfCondition(use_imu_effective),
         **hw_respawn,
     )
 
@@ -156,7 +221,7 @@ def generate_launch_description() -> LaunchDescription:
             LaunchConfiguration("arm_params"),
             {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
         ],
-        condition=IfCondition(LaunchConfiguration("use_arm")),
+        condition=IfCondition(use_arm_effective),
         **ctrl_respawn,
     )
 
@@ -170,9 +235,7 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(
             PythonExpression(
                 [
-                    "'",
-                    LaunchConfiguration("use_arm"),
-                    "' == 'true'",
+                    "'", LaunchConfiguration("use_arm"), "' == 'true' and ", str(arm_available),
                     " and ('",
                     LaunchConfiguration("arm_backend"),
                     "' != 'ros2_control' or not ",
@@ -204,7 +267,8 @@ def generate_launch_description() -> LaunchDescription:
                 [
                     "'",
                     LaunchConfiguration("use_arm"),
-                    "' == 'true'",
+                    "' == 'true' and ",
+                    str(arm_available),
                     " and '",
                     LaunchConfiguration("arm_backend"),
                     "' == 'ros2_control'",
@@ -286,6 +350,7 @@ def generate_launch_description() -> LaunchDescription:
             arg_arm_backend,
             # 依存不足時のフォールバック告知
             *([ros2_control_warning] if ros2_control_warning is not None else []),
+            *availability_warnings,
             # 共通
             crawler_driver_node,
             flipper_driver_node,

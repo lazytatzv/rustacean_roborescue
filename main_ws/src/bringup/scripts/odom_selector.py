@@ -32,10 +32,12 @@ class OdomSelector(Node):
         self.declare_parameter("odom_frame", "odom")
         self.declare_parameter("health_timeout_s", 5.0)
         self.declare_parameter("spark_timeout_s", 3.0)
+        self.declare_parameter("allow_kiss_fallback", True)
         self._base_frame = self.get_parameter("base_frame").value
         self._odom_frame = self.get_parameter("odom_frame").value
         health_timeout = self.get_parameter("health_timeout_s").value
         self._spark_timeout = self.get_parameter("spark_timeout_s").value
+        self._allow_kiss_fallback = bool(self.get_parameter("allow_kiss_fallback").value)
 
         self._use_imu = True
         self._spark_stale = False
@@ -58,11 +60,15 @@ class OdomSelector(Node):
             f"odom_selector started (mode=spark_fast_lio, base={self._base_frame}, "
             f"health_timeout={health_timeout}s, spark_timeout={self._spark_timeout}s)"
         )
+        if not self._allow_kiss_fallback:
+            self.get_logger().warn("KISS fallback is disabled; /odom will stay on spark_fast_lio")
 
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds / 1e9
 
     def _health_timeout_cb(self):
+        if not self._allow_kiss_fallback:
+            return
         self._timeout_timer.cancel()
         if not self._health_received:
             self._use_imu = False
@@ -71,6 +77,8 @@ class OdomSelector(Node):
             )
 
     def _spark_watchdog_cb(self):
+        if not self._allow_kiss_fallback:
+            return
         now = self._now()
         if self._last_spark_time is None:
             return
@@ -85,9 +93,13 @@ class OdomSelector(Node):
             self.get_logger().info("spark_fast_lio odom recovered")
 
     def _is_kiss_mode(self) -> bool:
+        if not self._allow_kiss_fallback:
+            return False
         return (not self._use_imu) or self._spark_stale
 
     def _health_cb(self, msg: Bool):
+        if not self._allow_kiss_fallback:
+            return
         self._health_received = True
         now = self._now()
         if msg.data:

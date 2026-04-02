@@ -1,13 +1,21 @@
+import ctypes
+
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
     bringup_share = FindPackageShare("bringup")
+
+    kiss_icp_available = True
+    try:
+        ctypes.CDLL("libtbb.so.12")
+    except OSError:
+        kiss_icp_available = False
 
     config_path = DeclareLaunchArgument(
         "config_path",
@@ -118,7 +126,11 @@ def generate_launch_description() -> LaunchDescription:
                 "invert_odom_tf": False,
             }
         ],
-        condition=IfCondition(LaunchConfiguration("use_lidar")),
+        condition=IfCondition(
+            PythonExpression(
+                ["'", LaunchConfiguration("use_lidar"), "' == 'true' and ", str(kiss_icp_available)]
+            )
+        ),
         respawn=True,
         respawn_delay=3.0,
     )
@@ -134,6 +146,7 @@ def generate_launch_description() -> LaunchDescription:
                 "odom_frame": LaunchConfiguration("map_frame"),
                 # use_imu=false 時は IMU health が届かないため、タイムアウトで自動 KISS-ICP へ
                 "health_timeout_s": 5.0,
+                "allow_kiss_fallback": kiss_icp_available,
             }
         ],
         condition=IfCondition(LaunchConfiguration("use_lidar")),
@@ -268,6 +281,18 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription(
         [
+            *(
+                [
+                    LogInfo(
+                        msg=(
+                            "[WARN][perception.launch] libtbb.so.12 is missing; "
+                            "disabling KISS-ICP and keeping spark_fast_lio odom"
+                        )
+                    )
+                ]
+                if not kiss_icp_available
+                else []
+            ),
             use_lidar,
             config_path,
             lidar_topic_raw,

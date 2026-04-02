@@ -78,6 +78,8 @@ def _build_network_actions(context):
                     cert,
                 ],
                 check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             actions.append(LogInfo(msg="[network.launch] generated self-signed QUIC TLS cert/key"))
         except Exception as e:
@@ -110,7 +112,6 @@ def _build_network_actions(context):
         "while true; do "
         "  if ss -ltn '( sport = :7447 )' | grep -q ':7447'; then "
         "    if ss -ltnp '( sport = :7447 )' 2>/dev/null | grep -q 'zenohd'; then "
-        "      echo '[network.launch] zenoh router detected on :7447, monitoring...'; "
         "      sleep 3; "
         "      continue; "
         "    fi; "
