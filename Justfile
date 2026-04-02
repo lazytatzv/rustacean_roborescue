@@ -89,9 +89,25 @@ udev-status:
   @echo "== by-id serial links =="
   ls -l /dev/serial/by-id 2>/dev/null || true
 
-# Dynamixel ID scan utilities (uv-managed)
+# Dynamixel ID scan utilities (uv preferred, venv fallback)
 dxl-scan-flipper *extra_args:
-  uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols {{extra_args}}
+  if command -v uv >/dev/null 2>&1; then \
+    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols {{extra_args}}; \
+  else \
+    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
+    python3 -m venv tools/maintenance/.venv; \
+    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
+    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
+    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols {{extra_args}}; \
+  fi
 
 dxl-scan-arm *extra_args:
-  uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols {{extra_args}}
+  if command -v uv >/dev/null 2>&1; then \
+    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols {{extra_args}}; \
+  else \
+    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
+    python3 -m venv tools/maintenance/.venv; \
+    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
+    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
+    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols {{extra_args}}; \
+  fi

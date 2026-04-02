@@ -9,6 +9,10 @@ cd tools/maintenance
 uv sync
 ```
 
+If `uv` is not installed on the host, root-level `just dxl-scan-*` recipes automatically
+fall back to `python3 -m venv` and install required packages into
+`tools/maintenance/.venv`.
+
 ## Dynamixel ID scan
 
 Scan flipper bus at 1 Mbps using both protocol versions:
