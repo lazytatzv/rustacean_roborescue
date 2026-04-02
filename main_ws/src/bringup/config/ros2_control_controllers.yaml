@@ -1,3 +1,7 @@
+# 基本的に今はrustのコントローラを使っているのでこれは使わない筈
+# 将来的にmoveit2と切り替え可能にしてドライバはdynamixel_hardware_interfaceを使うべきかもしれない
+
+
 controller_manager:
   ros__parameters:
     update_rate: 50  # Hz
