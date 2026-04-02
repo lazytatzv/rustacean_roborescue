@@ -75,7 +75,8 @@ ros2 launch launch/operator.launch.py use_audio:=false
 
 起動後:
 1. Foxglove Studio を開き、`ws://127.0.0.1:8765` に接続
-2. カメラ映像: `+` → Image パネル → `/camera/image_raw/ffmpeg` を選択 (H.264)
+2. カメラ映像: `+` → Video パネル → `/camera/image_raw/foxglove_video`
+  （または `/camera_front/compressed_video`）を選択 (H.264)
 3. PS4 コントローラで操作開始
 
 ## 起動されるノード
@@ -97,7 +98,8 @@ Operator PC (client)                  Robot NUC (router)
 ```
 
 - `/joy` → Zenoh 経由 → ロボット側 `joy_controller`
-- `/camera/image_raw/ffmpeg` ← Zenoh 経由 ← ロボット側カメラ
+- `/camera/image_raw/foxglove_video` / `/camera_front/compressed_video`
+  ← Zenoh 経由 ← ロボット側カメラ
 
 ## トラブルシューティング
 
@@ -105,5 +107,5 @@ Operator PC (client)                  Robot NUC (router)
 |------|---------|
 | Zenoh が接続しない | `zenoh_ope.json5` の IP アドレス、ロボット側 zenohd が起動しているか |
 | `/joy` がロボットに届かない | `RMW_IMPLEMENTATION=rmw_zenoh_cpp` が設定されているか |
-| カメラ映像が出ない | ロボット側 `camera.launch.py` が起動しているか、`/camera/image_raw/ffmpeg` が存在するか |
+| カメラ映像が出ない | ロボット側 `camera.launch.py` が起動しているか、`/camera/image_raw/foxglove_video` または `/camera_front/compressed_video` が存在するか |
 | 音声が聞こえない | `use_audio:=false` になっていないか、PulseAudio デバイスが正しいか |

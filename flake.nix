@@ -236,6 +236,27 @@
           ros.interactive-markers      # rviz interactive markers
           ros.resource-retriever       # URDF メッシュ読み込み
           ros.map-msgs                 # Map 表示
+          ros.qt-gui
+          ros.qt-gui-py-common
+          ros.python-qt-binding
+          ros.rqt
+          ros.rqt-gui
+          ros.rqt-gui-py
+          ros.rqt-py-common
+          ros.rqt-common-plugins
+          ros.rqt-topic
+          ros.rqt-publisher
+          ros.rqt-service-caller
+          ros.rqt-tf-tree
+          ros.rqt-bag
+          ros.rqt-msg
+          ros.rqt-srv
+          ros.rqt-action
+          ros.rqt-shell
+          ros.rqt-py-console
+          ros.ros2topic
+          ros.ros2service
+          ros.ros2node
           ros.rqt-graph
           ros.rqt-plot
           ros.rqt-console
@@ -373,7 +394,7 @@
             if lspci 2>/dev/null | grep -qi nvidia; then
               echo "⚠️  NVIDIA GPU detected. nixGL is not bundled (requires --impure)."
               echo "   Set: export NIXGL_CMD='nix run --impure github:nix-community/nixGL --'"
-              _detected_nixgl="''${NIXGL_CMD:-}"
+              _detected_nixgl="''${NIXGL_CMD:-nix run --impure github:nix-community/nixGL --}"
             else
               _detected_nixgl="nixGLIntel"
             fi

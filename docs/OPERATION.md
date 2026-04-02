@@ -159,7 +159,8 @@ just operator-up-min
 
 1. Foxglove Studio を起動
 2. 「Open connection」→「Foxglove WebSocket」→ `ws://127.0.0.1:8765`
-3. カメラ映像: 「+」→「Image」パネル→ トピックに `/camera/image_raw/ffmpeg` を選択
+3. カメラ映像: 「+」→「Video」パネル→ トピックに `/camera/image_raw/foxglove_video`
+  （または `/camera_front/compressed_video`）を選択
 4. LiDAR: 「+」→「3D」パネル → `/velodyne_points` または `/scan`
 
 ---
@@ -421,8 +422,9 @@ sudo usermod -aG dialout $USER
 ### 10.3 カメラ映像が Foxglove に出ない
 
 - ロボット側で `camera.launch.py` が起動しているか確認。
-- `/camera/image_raw/ffmpeg` トピックが存在するか確認: `ros2 topic list | grep camera`
-- Foxglove Studio のパネルでトピックに `/camera/image_raw/ffmpeg` が選択されているか確認（H.264 形式）。
+- `/camera/image_raw/foxglove_video` または `/camera_front/compressed_video` が存在するか確認:
+  `ros2 topic list | grep compressed_video`
+- Foxglove Studio の **Video** パネルで上記トピックが選択されているか確認（H.264 形式）。
 
 ### 10.4 Nav2 が経路を作らない
 

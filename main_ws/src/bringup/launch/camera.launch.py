@@ -210,6 +210,28 @@ def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfi
             )
         )
 
+        # Backward-compatible single-topic output for operator dashboards.
+        # Keep per-camera topics, and additionally expose front camera to a
+        # stable global topic that Foxglove layouts can subscribe to.
+        if name == "front":
+            actions.append(
+                Node(
+                    package="bringup",
+                    executable="ffmpeg_to_foxglove_video.py",
+                    name="ffmpeg_to_foxglove_front_compat",
+                    parameters=[
+                        {
+                            "use_sim_time": False,
+                            "input_topic": ffmpeg_in,
+                            "output_topic": "/camera/image_raw/foxglove_video",
+                        }
+                    ],
+                    condition=IfCondition(use_camera_cfg),
+                    respawn=False,
+                    respawn_delay=3.0,
+                )
+            )
+
     return actions
 
 
