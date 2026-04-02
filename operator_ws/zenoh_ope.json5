@@ -5,8 +5,15 @@
 
   // Routerを使った方が安定すると考えるためpeerは使わない
   mode: "client",
-  // QUIC優先 + TCPフォールバック（可用性重視）
-  connect: { endpoints: ["quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/10.42.0.1:17447", "tcp/10.42.0.1:17447"] }, // Robot IP (change as needed)
+  // TCP優先の単一運用（接続安定性重視）
+  connect: {
+    endpoints: [
+      "tcp/127.0.0.1:7447",
+      "tcp/127.0.0.1:17447",
+      "tcp/10.42.0.1:7447",
+      "tcp/10.42.0.1:17447"
+    ]
+  }, // Robot IP (change as needed)
   scouting: { multicast: { enabled: false } },
   transport: { shared_memory: { enabled: true } }
 }

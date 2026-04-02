@@ -33,5 +33,11 @@ ros2 run joy_controller joy_controller_node
 ## Notes
 
 - Button edges are handled explicitly so holding a button does not flood the downstream nodes.
-- STOP is latched until the node is restarted.
+- `PS` triggers E-STOP, and `OPTIONS` or `SHARE` clears it and switches mode.
 - The package is tuned for the current Jazzy workspace and the launch wiring in `bringup`.
+
+## Troubleshooting (crawler does not move)
+
+- Verify `/joy` is arriving: `ros2 topic hz /joy`
+- Verify drive command is published after pressing `OPTIONS`: `ros2 topic echo /crawler_driver --once`
+- If `OPTIONS` does not switch mode, inspect button indices from `ros2 topic echo /joy` while pressing buttons.

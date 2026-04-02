@@ -12,10 +12,10 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command
+from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 
@@ -74,14 +74,32 @@ def generate_launch_description():
         nav2_launch = os.path.join(bringup_dir, "launch", "nav2.launch.py")
         audio_launch = os.path.join(bringup_dir, "launch", "audio.launch.py")
 
-        use_nav2 = _b(cfg.get("use_nav2", False))
-        use_audio = _b(cfg.get("use_audio", True))
-        use_lidar = _b(cfg.get("use_lidar", True))
-        use_camera = _b(cfg.get("use_camera", True))
-        use_crawler = _b(cfg.get("use_crawler", True))
-        use_arm = _b(cfg.get("use_arm", True))
-        use_flipper = _b(cfg.get("use_flipper", True))
-        use_imu = _b(cfg.get("use_imu", True))
+        default_use_nav2 = _b(cfg.get("use_nav2", False))
+        default_use_audio = _b(cfg.get("use_audio", True))
+        default_use_lidar = _b(cfg.get("use_lidar", True))
+        default_use_camera = _b(cfg.get("use_camera", True))
+        default_use_crawler = _b(cfg.get("use_crawler", True))
+        default_use_arm = _b(cfg.get("use_arm", True))
+        default_use_flipper = _b(cfg.get("use_flipper", True))
+        default_use_imu = _b(cfg.get("use_imu", True))
+
+        arg_use_nav2 = DeclareLaunchArgument("use_nav2", default_value=default_use_nav2)
+        arg_use_audio = DeclareLaunchArgument("use_audio", default_value=default_use_audio)
+        arg_use_lidar = DeclareLaunchArgument("use_lidar", default_value=default_use_lidar)
+        arg_use_camera = DeclareLaunchArgument("use_camera", default_value=default_use_camera)
+        arg_use_crawler = DeclareLaunchArgument("use_crawler", default_value=default_use_crawler)
+        arg_use_arm = DeclareLaunchArgument("use_arm", default_value=default_use_arm)
+        arg_use_flipper = DeclareLaunchArgument("use_flipper", default_value=default_use_flipper)
+        arg_use_imu = DeclareLaunchArgument("use_imu", default_value=default_use_imu)
+
+        use_nav2 = LaunchConfiguration("use_nav2")
+        use_audio = LaunchConfiguration("use_audio")
+        use_lidar = LaunchConfiguration("use_lidar")
+        use_camera = LaunchConfiguration("use_camera")
+        use_crawler = LaunchConfiguration("use_crawler")
+        use_arm = LaunchConfiguration("use_arm")
+        use_flipper = LaunchConfiguration("use_flipper")
+        use_imu = LaunchConfiguration("use_imu")
         # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
         urdf_file = os.path.join(bringup_dir, "urdf", "robot.urdf.xacro")
         robot_state_publisher_actions = []
@@ -135,6 +153,14 @@ def generate_launch_description():
 
         actions = [
             LogInfo(msg="[system.launch] starting with fail-safe guards"),
+            arg_use_nav2,
+            arg_use_audio,
+            arg_use_lidar,
+            arg_use_camera,
+            arg_use_crawler,
+            arg_use_arm,
+            arg_use_flipper,
+            arg_use_imu,
             # network.launch.py 側でも再設定するが、初期化順で取りこぼさないよう先に注入する
             SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
             SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),

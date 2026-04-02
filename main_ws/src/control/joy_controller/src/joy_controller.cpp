@@ -46,7 +46,8 @@ class JoyController : public rclcpp::Node
     estop_publisher_ = this->create_publisher<std_msgs::msg::Bool>(
         "/emergency_stop", rclcpp::QoS(1).transient_local().reliable());
 
-    RCLCPP_INFO(this->get_logger(), "joy_controller started (IK + Joint support)");
+    RCLCPP_INFO(this->get_logger(),
+                "joy_controller started (initial mode: STOP, press OPTIONS for DRIVE)");
   }
 
  private:
@@ -209,6 +210,16 @@ class JoyController : public rclcpp::Node
       flipper_msg.flipper_vel = {
           static_cast<int32_t>(f1 * flipper_speed_), static_cast<int32_t>(f2 * flipper_speed_),
           static_cast<int32_t>(f3 * flipper_speed_), static_cast<int32_t>(f4 * flipper_speed_)};
+    }
+    else
+    {
+      const bool wants_drive =
+          std::abs(axis(msg, AXIS_LEFT_Y)) > deadzone_ || std::abs(axis(msg, AXIS_RIGHT_Y)) > deadzone_;
+      if (wants_drive)
+      {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                             "Drive input ignored in STOP mode. Press OPTIONS to enter DRIVE mode.");
+      }
     }
     crawler_publisher_->publish(crawler_msg);
     flipper_publisher_->publish(flipper_msg);

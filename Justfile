@@ -55,6 +55,10 @@ check-lint:
 cachix:
   cachix watch-exec roborescue-nix -- nix develop --command true
 
+# operator_ws 側の devShell も同じキャッシュへ投入
+operator-cachix:
+  cachix watch-exec roborescue-nix -- nix develop --accept-flake-config .#operator --command true
+
 
 install-rust:
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

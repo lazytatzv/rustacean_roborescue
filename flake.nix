@@ -301,6 +301,33 @@
         # Explicit Python environment with common developer packages (NumPy etc.)
         pythonEnv = pkgs.python3.withPackages (ps: with ps; [ numpy opencv4 pytest ]);
 
+        operatorDeps = [
+          ros.ros-core
+          ros.rmw-zenoh-cpp
+          ros.joy
+          ros.joy-linux
+          ros.foxglove-bridge
+          ros.ros2cli-common-extensions
+          ros.rclpy
+          ros.rosidl-default-generators
+          ros.rosidl-default-runtime
+          ros.image-transport
+          ros.ffmpeg-image-transport
+          ros.ffmpeg-image-transport-msgs
+          pkgs.gst_all_1.gstreamer
+          pkgs.gst_all_1.gst-plugins-base
+          pkgs.gst_all_1.gst-plugins-good
+          pkgs.gobject-introspection
+          pkgs.python3Packages.pygobject3
+          pkgs.pulseaudio
+          pkgs.zenoh
+        ];
+
+        operatorEnv = pkgs.symlinkJoin {
+          name = "roborescue-operator-env";
+          paths = operatorDeps;
+        };
+
       in
       {
         devShells.default = pkgs.mkShell {
@@ -387,6 +414,48 @@
             echo "======================================================="
             echo " Rustacean RoboRescue Dev Environment"
             echo " ROS: ${ROS_VERSION} | Rust: nightly | Sim: Gazebo Harmonic"
+            echo "======================================================="
+          '';
+        };
+
+        devShells.operator = pkgs.mkShell {
+          name = "RoboRescue Operator";
+          packages = [ operatorEnv ];
+
+          shellHook = ''
+            export ROS_DISTRO="${ROS_VERSION}"
+            export ROS_VERSION=2
+            export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+            export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
+            export LD_LIBRARY_PATH="${ros.rmw-zenoh-cpp}/lib:${ros.rmw-zenoh-cpp}/lib64:${ros.zenoh-cpp-vendor}/lib:${ros.zenoh-cpp-vendor}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+            _repo_root=""
+            if command -v git >/dev/null 2>&1; then
+              _repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+            fi
+            if [ -z "$_repo_root" ] && [ -f "$PWD/flake.nix" ]; then
+              _repo_root="$PWD"
+            fi
+
+            _op_cfg=""
+            if [ -n "$_repo_root" ] && [ -f "$_repo_root/operator_ws/zenoh_ope.json5" ]; then
+              _op_cfg="$_repo_root/operator_ws/zenoh_ope.json5"
+            elif [ -f "$PWD/zenoh_ope.json5" ]; then
+              _op_cfg="$PWD/zenoh_ope.json5"
+            fi
+
+            if [ -n "$_op_cfg" ]; then
+              export RMW_ZENOH_CONFIG_URI="file://$_op_cfg"
+              echo "✅ Zenoh config: $_op_cfg"
+            else
+              echo "⚠️  zenoh_ope.json5 が見つかりません。"
+            fi
+
+            unset _repo_root _op_cfg
+
+            echo "======================================================="
+            echo " Rustacean RoboRescue — Operator Station"
+            echo " ROS: ${ROS_VERSION} | RMW: rmw_zenoh_cpp"
             echo "======================================================="
           '';
         };

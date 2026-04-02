@@ -20,6 +20,8 @@ def generate_launch_description():
     zenoh_config_uri = f"file://{zenoh_config_path}"
 
     set_rmw = SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp")
+    # Keep waiting for router instead of failing the initial one-shot check.
+    set_router_check_attempts = SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1")
     set_zenoh_uri = SetEnvironmentVariable("RMW_ZENOH_CONFIG_URI", zenoh_config_uri)
 
     use_audio = DeclareLaunchArgument(
@@ -38,6 +40,16 @@ def generate_launch_description():
     bitrate = DeclareLaunchArgument(
         "bitrate", default_value="32000", description="Opus ビットレート [bps]"
     )
+    foxglove_address = DeclareLaunchArgument(
+        "foxglove_address",
+        default_value="0.0.0.0",
+        description="foxglove_bridge bind address",
+    )
+    foxglove_port = DeclareLaunchArgument(
+        "foxglove_port",
+        default_value="8765",
+        description="foxglove_bridge WebSocket port",
+    )
 
     joy_node = Node(
         package="joy",
@@ -53,8 +65,8 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "port": 8765,
-                "address": "127.0.0.1",
+                "port": LaunchConfiguration("foxglove_port"),
+                "address": LaunchConfiguration("foxglove_address"),
                 "send_buffer_limit": 10000000,
                 "max_qos_depth": 10,
                 "num_threads": 0,
@@ -97,11 +109,14 @@ def generate_launch_description():
     ld = LaunchDescription()
     # environment first
     ld.add_action(set_rmw)
+    ld.add_action(set_router_check_attempts)
     ld.add_action(set_zenoh_uri)
     ld.add_action(use_audio)
     ld.add_action(ope_mic_device)
     ld.add_action(ope_spk_device)
     ld.add_action(bitrate)
+    ld.add_action(foxglove_address)
+    ld.add_action(foxglove_port)
     ld.add_action(joy_node)
     ld.add_action(foxglove_node)
     ld.add_action(audio_sender)

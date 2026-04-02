@@ -25,6 +25,22 @@ operator_ws/
 
 ## セットアップ
 
+### 0. Nix キャッシュ有効化（推奨）
+
+operator環境はルート `flake.nix` の `devShells.operator` に統合済みです。
+次のように `--accept-flake-config` を付けて入るとバイナリキャッシュが効きます。
+
+```bash
+cd operator_ws
+nix develop --accept-flake-config ..#operator
+```
+
+CI/開発者がキャッシュを温める場合は、リポジトリルートで以下を実行します。
+
+```bash
+just operator-cachix
+```
+
 ### 1. Robot IP の設定
 
 `zenoh_ope.json5` を開き、ロボット (NUC) の実際の IP アドレスに書き換えます:
