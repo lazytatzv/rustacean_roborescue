@@ -186,6 +186,7 @@ def generate_launch_description():
                 launch_arguments={
                     "use_slam": use_lidar,
                     "use_lidar": use_lidar,
+                    "use_scan": use_lidar,
                     "use_rviz": "false",
                 },
             ),

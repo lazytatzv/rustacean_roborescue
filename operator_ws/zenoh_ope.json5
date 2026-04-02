@@ -6,12 +6,11 @@
   // Routerを使った方が安定すると考えるためpeerは使わない
   mode: "client",
   // TCP優先の単一運用（接続安定性重視）
+  // operator から robot へ接続する用途のため localhost は含めない。
   connect: {
     endpoints: [
-      "tcp/127.0.0.1:7447",
-      "tcp/127.0.0.1:17447",
       "tcp/10.42.0.1:7447",
-      "tcp/10.42.0.1:17447"
+      "tcp/100.114.200.30:7447"
     ]
   }, // Robot IP (change as needed)
   scouting: { multicast: { enabled: false } },

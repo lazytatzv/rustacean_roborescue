@@ -27,6 +27,12 @@ def generate_launch_description():
     use_audio = DeclareLaunchArgument(
         "use_audio", default_value="true", description="音声ノードを起動するか"
     )
+    use_joy = DeclareLaunchArgument(
+        "use_joy", default_value="true", description="joy_node を起動するか"
+    )
+    use_foxglove = DeclareLaunchArgument(
+        "use_foxglove", default_value="true", description="foxglove_bridge を起動するか"
+    )
     ope_mic_device = DeclareLaunchArgument(
         "ope_mic_device",
         default_value="",
@@ -56,6 +62,7 @@ def generate_launch_description():
         executable="joy_node",
         name="joy_node",
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     foxglove_node = Node(
@@ -63,6 +70,7 @@ def generate_launch_description():
         executable="foxglove_bridge",
         name="foxglove_bridge",
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_foxglove")),
         parameters=[
             {
                 "port": LaunchConfiguration("foxglove_port"),
@@ -112,6 +120,8 @@ def generate_launch_description():
     ld.add_action(set_router_check_attempts)
     ld.add_action(set_zenoh_uri)
     ld.add_action(use_audio)
+    ld.add_action(use_joy)
+    ld.add_action(use_foxglove)
     ld.add_action(ope_mic_device)
     ld.add_action(ope_spk_device)
     ld.add_action(bitrate)
