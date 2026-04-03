@@ -15,13 +15,16 @@ find_package(cv_bridge REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(OpenCV REQUIRED)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(ZBAR REQUIRED zbar)
+find_path(ZBAR_INCLUDE_DIR zbar.h)
+find_library(ZBAR_LIBRARY NAMES zbar)
+if(NOT ZBAR_INCLUDE_DIR OR NOT ZBAR_LIBRARY)
+  message(FATAL_ERROR "zbar not found. Install libzbar-dev or add pkgs.zbar to the Nix shell.")
+endif()
 
 include_directories(
   include
   ${OpenCV_INCLUDE_DIRS}
-  ${ZBAR_INCLUDE_DIRS}
+  ${ZBAR_INCLUDE_DIR}
 )
 
 # Build the component library
@@ -30,7 +33,7 @@ add_library(qr_detector_component SHARED
 )
 target_link_libraries(qr_detector_component
   ${OpenCV_LIBS}
-  ${ZBAR_LIBRARIES}
+  ${ZBAR_LIBRARY}
 )
 ament_target_dependencies(qr_detector_component
   rclcpp
