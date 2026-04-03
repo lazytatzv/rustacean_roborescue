@@ -36,7 +36,15 @@ nix-cache-install:
 
 # Show effective Nix cache-related settings for troubleshooting
 nix-cache-check:
-  nix config show | rg 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'
+  if nix config show >/dev/null 2>&1; then \
+    nix config show; \
+  elif nix show-config >/dev/null 2>&1; then \
+    nix show-config; \
+  else \
+    echo "Could not read nix config with this nix CLI" >&2; \
+    nix --help >&2; \
+    exit 1; \
+  fi | grep -E 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'
 
 # Enable compiler caches for local C/C++ and Rust builds
 compiler-cache-setup:
