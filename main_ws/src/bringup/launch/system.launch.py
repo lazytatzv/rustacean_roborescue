@@ -15,7 +15,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration
+from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 
@@ -125,6 +125,26 @@ def generate_launch_description():
                             "use_sim_time": False,
                         }
                     ],
+                )
+            )
+            # crawler/arm/flipper が全て無効のとき /joint_states を誰も publish しないため
+            # robot_state_publisher の TF ツリーが壊れる。ゼロ埋めでフォールバックする。
+            robot_state_publisher_actions.append(
+                Node(
+                    package="joint_state_publisher",
+                    executable="joint_state_publisher",
+                    name="joint_state_publisher_fallback",
+                    output="screen",
+                    parameters=[{"robot_description": robot_description}],
+                    condition=IfCondition(
+                        PythonExpression(
+                            [
+                                "'", use_crawler, "' == 'false' and '",
+                                use_arm, "' == 'false' and '",
+                                use_flipper, "' == 'false'",
+                            ]
+                        )
+                    ),
                 )
             )
         else:
