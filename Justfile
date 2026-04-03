@@ -24,6 +24,10 @@ nix-status:
 nix-cache-install:
   user="${SUDO_USER:-$USER}"; \
   sudo install -d /etc/nix/nix.conf.d; \
+  sudo touch /etc/nix/nix.conf; \
+  if ! sudo grep -q '/etc/nix/nix.conf.d/roborescue-cachix.conf' /etc/nix/nix.conf; then \
+    echo '!include /etc/nix/nix.conf.d/roborescue-cachix.conf' | sudo tee -a /etc/nix/nix.conf >/dev/null; \
+  fi; \
   printf '%s\n' \
     'experimental-features = nix-command flakes' \
     'substituters = https://cache.nixos.org https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
@@ -36,6 +40,16 @@ nix-cache-install:
 
 # Show effective Nix cache-related settings for troubleshooting
 nix-cache-check:
+  echo "== config files =="; \
+  if [ -f /etc/nix/nix.conf ]; then \
+    echo "-- /etc/nix/nix.conf"; \
+    grep -nE 'include|substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config' /etc/nix/nix.conf || true; \
+  fi; \
+  if [ -f /etc/nix/nix.conf.d/roborescue-cachix.conf ]; then \
+    echo "-- /etc/nix/nix.conf.d/roborescue-cachix.conf"; \
+    grep -nE 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config' /etc/nix/nix.conf.d/roborescue-cachix.conf || true; \
+  fi; \
+  echo "== effective =="; \
   if nix config show >/dev/null 2>&1; then \
     nix config show; \
   elif nix show-config >/dev/null 2>&1; then \
