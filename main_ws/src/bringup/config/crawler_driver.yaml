@@ -7,6 +7,7 @@ crawler_driver:
     gearhead_ratio: 66
     pulley_ratio: 2
     watchdog_timeout_ms: 500
+    serial_timeout_ds: 5  # Roboclaw hardware-side command timeout [100ms units]
     track_width: 0.4  # クローラ間距離 [m] (Nav2 cmd_vel → 差動駆動用)
     # Roboclaw PID tuning (要実測チューニング)
     m1_kp: 0.464

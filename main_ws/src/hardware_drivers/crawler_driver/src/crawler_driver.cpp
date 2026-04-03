@@ -32,6 +32,7 @@ constexpr uint8_t CMD_READ_MAIN_VOLTAGE = 90;
 constexpr uint8_t CMD_READ_STATUS = 24;
 constexpr uint8_t CMD_SET_M1_MAX_CURRENT = 133;
 constexpr uint8_t CMD_SET_M2_MAX_CURRENT = 134;
+constexpr uint8_t CMD_SET_SERIAL_TIMEOUT = 14;
 constexpr int DEFAULT_SERIAL_BAUD_RATE = 115200;
 
 // ──────────────────────────────────────────────
@@ -159,6 +160,15 @@ class RoboclawDriver
   bool resetEncoders()
   {
     std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, CMD_RESET_ENCODERS};
+    appendCRC(data);
+    return sendCommand(data);
+  }
+
+  /// 通信タイムアウトを設定する (単位: 100ms)
+  /// タイムアウトを過ぎると Roboclaw が自動停止する。
+  bool setSerialTimeoutDs(uint8_t timeout_ds)
+  {
+    std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, CMD_SET_SERIAL_TIMEOUT, timeout_ds};
     appendCRC(data);
     return sendCommand(data);
   }
@@ -335,6 +345,9 @@ class CrawlerDriver : public rclcpp::Node
 
     // ── テレメトリ周期 ────────────────────────────────────────────────────
     declare_parameter("telemetry_hz", 10);
+    // Roboclaw の通信タイムアウト (100ms 単位)。
+    // 例: 5 = 500ms で指令断時にハード側が自動停止。
+    declare_parameter("serial_timeout_ds", 5);
     // ── デバッグ出力 ──────────────────────────────────────────────────────
     declare_parameter("debug_io", false);
     declare_parameter("debug_log_period_ms", 200);
@@ -514,6 +527,27 @@ class CrawlerDriver : public rclcpp::Node
     // ハードウェア電流制限 (0 はスキップ)
     const float m1_max_ma = static_cast<float>(get_parameter("m1_max_current_ma").as_double());
     const float m2_max_ma = static_cast<float>(get_parameter("m2_max_current_ma").as_double());
+    const int serial_timeout_ds = get_parameter("serial_timeout_ds").as_int();
+
+    if (serial_timeout_ds >= 0 && serial_timeout_ds <= 255)
+    {
+      const bool ok = roboclaw_.setSerialTimeoutDs(static_cast<uint8_t>(serial_timeout_ds));
+      if (ok)
+      {
+        RCLCPP_INFO(get_logger(), "Roboclaw serial timeout set to %d ds (%d ms)", serial_timeout_ds,
+                    serial_timeout_ds * 100);
+      }
+      else
+      {
+        RCLCPP_WARN(get_logger(), "Failed to set Roboclaw serial timeout");
+      }
+    }
+    else
+    {
+      RCLCPP_WARN(get_logger(), "Invalid serial_timeout_ds=%d. Skipping Roboclaw timeout setup.",
+                  serial_timeout_ds);
+    }
+
     if (m1_max_ma > 0.0f)
     {
       roboclaw_.setMaxCurrent(CMD_SET_M1_MAX_CURRENT, m1_max_ma);
@@ -705,6 +739,15 @@ class CrawlerDriver : public rclcpp::Node
   {
     if (!hw_connected_) return;
 
+    const int32_t last_m1_cmd_qpps = m1_cmd_qpps_;
+    const int32_t last_m2_cmd_qpps = m2_cmd_qpps_;
+    const int32_t last_m1_actual_qpps = telemetry_.m1_speed_qpps;
+    const int32_t last_m2_actual_qpps = telemetry_.m2_speed_qpps;
+
+    // 片側だけ指令が通っているケースを減らすため、切断前にベストエフォート停止。
+    (void)roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
+    (void)roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
+
     hw_connected_ = false;
     telemetry_.valid = false;
     m1_cmd_qpps_ = 0;
@@ -723,7 +766,7 @@ class CrawlerDriver : public rclcpp::Node
     {
       RCLCPP_ERROR(get_logger(),
                    "[debug_io] link dropped: last_cmd_qpps=(%d, %d) last_actual_qpps=(%d, %d)",
-                   m1_cmd_qpps_, m2_cmd_qpps_, telemetry_.m1_speed_qpps, telemetry_.m2_speed_qpps);
+                   last_m1_cmd_qpps, last_m2_cmd_qpps, last_m1_actual_qpps, last_m2_actual_qpps);
     }
   }
 };
