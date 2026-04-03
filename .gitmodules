@@ -7,6 +7,7 @@
 [submodule "main_ws/src/common_interfaces"]
 	path = main_ws/src/external/common_interfaces
 	url = https://github.com/ros2/common_interfaces.git
+	branch = jazzy
 [submodule "main_ws/src/rcl_interfaces"]
 	path = main_ws/src/external/rcl_interfaces
 	url = https://github.com/ros2/rcl_interfaces.git
