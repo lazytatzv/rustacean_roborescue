@@ -37,6 +37,11 @@
           overlays = [
             nix-ros-overlay.overlays.default
             (import rust-overlay)
+            # opencv4 を protobuf 付きでビルドし直す
+            # → DNN の Caffe モデル読み込みが有効になり WeChatQRCode が動作する
+            (final: prev: {
+              opencv4 = prev.opencv4.override { protobuf = prev.protobuf; };
+            })
           ];
           config.allowUnfree = true;
           config.permittedInsecurePackages = [
