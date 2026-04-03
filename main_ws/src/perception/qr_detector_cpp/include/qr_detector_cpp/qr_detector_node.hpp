@@ -29,8 +29,10 @@ class QrDetectorNode : public rclcpp::Node
   int jpeg_quality_;
   int detection_interval_;
 
-  // WeChatQRCode detector
+  // WeChatQRCode detector (高精度; Protobuf付きOpenCV必須)
   std::unique_ptr<cv::wechat_qrcode::WeChatQRCode> detector_;
+  // 標準QRデコーダ (WeChatQRCode使用不可時のフォールバック)
+  cv::QRCodeDetector fallback_detector_;
 
   // Publishers and Subscriptions
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;

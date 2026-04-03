@@ -104,11 +104,6 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
     return;
   }
 
-  if (!detector_)
-  {
-    return;
-  }
-
   cv_bridge::CvImagePtr cv_ptr;
   try
   {
@@ -122,7 +117,18 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
 
   cv::Mat frame = cv_ptr->image;
   std::vector<cv::Mat> points;
-  std::vector<std::string> results = detector_->detectAndDecode(frame, points);
+  std::vector<std::string> results;
+
+  if (detector_)
+  {
+    results = detector_->detectAndDecode(frame, points);
+  }
+  else
+  {
+    // WeChatQRCode 未初期化時は標準デコーダで検出
+    std::vector<cv::Point2f> pts;
+    fallback_detector_.detectAndDecodeMulti(frame, results, pts);
+  }
 
   for (size_t i = 0; i < results.size(); ++i)
   {
