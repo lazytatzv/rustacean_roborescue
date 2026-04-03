@@ -15,9 +15,13 @@ find_package(cv_bridge REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(OpenCV REQUIRED)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ZBAR REQUIRED zbar)
+
 include_directories(
   include
   ${OpenCV_INCLUDE_DIRS}
+  ${ZBAR_INCLUDE_DIRS}
 )
 
 # Build the component library
@@ -26,6 +30,7 @@ add_library(qr_detector_component SHARED
 )
 target_link_libraries(qr_detector_component
   ${OpenCV_LIBS}
+  ${ZBAR_LIBRARIES}
 )
 ament_target_dependencies(qr_detector_component
   rclcpp

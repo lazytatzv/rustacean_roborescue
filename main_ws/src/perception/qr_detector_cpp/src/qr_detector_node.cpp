@@ -66,8 +66,13 @@ QrDetectorNode::QrDetectorNode(const rclcpp::NodeOptions &options) : Node("qr_de
   }
   else
   {
-    RCLCPP_ERROR(this->get_logger(), "WeChatQRCode detector NOT initialized due to missing models");
+    RCLCPP_WARN(this->get_logger(),
+                "WeChatQRCode models not found — using zbar fallback");
   }
+
+  // zbar: QRコードのみ有効化
+  zbar_scanner_.set_config(zbar::ZBAR_NONE, zbar::ZBAR_CFG_ENABLE, 0);
+  zbar_scanner_.set_config(zbar::ZBAR_QRCODE, zbar::ZBAR_CFG_ENABLE, 1);
 
   // ---- QoS: sensor data = BEST_EFFORT --------------------------------
   auto sensor_qos = rclcpp::QoS(rclcpp::KeepLast(5))
@@ -119,15 +124,32 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
   std::vector<cv::Mat> points;
   std::vector<std::string> results;
 
+  // 100フレームごとに受信確認ログ
+  if (frame_count_ % (100 * detection_interval_) == 0)
+  {
+    RCLCPP_INFO(this->get_logger(), "Processing frame %d (%dx%d %s)", frame_count_,
+                frame.cols, frame.rows, msg->encoding.c_str());
+  }
+
   if (detector_)
   {
     results = detector_->detectAndDecode(frame, points);
   }
   else
   {
-    // WeChatQRCode 未初期化時は標準デコーダで検出
-    std::vector<cv::Point2f> pts;
-    fallback_detector_.detectAndDecodeMulti(frame, results, pts);
+    // zbar フォールバック
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    zbar::Image zbar_img(gray.cols, gray.rows, "Y800",
+                         gray.data, static_cast<unsigned long>(gray.cols * gray.rows));
+    zbar_scanner_.scan(zbar_img);
+    for (auto sym = zbar_img.symbol_begin(); sym != zbar_img.symbol_end(); ++sym)
+    {
+      if (sym->get_type() == zbar::ZBAR_QRCODE)
+      {
+        results.push_back(sym->get_data());
+      }
+    }
   }
 
   for (size_t i = 0; i < results.size(); ++i)

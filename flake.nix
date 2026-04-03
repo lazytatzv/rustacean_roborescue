@@ -160,6 +160,7 @@
           ros.pcl-conversions
           ros.pcl-msgs                # transitive dep of pcl_conversions
           ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
+          pkgs.zbar                   # QR / バーコード検出 (qr_detector fallback)
           ros.image-transport
           ros.compressed-image-transport
           ros.ffmpeg-image-transport       # H.264 compression support

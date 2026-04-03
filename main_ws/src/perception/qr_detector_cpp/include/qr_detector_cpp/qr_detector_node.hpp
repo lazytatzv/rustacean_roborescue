@@ -11,6 +11,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <string>
 #include <vector>
+#include <zbar.h>
 
 namespace qr_detector_cpp
 {
@@ -31,8 +32,8 @@ class QrDetectorNode : public rclcpp::Node
 
   // WeChatQRCode detector (高精度; Protobuf付きOpenCV必須)
   std::unique_ptr<cv::wechat_qrcode::WeChatQRCode> detector_;
-  // 標準QRデコーダ (WeChatQRCode使用不可時のフォールバック)
-  cv::QRCodeDetector fallback_detector_;
+  // zbar スキャナー (WeChatQRCode使用不可時のフォールバック)
+  zbar::ImageScanner zbar_scanner_;
 
   // Publishers and Subscriptions
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
