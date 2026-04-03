@@ -11,6 +11,7 @@ export CARGO_BUILD_RUSTFLAGS := "-C link-arg=-fuse-ld=mold"
 install_dir := shell("pwd") + "/install"
 py_path := install_dir + "/lib/python3.12/site-packages"
 gen_cmake := install_dir + "/share/rosidl_generator_rs/cmake"
+sccache_conf := shell("pwd") + "/.sccache.toml"
 
 # configs
 distro := "jazzy"
@@ -28,6 +29,16 @@ filter := "2>&1 | grep -v 'doesn.t contain any .local_setup... files' || true"
 
 default: forge
 
+# sccache 設定が古い形式(size="20G")のとき自動修復する
+sccache-heal:
+	if command -v sccache >/dev/null 2>&1; then \
+		mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" "$HOME/.config/sccache"; \
+		printf '%s\n' '[cache.disk]' "dir = \"${XDG_CACHE_HOME:-$HOME/.cache}/sccache\"" 'size = 21474836480' > "$HOME/.config/sccache/config"; \
+		printf '%s\n' '[cache.disk]' "dir = \"${XDG_CACHE_HOME:-$HOME/.cache}/sccache\"" 'size = 21474836480' > "{{sccache_conf}}"; \
+		SCCACHE_CONF="{{sccache_conf}}" sccache --stop-server >/dev/null 2>&1 || true; \
+		SCCACHE_CONF="{{sccache_conf}}" sccache --start-server >/dev/null 2>&1 || true; \
+	fi
+
 clean:
 	@echo "Clean..."
 	rm -rf build/ install/ log/
@@ -37,10 +48,22 @@ forge-bindings:
 	colcon build --packages-up-to rosidl_generator_rs --merge-install --symlink-install --cmake-args -G Ninja {{filter}}
 
 # 依存パスを強制エクスポートした状態で全体をビルド
-forge: forge-bindings
+forge: sccache-heal forge-bindings
 	export AMENT_PREFIX_PATH="{{install_dir}}:$AMENT_PREFIX_PATH"; \
 	export PYTHONPATH="{{py_path}}:$PYTHONPATH"; \
 	export PATH="{{install_dir}}/lib/rosidl_generator_rs:$PATH"; \
+	if [ "${FORGE_USE_SCCACHE:-0}" = "1" ] && command -v sccache >/dev/null 2>&1; then \
+		export SCCACHE_CONF="{{sccache_conf}}"; \
+		export RUSTC_WRAPPER=sccache; \
+		export CARGO_BUILD_RUSTC_WRAPPER=sccache; \
+	else \
+		echo "[forge] INFO: building without sccache (set FORGE_USE_SCCACHE=1 to enable)."; \
+		unset RUSTC_WRAPPER; \
+		unset CARGO_BUILD_RUSTC_WRAPPER; \
+		unset RUSTC_WORKSPACE_WRAPPER; \
+		unset SCCACHE_CONF; \
+		unset SCCACHE_CACHE_SIZE; \
+	fi; \
 	colcon build {{common_args}} {{ignore_args}} {{filter}}
 
 reforge: clean forge
