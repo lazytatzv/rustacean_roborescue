@@ -56,13 +56,6 @@ def generate_launch_description() -> LaunchDescription:
     map_frame = DeclareLaunchArgument("map_frame", default_value="odom")
     base_frame = DeclareLaunchArgument("base_frame", default_value="base_link")
     lidar_frame = DeclareLaunchArgument("lidar_frame", default_value="velodyne")
-    lidar_tf_x = DeclareLaunchArgument("lidar_tf_x", default_value="0.0")
-    lidar_tf_y = DeclareLaunchArgument("lidar_tf_y", default_value="0.0")
-    lidar_tf_z = DeclareLaunchArgument("lidar_tf_z", default_value="0.0")
-    lidar_tf_roll = DeclareLaunchArgument("lidar_tf_roll", default_value="0.0")
-    lidar_tf_pitch = DeclareLaunchArgument("lidar_tf_pitch", default_value="0.0")
-    lidar_tf_yaw = DeclareLaunchArgument("lidar_tf_yaw", default_value="0.0")
-
     use_velodyne = DeclareLaunchArgument("use_velodyne", default_value="false")
     velodyne_driver_params = DeclareLaunchArgument(
         "velodyne_driver_params",
@@ -201,24 +194,6 @@ def generate_launch_description() -> LaunchDescription:
         condition=UnlessCondition(LaunchConfiguration("use_lidar")),
     )
 
-    lidar_static_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_to_lidar_tf",
-        arguments=[
-            "--x", LaunchConfiguration("lidar_tf_x"),
-            "--y", LaunchConfiguration("lidar_tf_y"),
-            "--z", LaunchConfiguration("lidar_tf_z"),
-            "--roll", LaunchConfiguration("lidar_tf_roll"),
-            "--pitch", LaunchConfiguration("lidar_tf_pitch"),
-            "--yaw", LaunchConfiguration("lidar_tf_yaw"),
-            "--frame-id", LaunchConfiguration("base_frame"),
-            "--child-frame-id", LaunchConfiguration("lidar_frame"),
-        ],
-        output="screen",
-        condition=IfCondition(LaunchConfiguration("use_lidar")),
-    )
-
     velodyne_driver_node = Node(
         package="velodyne_driver",
         executable="velodyne_driver_node",
@@ -328,12 +303,6 @@ def generate_launch_description() -> LaunchDescription:
             map_frame,
             base_frame,
             lidar_frame,
-            lidar_tf_x,
-            lidar_tf_y,
-            lidar_tf_z,
-            lidar_tf_roll,
-            lidar_tf_pitch,
-            lidar_tf_yaw,
             use_velodyne,
             velodyne_driver_params,
             velodyne_pointcloud_params,
@@ -359,7 +328,6 @@ def generate_launch_description() -> LaunchDescription:
             spark_node,
             kiss_icp_node,
             odom_selector_node,
-            lidar_static_tf,
             odom_base_static_tf,
             slam_node,
             rviz_node,
