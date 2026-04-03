@@ -43,7 +43,10 @@
             # → DNN の Caffe モデル読み込みが有効になり WeChatQRCode が動作する
             (final: prev: {
               opencv4 = prev.opencv4.overrideAttrs (old: {
-                cmakeFlags = old.cmakeFlags ++ [ "-DWITH_PROTOBUF=ON" ];
+                cmakeFlags = old.cmakeFlags ++ [
+                  "-DWITH_PROTOBUF=ON"
+                  "-DProtobuf_DIR=${prev.protobuf_29}/lib/cmake/protobuf"
+                ];
               });
             })
           ];
