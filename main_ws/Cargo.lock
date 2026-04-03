@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "geometry_msgs"
-version = "5.3.7"
+version = "5.3.6"
 dependencies = [
  "builtin_interfaces",
  "rosidl_runtime_rs",
@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "sensor_msgs"
-version = "5.3.7"
+version = "5.3.6"
 dependencies = [
  "builtin_interfaces",
  "geometry_msgs",
@@ -1031,7 +1031,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "std_msgs"
-version = "5.3.7"
+version = "5.3.6"
 dependencies = [
  "builtin_interfaces",
  "rosidl_runtime_rs",
@@ -1510,7 +1510,15 @@ version = "2.0.3"
 
 [[patch.unused]]
 name = "actionlib_msgs"
-version = "5.3.7"
+version = "5.3.6"
+
+[[patch.unused]]
+name = "arm_controller"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "arm_driver"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "composition_interfaces"
@@ -1518,7 +1526,7 @@ version = "2.0.3"
 
 [[patch.unused]]
 name = "diagnostic_msgs"
-version = "5.3.7"
+version = "5.3.6"
 
 [[patch.unused]]
 name = "lifecycle_msgs"
@@ -1526,7 +1534,7 @@ version = "2.0.3"
 
 [[patch.unused]]
 name = "nav_msgs"
-version = "5.3.7"
+version = "5.3.6"
 
 [[patch.unused]]
 name = "rcl_interfaces"
@@ -1537,8 +1545,12 @@ name = "rosgraph_msgs"
 version = "2.0.3"
 
 [[patch.unused]]
+name = "sensor_gateway"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "shape_msgs"
-version = "5.3.7"
+version = "5.3.6"
 
 [[patch.unused]]
 name = "statistics_msgs"
@@ -1546,11 +1558,11 @@ version = "2.0.3"
 
 [[patch.unused]]
 name = "std_srvs"
-version = "5.3.7"
+version = "5.3.6"
 
 [[patch.unused]]
 name = "stereo_msgs"
-version = "5.3.7"
+version = "5.3.6"
 
 [[patch.unused]]
 name = "test_msgs"
@@ -1558,7 +1570,7 @@ version = "2.0.3"
 
 [[patch.unused]]
 name = "trajectory_msgs"
-version = "5.3.7"
+version = "5.3.6"
 
 [[patch.unused]]
 name = "type_description_interfaces"
@@ -1570,4 +1582,4 @@ version = "2.5.0"
 
 [[patch.unused]]
 name = "visualization_msgs"
-version = "5.3.7"
+version = "5.3.6"

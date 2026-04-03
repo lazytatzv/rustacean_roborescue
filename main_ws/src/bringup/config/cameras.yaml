@@ -46,7 +46,7 @@ cameras:
     fps: 15
     pixel_format: YUYV
     frame_id: front_camera_link
-    use_qr: false
+    use_qr: true
     encoder: libx264
     bitrate: 1200000
 
