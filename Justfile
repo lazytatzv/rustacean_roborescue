@@ -23,6 +23,8 @@ nix-status:
 # Install Nix cache settings for this repo to /etc/nix/nix.conf.d (requires sudo)
 nix-cache-install:
   user="${SUDO_USER:-$USER}"; \
+  user_home="$(getent passwd "$user" | cut -d: -f6)"; \
+  user_nix_conf="$user_home/.config/nix/nix.conf"; \
   sudo install -d /etc/nix/nix.conf.d; \
   sudo touch /etc/nix/nix.conf; \
   if ! sudo grep -q '/etc/nix/nix.conf.d/roborescue-cachix.conf' /etc/nix/nix.conf; then \
@@ -35,8 +37,16 @@ nix-cache-install:
     'trusted-substituters = https://cache.nixos.org https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
     "trusted-users = root ${user}" \
     | sudo tee /etc/nix/nix.conf.d/roborescue-cachix.conf >/dev/null; \
+  sudo -u "$user" install -d "$user_home/.config/nix"; \
+  sudo -u "$user" touch "$user_nix_conf"; \
+  if ! sudo -u "$user" grep -q 'extra-substituters = .*roborescue-nix.cachix.org' "$user_nix_conf"; then \
+    echo 'extra-substituters = https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' | sudo -u "$user" tee -a "$user_nix_conf" >/dev/null; \
+  fi; \
+  if ! sudo -u "$user" grep -q 'extra-trusted-public-keys = .*roborescue-nix.cachix.org-1:' "$user_nix_conf"; then \
+    echo 'extra-trusted-public-keys = roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=' | sudo -u "$user" tee -a "$user_nix_conf" >/dev/null; \
+  fi; \
   sudo systemctl restart nix-daemon; \
-  echo "Installed /etc/nix/nix.conf.d/roborescue-cachix.conf and restarted nix-daemon"
+  echo "Installed system/user nix cache settings and restarted nix-daemon"
 
 # Show effective Nix cache-related settings for troubleshooting
 nix-cache-check:
@@ -59,8 +69,8 @@ nix-cache-check:
     nix --help >&2; \
     exit 1; \
   fi | grep -E 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'; \
-  if ! (nix config show 2>/dev/null || nix show-config 2>/dev/null) | grep -q 'roborescue-nix.cachix.org'; then \
-    echo "[WARN] roborescue-nix.cachix.org is NOT active in effective nix config"; \
+  if ! (nix config show 2>/dev/null || nix show-config 2>/dev/null) | grep -E '^substituters\s*=.*roborescue-nix.cachix.org' >/dev/null; then \
+    echo "[WARN] roborescue-nix.cachix.org is NOT active in effective substituters"; \
     echo "       Run: just nix-cache-install"; \
   fi
 
