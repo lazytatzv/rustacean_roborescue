@@ -190,7 +190,10 @@ udev-status:
 # Dynamixel ID scan utilities (uv preferred, venv fallback)
 dxl-scan-flipper *extra_args:
   if command -v uv >/dev/null 2>&1; then \
-    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
+    env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
+  elif command -v nix >/dev/null 2>&1; then \
+    echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
+    env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
   else \
     echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
     python3 -m venv tools/maintenance/.venv; \
@@ -201,7 +204,10 @@ dxl-scan-flipper *extra_args:
 
 dxl-scan-arm *extra_args:
   if command -v uv >/dev/null 2>&1; then \
-    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
+    env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
+  elif command -v nix >/dev/null 2>&1; then \
+    echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
+    env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
   else \
     echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
     python3 -m venv tools/maintenance/.venv; \
@@ -212,7 +218,10 @@ dxl-scan-arm *extra_args:
 
 dxl-scan-flipper-sweep:
   if command -v uv >/dev/null 2>&1; then \
-    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+    env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+  elif command -v nix >/dev/null 2>&1; then \
+    echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
+    env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
   else \
     echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
     python3 -m venv tools/maintenance/.venv; \
@@ -223,7 +232,10 @@ dxl-scan-flipper-sweep:
 
 dxl-scan-arm-sweep:
   if command -v uv >/dev/null 2>&1; then \
-    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+    env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+  elif command -v nix >/dev/null 2>&1; then \
+    echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
+    env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
   else \
     echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
     python3 -m venv tools/maintenance/.venv; \
@@ -235,10 +247,10 @@ dxl-scan-arm-sweep:
 # Faster sweeps for bring-up: narrow ID range + common baud rates only
 dxl-scan-flipper-fast:
   if command -v uv >/dev/null 2>&1; then \
-    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
+    env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
   elif command -v nix >/dev/null 2>&1; then \
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
-    nix develop --accept-flake-config --command uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
+    env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
   else \
     echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
     python3 -m venv tools/maintenance/.venv; \
@@ -249,10 +261,10 @@ dxl-scan-flipper-fast:
 
 dxl-scan-arm-fast:
   if command -v uv >/dev/null 2>&1; then \
-    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
+    env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
   elif command -v nix >/dev/null 2>&1; then \
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
-    nix develop --accept-flake-config --command uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
+    env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
   else \
     echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
     python3 -m venv tools/maintenance/.venv; \
