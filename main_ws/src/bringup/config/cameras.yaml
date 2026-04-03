@@ -35,6 +35,8 @@
 
 cameras:
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
+
+  # 前の右側のカメラ
   - name: front
     driver: v4l2
     enabled: true

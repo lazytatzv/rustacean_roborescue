@@ -82,7 +82,7 @@ compiler-cache-setup:
     ccache --set-config=max_size=20G; \
   fi
   if command -v sccache >/dev/null 2>&1; then \
-    printf '%s\n' '[cache.disk]' "dir = \"${XDG_CACHE_HOME:-$HOME/.cache}/sccache\"" 'size = "20G"' > "$HOME/.config/sccache/config"; \
+    printf '%s\n' '[cache.disk]' "dir = \"${XDG_CACHE_HOME:-$HOME/.cache}/sccache\"" 'size = 21474836480' > "$HOME/.config/sccache/config"; \
     sccache --stop-server >/dev/null 2>&1 || true; \
     sccache --start-server >/dev/null 2>&1 || true; \
   fi
