@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <chrono>
+#include <fcntl.h>
 
 /**
  * HWT901B AHRS IMU センサノード
@@ -71,7 +72,11 @@ void HWT901BIMUNode::open_serial()
   serial_.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none)); // parityなし
   serial_.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one)); // stop bitは1
   serial_.set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none)); // flow制御なし
-  serial_.non_blocking(true);
+  const int fd = serial_.native_handle();
+  const int flags = ::fcntl(fd, F_GETFL, 0);
+  if (flags == -1 || ::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+    RCLCPP_WARN(this->get_logger(), "Failed to set non-blocking mode on %s", port_name_.c_str());
+  }
 }
 
 void HWT901BIMUNode::poll_serial()
