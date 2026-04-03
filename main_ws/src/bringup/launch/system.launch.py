@@ -77,6 +77,7 @@ def generate_launch_description():
         default_use_nav2 = _b(cfg.get("use_nav2", False))
         default_use_audio = _b(cfg.get("use_audio", True))
         default_use_lidar = _b(cfg.get("use_lidar", True))
+        default_use_velodyne = _b(cfg.get("use_velodyne", cfg.get("use_lidar", True)))
         default_use_camera = _b(cfg.get("use_camera", True))
         default_use_crawler = _b(cfg.get("use_crawler", True))
         default_use_arm = _b(cfg.get("use_arm", True))
@@ -86,6 +87,7 @@ def generate_launch_description():
         arg_use_nav2 = DeclareLaunchArgument("use_nav2", default_value=default_use_nav2)
         arg_use_audio = DeclareLaunchArgument("use_audio", default_value=default_use_audio)
         arg_use_lidar = DeclareLaunchArgument("use_lidar", default_value=default_use_lidar)
+        arg_use_velodyne = DeclareLaunchArgument("use_velodyne", default_value=default_use_velodyne)
         arg_use_camera = DeclareLaunchArgument("use_camera", default_value=default_use_camera)
         arg_use_crawler = DeclareLaunchArgument("use_crawler", default_value=default_use_crawler)
         arg_use_arm = DeclareLaunchArgument("use_arm", default_value=default_use_arm)
@@ -95,6 +97,7 @@ def generate_launch_description():
         use_nav2 = LaunchConfiguration("use_nav2")
         use_audio = LaunchConfiguration("use_audio")
         use_lidar = LaunchConfiguration("use_lidar")
+        use_velodyne = LaunchConfiguration("use_velodyne")
         use_camera = LaunchConfiguration("use_camera")
         use_crawler = LaunchConfiguration("use_crawler")
         use_arm = LaunchConfiguration("use_arm")
@@ -156,6 +159,7 @@ def generate_launch_description():
             arg_use_nav2,
             arg_use_audio,
             arg_use_lidar,
+            arg_use_velodyne,
             arg_use_camera,
             arg_use_crawler,
             arg_use_arm,
@@ -188,6 +192,7 @@ def generate_launch_description():
                 launch_arguments={
                     "use_slam": use_lidar,
                     "use_lidar": use_lidar,
+                    "use_velodyne": use_velodyne,
                     "use_scan": use_lidar,
                     "use_rviz": "false",
                 },
