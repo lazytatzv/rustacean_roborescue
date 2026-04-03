@@ -120,6 +120,11 @@
 
           vtk
           pcl
+
+          # --- QR / バーコード検出 (qr_detector fallback) ---
+          # buildTools に直接置くことで symlinkJoin を経由せず
+          # cmake の find_path/find_library がヘッダ・ライブラリを見つけられる。
+          zbar
         ];
 
         # ── ROS 2 パッケージ群 ──────────────────────────────
@@ -160,7 +165,6 @@
           ros.pcl-conversions
           ros.pcl-msgs                # transitive dep of pcl_conversions
           ros.cv-bridge               # OpenCV ↔ ROS (qr_detector)
-          pkgs.zbar                   # QR / バーコード検出 (qr_detector fallback)
           ros.image-transport
           ros.compressed-image-transport
           ros.ffmpeg-image-transport       # H.264 compression support
@@ -435,7 +439,7 @@
             # 該当パッケージの実体パスを明示的に先頭へ追加する。
             export LD_LIBRARY_PATH="${tbbRuntime}/lib:${ros.rmw-zenoh-cpp}/lib:${ros.rmw-zenoh-cpp}/lib64:${ros.zenoh-cpp-vendor}/lib:${ros.zenoh-cpp-vendor}/lib64:${roboRescueEnv}/lib:${roboRescueEnv}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             #export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
-            export CMAKE_PREFIX_PATH="${roboRescueEnv}:$CMAKE_PREFIX_PATH"
+            export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.zbar}:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
 
             # --- ROS 2 RMW (Zenoh) ---
