@@ -3,11 +3,11 @@
 # ros2 launch bringup system.launch.py で読み込まれる。
 # 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
-use_crawler: true
+use_crawler: false
 use_arm: false
-use_flipper: false
+use_flipper: true
 use_imu: false
-use_lidar: true
-use_camera: true
+use_lidar: false
+use_camera: false
 use_nav2: false
-use_audio: true
+use_audio: false

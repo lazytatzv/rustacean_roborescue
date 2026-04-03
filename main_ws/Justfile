@@ -69,7 +69,16 @@ forge: sccache-heal forge-bindings
 reforge: clean forge
 
 launch *launch_args:
-	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && ros2 launch bringup system.launch.py {{launch_args}}
+	ROOT=$(cd .. && pwd); \
+	if command -v python3 >/dev/null 2>&1 && python3 -c 'import ctypes; ctypes.CDLL("libtbb.so.12")' >/dev/null 2>&1; then \
+		cd "$ROOT/main_ws" && source install/setup.bash && ros2 launch bringup system.launch.py {{launch_args}}; \
+	elif command -v nix >/dev/null 2>&1 && [ -f "$ROOT/flake.nix" ]; then \
+		echo "[launch] libtbb.so.12 not found in current shell. Falling back to nix develop."; \
+		cd "$ROOT" && nix develop --accept-flake-config --command bash -lc 'cd main_ws && source install/setup.bash && ros2 launch bringup system.launch.py {{launch_args}}'; \
+	else \
+		echo "[launch] WARN: libtbb.so.12 is missing and nix is unavailable. Launching anyway (KISS fallback will be disabled)."; \
+		cd "$ROOT/main_ws" && source install/setup.bash && ros2 launch bringup system.launch.py {{launch_args}}; \
+	fi
 
 # ── Code Quality ──
 
