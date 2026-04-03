@@ -26,9 +26,9 @@ nix-cache-install:
   sudo install -d /etc/nix/nix.conf.d; \
   printf '%s\n' \
     'experimental-features = nix-command flakes' \
-    'extra-substituters = https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
-    'extra-trusted-public-keys = roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=' \
-    'trusted-substituters = https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
+    'substituters = https://cache.nixos.org https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
+    'trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=' \
+    'trusted-substituters = https://cache.nixos.org https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
     "trusted-users = root ${user}" \
     | sudo tee /etc/nix/nix.conf.d/roborescue-cachix.conf >/dev/null; \
   sudo systemctl restart nix-daemon; \
@@ -44,7 +44,11 @@ nix-cache-check:
     echo "Could not read nix config with this nix CLI" >&2; \
     nix --help >&2; \
     exit 1; \
-  fi | grep -E 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'
+  fi | grep -E 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'; \
+  if ! (nix config show 2>/dev/null || nix show-config 2>/dev/null) | grep -q 'roborescue-nix.cachix.org'; then \
+    echo "[WARN] roborescue-nix.cachix.org is NOT active in effective nix config"; \
+    echo "       Run: just nix-cache-install"; \
+  fi
 
 # Enable compiler caches for local C/C++ and Rust builds
 compiler-cache-setup:
