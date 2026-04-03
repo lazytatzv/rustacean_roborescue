@@ -37,10 +37,14 @@
           overlays = [
             nix-ros-overlay.overlays.default
             (import rust-overlay)
-            # opencv4 を protobuf 付きでビルドし直す
+            # opencv4 に WITH_PROTOBUF=ON を強制する
+            # protobuf_29 は既にbuild inputsにあるが、protobuf 25+でcmake package名が
+            # 変わりauto-detectionが失敗するため明示指定が必要。
             # → DNN の Caffe モデル読み込みが有効になり WeChatQRCode が動作する
             (final: prev: {
-              opencv4 = prev.opencv4.override { protobuf = prev.protobuf; };
+              opencv4 = prev.opencv4.overrideAttrs (old: {
+                cmakeFlags = old.cmakeFlags ++ [ "-DWITH_PROTOBUF=ON" ];
+              });
             })
           ];
           config.allowUnfree = true;
