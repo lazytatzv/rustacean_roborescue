@@ -38,6 +38,50 @@ nix-cache-install:
 nix-cache-check:
   nix config show | rg 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'
 
+# Enable compiler caches for local C/C++ and Rust builds
+compiler-cache-setup:
+  mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/ccache" "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" "$HOME/.config/sccache"
+  if command -v ccache >/dev/null 2>&1; then \
+    ccache --set-config=cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/ccache"; \
+    ccache --set-config=max_size=20G; \
+  fi
+  if command -v sccache >/dev/null 2>&1; then \
+    printf '%s\n' '[cache.disk]' "dir = \"${XDG_CACHE_HOME:-$HOME/.cache}/sccache\"" 'size = "20G"' > "$HOME/.config/sccache/config"; \
+    sccache --stop-server >/dev/null 2>&1 || true; \
+    sccache --start-server >/dev/null 2>&1 || true; \
+  fi
+  echo "Configured ccache/sccache cache directories under ${XDG_CACHE_HOME:-$HOME/.cache}"
+
+# Show compiler cache status and hit/miss counters
+compiler-cache-status:
+  echo "== env =="
+  echo "CC=${CC:-<unset>}"
+  echo "CXX=${CXX:-<unset>}"
+  echo "RUSTC_WRAPPER=${RUSTC_WRAPPER:-<unset>}"
+  echo "CCACHE_DIR=${CCACHE_DIR:-<unset>}"
+  echo "SCCACHE_DIR=${SCCACHE_DIR:-<unset>}"
+  echo
+  if command -v ccache >/dev/null 2>&1; then \
+    echo "== ccache =="; \
+    ccache --show-config | rg 'cache_dir|max_size' || true; \
+    ccache -s || true; \
+  else \
+    echo "ccache: not found"; \
+  fi
+  echo
+  if command -v sccache >/dev/null 2>&1; then \
+    echo "== sccache =="; \
+    sccache --show-stats || true; \
+  else \
+    echo "sccache: not found"; \
+  fi
+
+# Reset compiler cache counters (keeps existing cache artifacts)
+compiler-cache-reset-stats:
+  if command -v ccache >/dev/null 2>&1; then ccache -z || true; fi
+  if command -v sccache >/dev/null 2>&1; then sccache --zero-stats || true; fi
+  echo "Reset ccache/sccache statistics counters"
+
 dev:
   # Start a development shell for interactive work (recommended)
   @echo "Starting nix dev shell (interactive). Use Ctrl-D to exit."

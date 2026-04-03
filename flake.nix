@@ -58,7 +58,7 @@
         # ── ビルドツール & CLI ──────────────────────────────
         buildTools = with pkgs; [
           # --- C++ ビルド ---
-          cmake ccache mold ninja
+          cmake ccache sccache mold ninja
           clang-tools clang llvmPackages.openmp
           boost                       # crawler_driver (boost::asio)
           tbb                         # kiss_icp runtime (libtbb.so.12)
@@ -373,6 +373,11 @@
 
             # --- C++ ビルド高速化 ---
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            export CCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/ccache"
+            export CCACHE_MAXSIZE="20G"
+            export RUSTC_WRAPPER="sccache"
+            export SCCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sccache"
+            export SCCACHE_CACHE_SIZE="20G"
             export CC="ccache clang"
             export CXX="ccache clang++"
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
@@ -524,6 +529,7 @@
             pkgs.clang pkgs.clang-tools pkgs.llvmPackages.libclang
             pkgs.boost pkgs.vtk pkgs.pcl
             pkgs.ccache
+            pkgs.sccache
 
             # --- colcon / ROS ビルドインフラ ---
             pkgs.colcon
@@ -547,6 +553,11 @@
             export ROS_VERSION=2
             export RUST_SRC_PATH="${rustNightly}/lib/rustlib/src/rust/library"
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            export CCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/ccache"
+            export CCACHE_MAXSIZE="20G"
+            export RUSTC_WRAPPER="sccache"
+            export SCCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sccache"
+            export SCCACHE_CACHE_SIZE="20G"
             export CC="ccache clang"
             export CXX="ccache clang++"
             export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
