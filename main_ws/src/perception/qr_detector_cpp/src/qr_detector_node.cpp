@@ -25,7 +25,6 @@ QrDetectorNode::QrDetectorNode(const rclcpp::NodeOptions &options) : Node("qr_de
   {
     try
     {
-      // Try to find models in the Python package share directory
       std::string python_pkg_share = ament_index_cpp::get_package_share_directory("qr_detector");
       model_dir_ = (std::filesystem::path(python_pkg_share) / "models").string();
     }
@@ -66,8 +65,7 @@ QrDetectorNode::QrDetectorNode(const rclcpp::NodeOptions &options) : Node("qr_de
   }
   else
   {
-    RCLCPP_WARN(this->get_logger(),
-                "WeChatQRCode models not found — using zbar fallback");
+    RCLCPP_WARN(this->get_logger(), "WeChatQRCode models not found — using zbar fallback");
   }
 
   // zbar: QRコードのみ有効化
@@ -80,8 +78,6 @@ QrDetectorNode::QrDetectorNode(const rclcpp::NodeOptions &options) : Node("qr_de
                         .durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
 
   // ---- Subscriber ----------------------------------------------------
-  // 相対トピック名を使用 → namespace で自動ルーティング
-  // 例: namespace=camera_arm なら /camera_arm/image_raw を購読
   image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
       "image_raw", sensor_qos,
       std::bind(&QrDetectorNode::image_callback, this, std::placeholders::_1));
@@ -103,7 +99,6 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
 {
   frame_count_++;
 
-  // Frame skipping
   if (frame_count_ % detection_interval_ != 0)
   {
     return;
@@ -124,22 +119,24 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
   std::vector<cv::Mat> points;
   std::vector<std::string> results;
 
-  // 100フレームごとに受信確認ログ
-  if (frame_count_ % (100 * detection_interval_) == 0)
-  {
-    RCLCPP_INFO(this->get_logger(), "Processing frame %d (%dx%d %s)", frame_count_,
-                frame.cols, frame.rows, msg->encoding.c_str());
-  }
-
   if (detector_)
   {
     results = detector_->detectAndDecode(frame, points);
   }
   else
   {
-    // zbar フォールバック
-    cv::Mat gray;
-    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    // zbar フォールバック (MONO8 で直接変換)
+    cv_bridge::CvImagePtr gray_ptr;
+    try
+    {
+      gray_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+    }
+    catch (const cv_bridge::Exception &e)
+    {
+      RCLCPP_ERROR(this->get_logger(), "cv_bridge mono8 exception: %s", e.what());
+      return;
+    }
+    cv::Mat gray = gray_ptr->image.isContinuous() ? gray_ptr->image : gray_ptr->image.clone();
     zbar::Image zbar_img(gray.cols, gray.rows, "Y800",
                          gray.data, static_cast<unsigned long>(gray.cols * gray.rows));
     zbar_scanner_.scan(zbar_img);
@@ -164,7 +161,6 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
     qr_pub_->publish(qr_msg);
     RCLCPP_INFO(this->get_logger(), "QR detected: %s", results[i].c_str());
 
-    // Draw bounding box
     if (publish_compressed_ && i < points.size())
     {
       cv::Mat pts_mat = points[i];
@@ -180,7 +176,6 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
     }
   }
 
-  // ---- Publish compressed image -------------------
   if (publish_compressed_)
   {
     auto comp_msg = sensor_msgs::msg::CompressedImage();
