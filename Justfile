@@ -20,6 +20,24 @@ sync:
 nix-status:
   systemctl status nix-daemon
 
+# Install Nix cache settings for this repo to /etc/nix/nix.conf.d (requires sudo)
+nix-cache-install:
+  user="${SUDO_USER:-$USER}"; \
+  sudo install -d /etc/nix/nix.conf.d; \
+  printf '%s\n' \
+    'experimental-features = nix-command flakes' \
+    'extra-substituters = https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
+    'extra-trusted-public-keys = roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=' \
+    'trusted-substituters = https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
+    "trusted-users = root ${user}" \
+    | sudo tee /etc/nix/nix.conf.d/roborescue-cachix.conf >/dev/null; \
+  sudo systemctl restart nix-daemon; \
+  echo "Installed /etc/nix/nix.conf.d/roborescue-cachix.conf and restarted nix-daemon"
+
+# Show effective Nix cache-related settings for troubleshooting
+nix-cache-check:
+  nix config show | rg 'substituters|trusted-public-keys|trusted-substituters|trusted-users|accept-flake-config'
+
 dev:
   # Start a development shell for interactive work (recommended)
   @echo "Starting nix dev shell (interactive). Use Ctrl-D to exit."
@@ -132,4 +150,27 @@ dxl-scan-arm-sweep:
     tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
     tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
     tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+  fi
+
+# Faster sweeps for bring-up: narrow ID range + common baud rates only
+dxl-scan-flipper-fast:
+  if command -v uv >/dev/null 2>&1; then \
+    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
+  else \
+    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
+    python3 -m venv tools/maintenance/.venv; \
+    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
+    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
+    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
+  fi
+
+dxl-scan-arm-fast:
+  if command -v uv >/dev/null 2>&1; then \
+    uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
+  else \
+    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
+    python3 -m venv tools/maintenance/.venv; \
+    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
+    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
+    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
   fi
