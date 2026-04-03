@@ -46,6 +46,7 @@
 
         ROS_VERSION = "jazzy";
         ros = pkgs.rosPackages.${ROS_VERSION};
+        tbbRuntime = if pkgs ? onetbb then pkgs.onetbb else pkgs.tbb;
 
         # ── Rust ツールチェーン ──────────────────────────────
         # nightly: proc-macro / bindgen に必要
@@ -61,7 +62,7 @@
           cmake ccache sccache mold ninja
           clang-tools clang llvmPackages.openmp
           boost                       # crawler_driver (boost::asio)
-          tbb                         # kiss_icp runtime (libtbb.so.12)
+          tbbRuntime                  # kiss_icp runtime (libtbb.so.12)
 
           # --- Rust ---
           rustNightly
@@ -271,7 +272,7 @@
         ];
 
         # C++ ライブラリ (ROS 外)
-        cppLibs = with pkgs; [ eigen orocos-kdl tbb ];
+        cppLibs = with pkgs; [ eigen orocos-kdl tbbRuntime ];
 
         # ── CI 専用 ROS 依存 ────────────────────────────────────────────────
         # Gazebo / RViz2 / Nav2 / SLAM など GUI・シミュレーション系を除外し
@@ -373,6 +374,7 @@
 
             # --- C++ ビルド高速化 ---
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            export TBBROOT="${tbbRuntime}"
             export CCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/ccache"
             export CCACHE_MAXSIZE="20G"
             export SCCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sccache"
@@ -418,7 +420,7 @@
             # --- ライブラリパス ---
             # rmw_zenoh_cpp は symlinkJoin 経由だと .so 探索に失敗するケースがあるため
             # 該当パッケージの実体パスを明示的に先頭へ追加する。
-            export LD_LIBRARY_PATH="${pkgs.tbb}/lib:${ros.rmw-zenoh-cpp}/lib:${ros.rmw-zenoh-cpp}/lib64:${ros.zenoh-cpp-vendor}/lib:${ros.zenoh-cpp-vendor}/lib64:${roboRescueEnv}/lib:${roboRescueEnv}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export LD_LIBRARY_PATH="${tbbRuntime}/lib:${ros.rmw-zenoh-cpp}/lib:${ros.rmw-zenoh-cpp}/lib64:${ros.zenoh-cpp-vendor}/lib:${ros.zenoh-cpp-vendor}/lib64:${roboRescueEnv}/lib:${roboRescueEnv}/lib64''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             #export CMAKE_PREFIX_PATH="${roboRescueEnv}:${pkgs.vtk}/lib/cmake/vtk:$CMAKE_PREFIX_PATH"
             export CMAKE_PREFIX_PATH="${roboRescueEnv}:$CMAKE_PREFIX_PATH"
             export AMENT_PREFIX_PATH="${roboRescueEnv}:$AMENT_PREFIX_PATH"
@@ -551,6 +553,7 @@
             export ROS_VERSION=2
             export RUST_SRC_PATH="${rustNightly}/lib/rustlib/src/rust/library"
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            export TBBROOT="${tbbRuntime}"
             export CCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/ccache"
             export CCACHE_MAXSIZE="20G"
             export SCCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sccache"

@@ -1,4 +1,35 @@
 import ctypes
+import os
+
+
+def _can_load_libtbb12() -> bool:
+    # First try normal dynamic loader lookup.
+    try:
+        ctypes.CDLL("libtbb.so.12")
+        return True
+    except OSError:
+        pass
+
+    # Then try explicit paths provided by nix/dev shells.
+    candidates = []
+    tbb_root = os.environ.get("TBBROOT", "")
+    if tbb_root:
+        candidates.append(os.path.join(tbb_root, "lib", "libtbb.so.12"))
+
+    for var_name in ("LD_LIBRARY_PATH", "NIX_LD_LIBRARY_PATH"):
+        for lib_dir in os.environ.get(var_name, "").split(":"):
+            if lib_dir:
+                candidates.append(os.path.join(lib_dir, "libtbb.so.12"))
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            try:
+                ctypes.CDLL(candidate)
+                return True
+            except OSError:
+                continue
+
+    return False
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
@@ -11,11 +42,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     bringup_share = FindPackageShare("bringup")
 
-    kiss_icp_available = True
-    try:
-        ctypes.CDLL("libtbb.so.12")
-    except OSError:
-        kiss_icp_available = False
+    kiss_icp_available = _can_load_libtbb12()
 
     config_path = DeclareLaunchArgument(
         "config_path",
