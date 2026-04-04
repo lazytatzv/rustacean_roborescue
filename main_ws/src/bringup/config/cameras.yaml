@@ -36,7 +36,7 @@
 cameras:
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
 
-  # 前の右側のカメラ
+  # フロントカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.3)
   - name: front
     driver: v4l2
     enabled: true
@@ -50,16 +50,31 @@ cameras:
     encoder: libx264
     bitrate: 1200000
 
+  # バックカメラ: BUFFALO USB 2.0 Camera (usb-0000:00:14.0-3.1.4.4)
   - name: back
     driver: v4l2
     enabled: true
-    device: /dev/video1
+    device: /dev/video2
+    width: 1280
+    height: 720
+    fps: 15
+    pixel_format: MJPG
+    frame_id: back_camera_link
+    use_qr: false
+    encoder: libx264
+    bitrate: 2000000
+
+  # アームカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.4)
+  - name: arm
+    driver: v4l2
+    enabled: true
+    device: /dev/video4
     width: 640
     height: 480
     fps: 15
     pixel_format: YUYV
-    frame_id: back_camera_link
-    use_qr: false
+    frame_id: arm_camera_link
+    use_qr: true
     encoder: libx264
     bitrate: 1200000
 
@@ -90,7 +105,6 @@ cameras:
     bitrate: 1200000
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
-  # 事前にライブストリーミングモードを有効化すること: https://theta360.com/en/support/
   - name: theta
     driver: theta_s
     device: /dev/video4
@@ -104,10 +118,10 @@ cameras:
     bitrate: 4000000
 
   # ── RealSense ─────────────────────────────────────────────────────────────
-  - name: arm
+  - name: realsense_arm
     driver: realsense
     enabled: false
-    serial: ""            # 複数台使う場合はシリアル番号を指定
+    serial: ""
     enable_color: true
     enable_depth: true
     color_width: 640
@@ -116,6 +130,6 @@ cameras:
     depth_width: 640
     depth_height: 480
     depth_fps: 30
-    use_qr: true
+    use_qr: false
     encoder: libx264
     bitrate: 1000000
