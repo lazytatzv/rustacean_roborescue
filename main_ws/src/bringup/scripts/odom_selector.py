@@ -13,6 +13,8 @@ odom_selector: /imu/health と spark odom の死活に基づいて /odom ソー�
   - IMU 復活判定: health=true が ALIVE_THRESHOLD 秒継続後に切り替え
 """
 
+import threading
+
 import rclpy
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
@@ -50,6 +52,7 @@ class OdomSelector(Node):
 
         # 複数コールバックを並行実行するため ReentrantCallbackGroup を使う
         self._cb_group = ReentrantCallbackGroup()
+        self._lock = threading.Lock()
 
         self._pub = self.create_publisher(Odometry, "/odom", 10)
         self._tf_broadcaster = tf2_ros.TransformBroadcaster(self)
@@ -75,57 +78,65 @@ class OdomSelector(Node):
         if not self._allow_kiss_fallback:
             return
         self._timeout_timer.cancel()
-        if not self._health_received:
-            self._use_imu = False
-            self.get_logger().warn(
-                "No /imu/health received within timeout -> switching to KISS-ICP odom"
-            )
+        with self._lock:
+            if not self._health_received:
+                self._use_imu = False
+        self.get_logger().warn(
+            "No /imu/health received within timeout -> switching to KISS-ICP odom"
+        )
 
     def _spark_watchdog_cb(self):
         if not self._allow_kiss_fallback:
             return
         now = self._now()
-        if self._last_spark_time is None:
-            return
-        stale = (now - self._last_spark_time) > self._spark_timeout
-        if stale and not self._spark_stale:
-            self._spark_stale = True
+        with self._lock:
+            if self._last_spark_time is None:
+                return
+            stale = (now - self._last_spark_time) > self._spark_timeout
+            prev_stale = self._spark_stale
+            self._spark_stale = stale
+        if stale and not prev_stale:
             self.get_logger().warn(
                 f"spark_fast_lio odom stale (>{self._spark_timeout}s) -> switching to KISS-ICP"
             )
-        elif not stale and self._spark_stale:
-            self._spark_stale = False
+        elif not stale and prev_stale:
             self.get_logger().info("spark_fast_lio odom recovered")
 
     def _is_kiss_mode(self) -> bool:
         if not self._allow_kiss_fallback:
             return False
-        return (not self._use_imu) or self._spark_stale
+        with self._lock:
+            return (not self._use_imu) or self._spark_stale
 
     def _health_cb(self, msg: Bool):
         if not self._allow_kiss_fallback:
             return
-        self._health_received = True
         now = self._now()
-        if msg.data:
-            self._health_false_since = None
-            if self._health_true_since is None:
-                self._health_true_since = now
-            if not self._use_imu and (now - self._health_true_since) >= self.ALIVE_THRESHOLD:
-                self._use_imu = True
-                self._health_true_since = None
-                self.get_logger().info("IMU recovered -> switching back to spark_fast_lio odom")
-        else:
-            self._health_true_since = None
-            if self._health_false_since is None:
-                self._health_false_since = now
-            if self._use_imu and (now - self._health_false_since) >= self.DEAD_THRESHOLD:
-                self._use_imu = False
+        log = None
+        with self._lock:
+            self._health_received = True
+            if msg.data:
                 self._health_false_since = None
-                self.get_logger().warn("IMU dead -> switching to KISS-ICP odom")
+                if self._health_true_since is None:
+                    self._health_true_since = now
+                if not self._use_imu and (now - self._health_true_since) >= self.ALIVE_THRESHOLD:
+                    self._use_imu = True
+                    self._health_true_since = None
+                    log = ("info", "IMU recovered -> switching back to spark_fast_lio odom")
+            else:
+                self._health_true_since = None
+                if self._health_false_since is None:
+                    self._health_false_since = now
+                if self._use_imu and (now - self._health_false_since) >= self.DEAD_THRESHOLD:
+                    self._use_imu = False
+                    self._health_false_since = None
+                    log = ("warn", "IMU dead -> switching to KISS-ICP odom")
+        if log:
+            getattr(self.get_logger(), log[0])(log[1])
 
     def _spark_cb(self, msg: Odometry):
-        self._last_spark_time = self._now()
+        with self._lock:
+            self._last_spark_time = self._now()
         if not self._is_kiss_mode():
             self._pub.publish(msg)
 
