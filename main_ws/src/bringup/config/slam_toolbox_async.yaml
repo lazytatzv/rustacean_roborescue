@@ -24,6 +24,10 @@ slam_toolbox:
     minimum_time_interval: 0.5
     transform_publish_period: 0.1
 
+    # Ceres ソルバーのスレッド数。0 だとシングルスレッド。
+    # ロボットの CPU コア数に応じて調整する。
+    num_solver_threads: 2
+
     # ── Solver設定 ──
     solver_plugin: solver_plugins::CeresSolver
     ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
