@@ -36,6 +36,7 @@ nix-cache-install:
     'trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= roborescue-nix.cachix.org-1:qy3rP4VwHob/xePMW77gUxZVvPMz8izs86rIdruro0U= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=' \
     'trusted-substituters = https://cache.nixos.org https://roborescue-nix.cachix.org https://nix-community.cachix.org https://ros.cachix.org' \
     "trusted-users = root ${user}" \
+    'accept-flake-config = true' \
     | sudo tee /etc/nix/nix.conf.d/roborescue-cachix.conf >/dev/null; \
   sudo -u "$user" install -d "$user_home/.config/nix"; \
   sudo -u "$user" touch "$user_nix_conf"; \
@@ -133,11 +134,11 @@ robot-up-min:
 
 # One command operator bringup with fixed Zenoh env (lightweight mode)
 operator-up-min:
-  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_CONFIG_OVERRIDE="mode=\"peer\";connect/endpoints=[\"tcp/10.42.0.1:7447\"];scouting/multicast/enabled=false" && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 launch launch/operator.launch.py use_foxglove:=false use_audio:=false use_joy:=true'
+  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 launch launch/operator.launch.py use_foxglove:=false use_audio:=false use_joy:=true'
 
 # Quick operator-side graph check under the same fixed env
 operator-topic-list:
-  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_CONFIG_OVERRIDE="mode=\"peer\";connect/endpoints=[\"tcp/10.42.0.1:7447\"];scouting/multicast/enabled=false" && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 topic list'
+  nix develop --accept-flake-config .#operator --command bash -lc 'cd operator_ws && source install/setup.bash && export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RMW_ZENOH_CONFIG_URI=file://$PWD/zenoh_ope.json5 && export ZENOH_ROUTER_CHECK_ATTEMPTS=-1 && export ROS_DOMAIN_ID=0 && export ROS_LOCALHOST_ONLY=0 && ros2 daemon stop >/dev/null 2>&1 || true && ros2 topic list'
 
 
 # TEST
@@ -159,7 +160,7 @@ check-lint:
 # cachixにバイナリキャッシュを上げる
 # flake.nixを更新したら定期的にやっておく
 cachix:
-  cachix watch-exec roborescue-nix -- nix develop --command true
+  cachix watch-exec roborescue-nix -- nix develop --accept-flake-config --command true
 
 # operator_ws 側の devShell も同じキャッシュへ投入
 operator-cachix:
