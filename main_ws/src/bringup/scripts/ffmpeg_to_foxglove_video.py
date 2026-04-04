@@ -27,11 +27,13 @@ class FfmpegToFoxgloveVideo(Node):
         input_topic = self.get_parameter("input_topic").get_parameter_value().string_value
         output_topic = self.get_parameter("output_topic").get_parameter_value().string_value
 
-        # 動画はリアルタイム性優先。取りこぼしより遅延の方が問題なので両方 BEST_EFFORT。
-        qos = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
+        # ffmpeg_image_transport は BEST_EFFORT で配信するので sub は合わせる。
+        # foxglove_bridge はデフォルト RELIABLE でsubscribeするので pub は RELIABLE を維持。
+        qos_sub = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
+        qos_pub = QoSProfile(depth=5, reliability=ReliabilityPolicy.RELIABLE)
 
-        self._pub = self.create_publisher(CompressedVideo, output_topic, qos)
-        self._sub = self.create_subscription(FFMPEGPacket, input_topic, self._cb, qos)
+        self._pub = self.create_publisher(CompressedVideo, output_topic, qos_pub)
+        self._sub = self.create_subscription(FFMPEGPacket, input_topic, self._cb, qos_sub)
         self.get_logger().info(f"ffmpeg_to_foxglove_video: {input_topic} → {output_topic}")
 
     def _cb(self, msg: FFMPEGPacket) -> None:
