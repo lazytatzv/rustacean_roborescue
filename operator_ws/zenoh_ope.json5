@@ -7,7 +7,9 @@
     // ROBOT_IP = 10.42.0.1 (ロボット側ホットスポット固定 IP)
     endpoints: [
       "quic/10.42.0.1:7447",
-      "tcp/10.42.0.1:7447"
+      "tcp/10.42.0.1:7447",
+      "quic/10.42.0.1:17447",
+      "tcp/10.42.0.1:17447"
     ]
   },
   scouting: { multicast: { enabled: false } },

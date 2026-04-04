@@ -43,40 +43,40 @@ cameras:
     device: /dev/video0
     width: 640
     height: 480
-    fps: 15
+    fps: 10
     pixel_format: YUYV
     frame_id: front_camera_link
     use_qr: true
     encoder: libx264
-    bitrate: 1200000
+    bitrate: 1000000
 
   # バックカメラ: BUFFALO USB 2.0 Camera (usb-0000:00:14.0-3.1.4.4)
   - name: back
     driver: v4l2
     enabled: true
     device: /dev/video2
-    width: 1280
-    height: 720
-    fps: 15
-    pixel_format: MJPG
+    width: 320
+    height: 240
+    fps: 10
+    pixel_format: YUYV
     frame_id: back_camera_link
     use_qr: false
     encoder: libx264
-    bitrate: 2000000
+    bitrate: 800000
 
   # アームカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.4)
   - name: arm
     driver: v4l2
     enabled: true
     device: /dev/video4
-    width: 640
-    height: 480
-    fps: 15
+    width: 320
+    height: 240
+    fps: 10
     pixel_format: YUYV
     frame_id: arm_camera_link
     use_qr: true
     encoder: libx264
-    bitrate: 1200000
+    bitrate: 800000
 
   - name: left
     driver: v4l2
