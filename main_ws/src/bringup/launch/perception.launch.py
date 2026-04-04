@@ -31,6 +31,7 @@ def _can_load_libtbb12() -> bool:
 
     return False
 
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition, UnlessCondition
@@ -56,6 +57,10 @@ def generate_launch_description() -> LaunchDescription:
     map_frame = DeclareLaunchArgument("map_frame", default_value="odom")
     base_frame = DeclareLaunchArgument("base_frame", default_value="base_link")
     lidar_frame = DeclareLaunchArgument("lidar_frame", default_value="velodyne")
+    kiss_icp_params = DeclareLaunchArgument(
+        "kiss_icp_params",
+        default_value=PathJoinSubstitution([bringup_share, "config", "kiss_icp.yaml"]),
+    )
     use_velodyne = DeclareLaunchArgument("use_velodyne", default_value="false")
     velodyne_driver_params = DeclareLaunchArgument(
         "velodyne_driver_params",
@@ -139,12 +144,13 @@ def generate_launch_description() -> LaunchDescription:
             ("pointcloud_topic", LaunchConfiguration("lidar_topic_raw")),
         ],
         parameters=[
+            LaunchConfiguration("kiss_icp_params"),
             {
                 "base_frame": LaunchConfiguration("base_frame"),
                 "lidar_odom_frame": LaunchConfiguration("map_frame"),
                 "publish_odom_tf": False,  # odom_selector が TF を担当
                 "invert_odom_tf": False,
-            }
+            },
         ],
         condition=IfCondition(
             PythonExpression(
@@ -181,14 +187,22 @@ def generate_launch_description() -> LaunchDescription:
         executable="static_transform_publisher",
         name="odom_base_fallback_tf",
         arguments=[
-            "--x", "0",
-            "--y", "0",
-            "--z", "0",
-            "--roll", "0",
-            "--pitch", "0",
-            "--yaw", "0",
-            "--frame-id", LaunchConfiguration("map_frame"),
-            "--child-frame-id", LaunchConfiguration("base_frame"),
+            "--x",
+            "0",
+            "--y",
+            "0",
+            "--z",
+            "0",
+            "--roll",
+            "0",
+            "--pitch",
+            "0",
+            "--yaw",
+            "0",
+            "--frame-id",
+            LaunchConfiguration("map_frame"),
+            "--child-frame-id",
+            LaunchConfiguration("base_frame"),
         ],
         output="screen",
         condition=UnlessCondition(LaunchConfiguration("use_lidar")),
@@ -303,6 +317,7 @@ def generate_launch_description() -> LaunchDescription:
             map_frame,
             base_frame,
             lidar_frame,
+            kiss_icp_params,
             use_velodyne,
             velodyne_driver_params,
             velodyne_pointcloud_params,

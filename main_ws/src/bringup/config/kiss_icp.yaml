@@ -1,0 +1,20 @@
+kiss_icp:
+  ros__parameters:
+    data:
+      deskew: true
+      # ロボット自身のボディ（フットプリント ~0.30m）をフィルタする最小距離
+      min_range: 0.5
+      # VLP-16 の実効レンジに合わせる
+      max_range: 50.0
+
+    mapping:
+      # max_range / 100 = 0.5m。狭所レスキュー環境では細かくする。
+      voxel_size: 0.3
+      max_points_per_voxel: 20
+
+    adaptive_threshold:
+      initial_threshold: 2.0
+      min_motion_th: 0.1
+
+    registration:
+      max_num_threads: 0 # 0 = auto
