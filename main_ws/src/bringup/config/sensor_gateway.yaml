@@ -1,3 +1,4 @@
+# 実機で使用する
 sensor_gateway:
   ros__parameters:
     serial_port: "/dev/stm32"
