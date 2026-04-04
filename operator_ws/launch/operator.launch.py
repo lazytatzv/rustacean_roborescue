@@ -85,9 +85,16 @@ def generate_launch_description():
                 "port": LaunchConfiguration("foxglove_port"),
                 "address": LaunchConfiguration("foxglove_address"),
                 "send_buffer_limit": 10000000,
-                "max_qos_depth": 10,
+                "max_qos_depth": 5,
                 "num_threads": 0,
                 "use_compression": False,
+                # image_raw (生ピクセル) と image_raw/ffmpeg (内部変換用) を除外。
+                # front/back/arm それぞれ image_raw は 14〜42 Mbps 出るため operator 側に流さない。
+                # 代わりに compressed_video (H264) か image_raw/compressed (JPEG) を使う。
+                "topic_whitelist": [
+                    "^(?!/camera_)",                              # カメラ以外は全て通す
+                    "/camera_[^/]+/(?!(image_raw$|image_raw/ffmpeg))",  # カメラは raw/ffmpeg だけ除外
+                ],
             }
         ],
     )
