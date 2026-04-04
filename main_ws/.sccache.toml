@@ -1,0 +1,3 @@
+[cache.disk]
+dir = "/home/yano/.cache/sccache"
+size = 21474836480
