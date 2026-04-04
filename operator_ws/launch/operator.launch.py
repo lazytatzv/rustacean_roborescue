@@ -25,6 +25,13 @@ def generate_launch_description():
     # ZENOH_ROUTER_CHECK_ATTEMPTS=-1 skips the router check so nodes start immediately
     set_router_check_attempts = SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1")
     set_zenoh_uri = SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", zenoh_config_uri)
+    # ZENOH_CONFIG_OVERRIDE: Force peer mode and disable multicast for stability, 
+    # and provide the absolute path for the TLS certificate.
+    zenoh_cert_path = os.path.join(repo_root, "quic", "server.crt")
+    set_zenoh_override = SetEnvironmentVariable(
+        "ZENOH_CONFIG_OVERRIDE",
+        f'mode="peer";scouting/multicast/enabled=false;transport/link/tls/root_ca_certificate="{zenoh_cert_path}"',
+    )
 
     use_audio = DeclareLaunchArgument(
         "use_audio", default_value="true", description="音声ノードを起動するか"
@@ -78,7 +85,7 @@ def generate_launch_description():
                 "port": LaunchConfiguration("foxglove_port"),
                 "address": LaunchConfiguration("foxglove_address"),
                 "send_buffer_limit": 10000000,
-                "max_qos_depth": 5,
+                "max_qos_depth": 10,
                 "num_threads": 0,
                 "use_compression": False,
                 # image_raw (生ピクセル) と image_raw/ffmpeg (内部変換用) を除外。
