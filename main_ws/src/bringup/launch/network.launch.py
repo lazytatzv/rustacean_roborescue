@@ -175,7 +175,7 @@ def _build_network_actions(context):
         # ルーター起動直後でも接続待ちを続け、初期化時の取りこぼしを減らす。
         SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
         # ROS2ノードは zenohd (client として localhost:7447 に接続) を使う。
-        SetEnvironmentVariable("RMW_ZENOH_CONFIG_URI", f"file://{zenoh_robot_config}"),
+        SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", f"file://{zenoh_robot_config}"),
         # ==========================================
         # 2. Zenohルーター (zenohd) のデーモン起動
         # ==========================================

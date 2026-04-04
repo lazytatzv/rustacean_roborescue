@@ -453,7 +453,7 @@
               _repo_root="$PWD"
             fi
             if [ -n "$_repo_root" ] && [ -f "$_repo_root/main_ws/src/bringup/config/zenoh_robot.json5" ]; then
-              export RMW_ZENOH_CONFIG_URI="file://$_repo_root/main_ws/src/bringup/config/zenoh_robot.json5"
+              export ZENOH_SESSION_CONFIG_URI="file://$_repo_root/main_ws/src/bringup/config/zenoh_robot.json5"
             fi
             unset _repo_root
 
@@ -494,7 +494,7 @@
             fi
 
             if [ -n "$_op_cfg" ]; then
-              export RMW_ZENOH_CONFIG_URI="file://$_op_cfg"
+              export ZENOH_SESSION_CONFIG_URI="file://$_op_cfg"
               echo "✅ Zenoh config: $_op_cfg"
             else
               echo "⚠️  zenoh_ope.json5 が見つかりません。"

@@ -1,7 +1,7 @@
 // オペレーター側 Zenoh セッション設定 (foxglove_bridge / joy_node 等で使用)
 //
 // 使い方:
-//   export RMW_ZENOH_CONFIG_URI=file:///path/to/zenoh_operator.json5
+//   export ZENOH_SESSION_CONFIG_URI=file:///path/to/zenoh_operator.json5
 //   ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 //
 // QUIC を使うには事前にロボットから server.crt をコピーしておく:

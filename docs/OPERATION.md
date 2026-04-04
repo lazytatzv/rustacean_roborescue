@@ -140,7 +140,7 @@ journalctl -u roborescue -f
 ```
 
 `operator.launch.py` では `ZENOH_CONFIG_OVERRIDE` により同等の設定を強制しています。
-これにより、`RMW_ZENOH_CONFIG_URI` が無視される環境でも localhost 誤接続を回避できます。
+これにより、`ZENOH_SESSION_CONFIG_URI` が無視される環境でも localhost 誤接続を回避できます。
 
 ### 4.2 起動
 
@@ -180,7 +180,7 @@ just operator-up-min
 
 ```
 Operator PC                                   Robot NUC
-  RMW_ZENOH_CONFIG_URI=zenoh_ope.json5          zenohd (router daemon)
+  ZENOH_SESSION_CONFIG_URI=zenoh_ope.json5          zenohd (router daemon)
   mode: peer                                      zenoh_router.json5
   connect: tcp <ROBOT_IP>:7447 ───────────────►  listen: quic/tcp 0.0.0.0:7447
                                                        ▲
@@ -245,7 +245,7 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
 
 ```bash
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-export RMW_ZENOH_CONFIG_URI=file:///path/to/zenoh_xxx.json5
+export ZENOH_SESSION_CONFIG_URI=file:///path/to/zenoh_xxx.json5
 export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
 export ZENOH_CONFIG_OVERRIDE='mode="peer";connect/endpoints=["tcp/<ROBOT_IP>:7447"];scouting/multicast/enabled=false'
 ```
