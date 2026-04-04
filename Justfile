@@ -166,6 +166,28 @@ cachix:
 operator-cachix:
   cachix watch-exec roborescue-nix -- nix develop --accept-flake-config .#operator --command true
 
+# devShell の全クロージャーを cachix へ明示 push する
+# cachix watch-exec は "既に nix store にあるパス" を捕捉しないため、
+# opencv など重いパッケージが store 済みのときはこちらを使う
+nix-cache-push:
+  echo "[nix-cache-push] collecting and pushing devShell closure ..."; \
+  nix develop --accept-flake-config --command bash -c \
+    'echo $buildInputs $nativeBuildInputs $propagatedBuildInputs $propagatedNativeBuildInputs' \
+    | tr " " "\n" | grep "^/nix/store/" \
+    | xargs -r nix-store --query --requisites \
+    | sort -u \
+    | cachix push roborescue-nix
+
+# operator devShell 版
+nix-cache-push-operator:
+  echo "[nix-cache-push-operator] collecting and pushing operator devShell closure ..."; \
+  nix develop --accept-flake-config .#operator --command bash -c \
+    'echo $buildInputs $nativeBuildInputs $propagatedBuildInputs $propagatedNativeBuildInputs' \
+    | tr " " "\n" | grep "^/nix/store/" \
+    | xargs -r nix-store --query --requisites \
+    | sort -u \
+    | cachix push roborescue-nix
+
 
 install-rust:
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
