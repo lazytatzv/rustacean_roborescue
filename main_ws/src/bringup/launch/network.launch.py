@@ -51,7 +51,8 @@ def _build_network_actions(context):
     if not os.path.isfile(zenoh_router_config) or not os.path.isfile(zenoh_robot_config):
         raise RuntimeError("[network.launch] zenoh HA config files are missing")
 
-    quic_dir = os.path.join(bringup_dir, "config", "quic")
+    # ~/.ros/zenoh_quic/ に置くことでオペレーター側から scp しやすくする
+    quic_dir = os.path.join(os.path.expanduser("~"), ".ros", "zenoh_quic")
     cert = os.path.join(quic_dir, "server.crt")
     key = os.path.join(quic_dir, "server.key")
     os.makedirs(quic_dir, exist_ok=True)
@@ -105,8 +106,30 @@ def _build_network_actions(context):
             '}\n'
         )
 
-    router_config_for_launch = zenoh_router_config
-    if not quic_available:
+    if quic_available:
+        # QUIC 用: 証明書の絶対パスを注入して動的生成する
+        # (zenoh_router.json5 は相対パスで書かれているため cwd 依存になるのを避ける)
+        fd2, quic_cfg = tempfile.mkstemp(prefix="zenoh_router_quic_", suffix=".json5")
+        with os.fdopen(fd2, "w", encoding="utf-8") as f:
+            f.write(
+                '{\n'
+                '  mode: "router",\n'
+                '  listen: { endpoints: ["quic/0.0.0.0:7447", "tcp/0.0.0.0:7447"] },\n'
+                '  scouting: { multicast: { enabled: false } },\n'
+                '  transport: {\n'
+                '    shared_memory: { enabled: true },\n'
+                '    link: {\n'
+                '      tls: {\n'
+                f'        listen_private_key: "{key}",\n'
+                f'        listen_certificate: "{cert}"\n'
+                '      }\n'
+                '    }\n'
+                '  }\n'
+                '}\n'
+            )
+        actions.append(LogInfo(msg=f"[network.launch] QUIC cert for operator: scp robot@<IP>:{cert} ./quic/server.crt"))
+        router_config_for_launch = quic_cfg
+    else:
         router_config_for_launch = tcp_only_cfg
 
     router_cmd = (

@@ -1,0 +1,33 @@
+// オペレーター側 Zenoh セッション設定 (foxglove_bridge / joy_node 等で使用)
+//
+// 使い方:
+//   export RMW_ZENOH_CONFIG_URI=file:///path/to/zenoh_operator.json5
+//   ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+//
+// QUIC を使うには事前にロボットから server.crt をコピーしておく:
+//   scp robot@ROBOT_IP:~/.ros/zenoh_quic/server.crt ./quic/server.crt
+//   (network.launch.py が bringup/config/quic/ に生成する)
+//
+// ROBOT_IP の部分は実際のロボットの IP アドレスに書き換えること。
+{
+  mode: "client",
+  connect: {
+    // QUIC 優先、失敗時は TCP にフォールバック
+    endpoints: [
+      "quic/ROBOT_IP:7447",
+      "tcp/ROBOT_IP:7447"
+    ]
+  },
+  scouting: {
+    multicast: { enabled: false }
+  },
+  transport: {
+    link: {
+      tls: {
+        // ロボット側の自己署名証明書を CA として信頼させる
+        // server.crt が手元にない場合はこの行をコメントアウトし TCP のみ使用
+        root_ca_certificate: "quic/server.crt"
+      }
+    }
+  }
+}
