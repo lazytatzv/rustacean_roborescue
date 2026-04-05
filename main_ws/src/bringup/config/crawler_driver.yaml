@@ -22,6 +22,10 @@ crawler_driver:
     # ログ上で cmd と actual の符号が逆なら -1 を設定
     m1_direction_sign: -1
     m2_direction_sign: -1
+    # エンコーダリセット方針:
+    # 初回接続時のみリセットし、再接続時は既定でリセットしない
+    reset_encoders_on_connect: true
+    reset_encoders_on_reconnect: false
 
     # ── ハードウェア電流制限 (Roboclaw SETM1/M2MAXCURRENT) ────────────────────
     # Roboclaw が直接カットするので最も確実な保護。0 で無効化。
