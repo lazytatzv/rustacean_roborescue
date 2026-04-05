@@ -18,6 +18,10 @@ crawler_driver:
     m2_ki: 0.020
     m2_kd: 0.0
     m2_qpps: 50062   # M2 max quadrature pulses/sec
+    # モーター向き補正: 実機配線や取り付け向き差を吸収 (+1 or -1)
+    # ログ上で cmd と actual の符号が逆なら -1 を設定
+    m1_direction_sign: -1
+    m2_direction_sign: -1
 
     # ── ハードウェア電流制限 (Roboclaw SETM1/M2MAXCURRENT) ────────────────────
     # Roboclaw が直接カットするので最も確実な保護。0 で無効化。
