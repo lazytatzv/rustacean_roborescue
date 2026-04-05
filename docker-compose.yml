@@ -3,15 +3,6 @@
 # 他プロジェクトでdocker使う際もこれは最低限必要なので参考にはなりそう
 
 services:
-  # Foxglove Studio (Web version)
-  # Access via: http://localhost:8080
-  foxglove:
-    image: foxglove/studio:latest
-    container_name: foxglove_studio
-    ports:
-      - "8080:8080"
-    restart: unless-stopped
-
   ros2_container:
     image: rustacean-roborescue-env:latest
     container_name: ros2_working_container

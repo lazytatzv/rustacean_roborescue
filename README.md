@@ -46,8 +46,7 @@ just get-cert <ROBOT_IP>
 # Start operator station
 just launch
 
-# (Optional) Start Foxglove Studio UI via Docker (runs on http://localhost:8080)
-cd ..
+# (Optional) Start Foxglove Studio UI via Nix
 just foxglove
 ```
 

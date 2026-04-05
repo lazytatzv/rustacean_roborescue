@@ -113,6 +113,7 @@
           fish fishPlugins.bass just
           git lazygit ripgrep fd btop zellij tmux
           nodePackages.mermaid-cli    # topology/*.mmd 図の生成
+          foxglove-studio             # HMI: 可視化ツール
 
           # --- ROS 2 ビルドインフラ (buildTools 側に置く) ---
           ros.ros-core
@@ -429,6 +430,7 @@
               alias nixGL="$_detected_nixgl"
               alias gz="$_detected_nixgl gz"
               alias rviz2="$_detected_nixgl rviz2"
+              alias foxglove-studio="$_detected_nixgl foxglove-studio"
               alias rqt="$_detected_nixgl rqt"
               alias rqt_graph="$_detected_nixgl rqt_graph"
             fi

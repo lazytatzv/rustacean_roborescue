@@ -36,7 +36,7 @@ Use the provided Just recipes for a consistent experience:
 # Start the full operator station (Joy + Bridge + Audio)
 just launch
 
-# (Optional) Start Foxglove Studio UI via Docker (runs on http://localhost:8080)
+# (Optional) Start Foxglove Studio UI via Nix
 # This command should be run from the repository root
 cd ..
 just foxglove

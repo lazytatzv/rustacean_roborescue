@@ -289,15 +289,11 @@ mm:
 	@rm .puppeteer-config.json
 	@echo "Topology diagrams generated in docs/images/"
 
-# Start Foxglove Studio (Web version) via Docker
+# Start Foxglove Studio (Native Desktop version via Nix)
 foxglove:
-	@echo "Starting Foxglove Studio on http://localhost:8080 ..."
-	docker compose up -d foxglove
-	@echo "Foxglove is running. Open your browser and go to http://localhost:8080"
-
-# Stop Foxglove Studio
-foxglove-down:
-	docker compose stop foxglove
+	@echo "Starting Foxglove Studio..."
+	nix develop --accept-flake-config --command bash -lc 'foxglove-studio >/dev/null 2>&1' &
+	@echo "Foxglove Studio launched in background."
 
 # ── Desktop Visualization (No Browser required) ──
 
