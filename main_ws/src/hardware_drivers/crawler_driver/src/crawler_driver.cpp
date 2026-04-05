@@ -24,8 +24,9 @@ constexpr uint8_t CMD_M2_VELOCITY = 36;
 constexpr uint8_t CMD_SET_M1_PID = 28;
 constexpr uint8_t CMD_SET_M2_PID = 29;
 constexpr uint8_t CMD_RESET_ENCODERS = 20;
-constexpr uint8_t CMD_READ_M1_SPEED = 18;
-constexpr uint8_t CMD_READ_M2_SPEED = 19;
+// Roboclaw speed read commands (qpps + direction)
+constexpr uint8_t CMD_READ_M1_SPEED = 30;
+constexpr uint8_t CMD_READ_M2_SPEED = 31;
 constexpr uint8_t CMD_READ_CURRENTS = 49;
 constexpr uint8_t CMD_READ_TEMPERATURE = 47;
 constexpr uint8_t CMD_READ_MAIN_VOLTAGE = 90;
@@ -330,6 +331,9 @@ class CrawlerDriver : public rclcpp::Node
     // Motor direction sign (+1 or -1). Use when wiring/gear orientation differs.
     declare_parameter("m1_direction_sign", 1);
     declare_parameter("m2_direction_sign", 1);
+    // Encoder reset policy: reset at first successful connect only by default.
+    declare_parameter("reset_encoders_on_connect", true);
+    declare_parameter("reset_encoders_on_reconnect", false);
 
     // ── スタック保護パラメータ ────────────────────────────────────────────
     // 指令速度に対して実速度がこの割合以下ならスタックとみなす
@@ -371,7 +375,7 @@ class CrawlerDriver : public rclcpp::Node
     watchdog_timer_ = create_wall_timer(std::chrono::milliseconds(watchdog_timeout_ms_),
                                         std::bind(&CrawlerDriver::watchdog_callback, this));
 
-    const int telem_ms = 1000 / get_parameter("telemetry_hz").as_int();
+    const int telem_ms = static_cast<int>(1000.0 / static_cast<double>(telemetry_hz_));
     telemetry_timer_ = create_wall_timer(std::chrono::milliseconds(telem_ms),
                                          std::bind(&CrawlerDriver::telemetry_callback, this));
 
@@ -421,6 +425,8 @@ class CrawlerDriver : public rclcpp::Node
   int m2_qpps_;
   int m1_direction_sign_;
   int m2_direction_sign_;
+  bool reset_encoders_on_connect_ = true;
+  bool reset_encoders_on_reconnect_ = false;
 
   double stall_error_ratio_;
   int stall_cmd_threshold_qpps_;
@@ -431,9 +437,13 @@ class CrawlerDriver : public rclcpp::Node
   rclcpp::Time last_cmd_time_;
   bool estop_active_ = false;
   bool hw_connected_ = false;
+  bool has_connected_once_ = false;
   StallState m1_stall_, m2_stall_;
   int32_t m1_cmd_qpps_ = 0, m2_cmd_qpps_ = 0;
   RoboclawTelemetry telemetry_;
+  int telemetry_hz_ = 10;
+  double telemetry_dt_sec_ = 0.1;
+  rclcpp::Time last_stall_eval_time_;
 
   // ── タイマー / サブスクリプション ─────────────────────────────────────────
   rclcpp::Subscription<custom_interfaces::msg::CrawlerVelocity>::SharedPtr subscription_;
@@ -478,14 +488,24 @@ class CrawlerDriver : public rclcpp::Node
     m2_qpps_ = get_parameter("m2_qpps").as_int();
     m1_direction_sign_ = normalizeDirectionSign(get_parameter("m1_direction_sign").as_int());
     m2_direction_sign_ = normalizeDirectionSign(get_parameter("m2_direction_sign").as_int());
+    reset_encoders_on_connect_ = get_parameter("reset_encoders_on_connect").as_bool();
+    reset_encoders_on_reconnect_ = get_parameter("reset_encoders_on_reconnect").as_bool();
 
     stall_error_ratio_ = get_parameter("stall_error_ratio").as_double();
     stall_cmd_threshold_qpps_ = get_parameter("stall_cmd_threshold_qpps").as_int();
     stall_window_sec_ = get_parameter("stall_window_sec").as_double();
     stall_max_reduction_ = get_parameter("stall_max_reduction").as_double();
+    telemetry_hz_ = get_parameter("telemetry_hz").as_int();
+    if (telemetry_hz_ <= 0)
+    {
+      RCLCPP_WARN(get_logger(), "Invalid telemetry_hz=%d. Falling back to 10 Hz", telemetry_hz_);
+      telemetry_hz_ = 10;
+    }
+    telemetry_dt_sec_ = 1.0 / static_cast<double>(telemetry_hz_);
 
     counts_per_meter_ = (counts_per_rev * gearhead_ratio * pulley_ratio) / circumference;
     last_cmd_time_ = now();
+    last_stall_eval_time_ = now();
 
     if (baud_rate_ <= 0)
     {
@@ -514,31 +534,47 @@ class CrawlerDriver : public rclcpp::Node
     if (!roboclaw_.connect(port, baud_rate_))
     {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
-                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...", port.c_str(),
-                           baud_rate_);
+                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...",
+                           port.c_str(), baud_rate_);
       return;
     }
 
     if (debug_io_)
     {
-      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d", port.c_str(),
-                  baud_rate_);
+      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d",
+                  port.c_str(), baud_rate_);
+    }
+
+    if (!initHardware())
+    {
+      RCLCPP_ERROR(get_logger(), "Hardware initialization failed. Retrying connection...");
+      roboclaw_.disconnect();
+      return;
     }
 
     hw_connected_ = true;
+    has_connected_once_ = true;
     connect_timer_->cancel();
     last_cmd_time_ = now();
-    initHardware();
     RCLCPP_INFO(get_logger(), "Connected to Roboclaw on %s @ %d bps", port.c_str(), baud_rate_);
   }
 
-  void initHardware()
+  bool initHardware()
   {
-    roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
-    roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
-    roboclaw_.setPIDConstants(CMD_SET_M1_PID, m1_kp_, m1_ki_, m1_kd_, m1_qpps_);
-    roboclaw_.setPIDConstants(CMD_SET_M2_PID, m2_kp_, m2_ki_, m2_kd_, m2_qpps_);
-    roboclaw_.resetEncoders();
+    bool ok = true;
+    ok &= roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
+    ok &= roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
+    ok &= roboclaw_.setPIDConstants(CMD_SET_M1_PID, m1_kp_, m1_ki_, m1_kd_, m1_qpps_);
+    ok &= roboclaw_.setPIDConstants(CMD_SET_M2_PID, m2_kp_, m2_ki_, m2_kd_, m2_qpps_);
+
+    const bool should_reset_encoders =
+        reset_encoders_on_connect_ && (!has_connected_once_ || reset_encoders_on_reconnect_);
+    if (should_reset_encoders)
+    {
+      ok &= roboclaw_.resetEncoders();
+      RCLCPP_INFO(get_logger(), "Encoders reset (%s)",
+                  has_connected_once_ ? "reconnect" : "startup");
+    }
 
     // ハードウェア電流制限 (0 はスキップ)
     const float m1_max_ma = static_cast<float>(get_parameter("m1_max_current_ma").as_double());
@@ -547,8 +583,8 @@ class CrawlerDriver : public rclcpp::Node
 
     if (serial_timeout_ds >= 0 && serial_timeout_ds <= 255)
     {
-      const bool ok = roboclaw_.setSerialTimeoutDs(static_cast<uint8_t>(serial_timeout_ds));
-      if (ok)
+      const bool timeout_ok = roboclaw_.setSerialTimeoutDs(static_cast<uint8_t>(serial_timeout_ds));
+      if (timeout_ok)
       {
         RCLCPP_INFO(get_logger(), "Roboclaw serial timeout set to %d ds (%d ms)", serial_timeout_ds,
                     serial_timeout_ds * 100);
@@ -556,6 +592,7 @@ class CrawlerDriver : public rclcpp::Node
       else
       {
         RCLCPP_WARN(get_logger(), "Failed to set Roboclaw serial timeout");
+        ok = false;
       }
     }
     else
@@ -566,16 +603,17 @@ class CrawlerDriver : public rclcpp::Node
 
     if (m1_max_ma > 0.0f)
     {
-      roboclaw_.setMaxCurrent(CMD_SET_M1_MAX_CURRENT, m1_max_ma);
+      ok &= roboclaw_.setMaxCurrent(CMD_SET_M1_MAX_CURRENT, m1_max_ma);
       RCLCPP_INFO(get_logger(), "M1 max current set to %.0f mA", m1_max_ma);
     }
     if (m2_max_ma > 0.0f)
     {
-      roboclaw_.setMaxCurrent(CMD_SET_M2_MAX_CURRENT, m2_max_ma);
+      ok &= roboclaw_.setMaxCurrent(CMD_SET_M2_MAX_CURRENT, m2_max_ma);
       RCLCPP_INFO(get_logger(), "M2 max current set to %.0f mA", m2_max_ma);
     }
 
-    RCLCPP_INFO(get_logger(), "Hardware initialized");
+    if (ok) RCLCPP_INFO(get_logger(), "Hardware initialized");
+    return ok;
   }
 
   void initPublishers()
@@ -686,7 +724,10 @@ class CrawlerDriver : public rclcpp::Node
     const int32_t m2_actual_qpps = telemetry_.m2_speed_qpps * m2_direction_sign_;
 
     // スタック検出 (テレメトリが有効な場合のみ)
-    const double dt = watchdog_timeout_ms_ / 1000.0;  // 近似 dt
+    const auto now_time = now();
+    double dt = (now_time - last_stall_eval_time_).seconds();
+    if (dt <= 0.0 || dt > 1.0) dt = telemetry_dt_sec_;
+    last_stall_eval_time_ = now_time;
     if (telemetry_.valid)
     {
       updateStall(m1_stall_, m1_cmd_qpps_, m1_actual_qpps, dt);
@@ -777,9 +818,10 @@ class CrawlerDriver : public rclcpp::Node
     roboclaw_.disconnect();
     if (connect_timer_) connect_timer_->reset();
 
-    RCLCPP_ERROR(get_logger(),
-                 "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
-                 reason);
+    RCLCPP_ERROR(
+        get_logger(),
+        "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
+        reason);
 
     if (debug_io_)
     {

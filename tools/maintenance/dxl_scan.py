@@ -15,7 +15,9 @@ from typing import Iterable
 from dynamixel_sdk import PacketHandler, PortHandler
 
 
-def _scan_ids(device: str, baud: int, protocol: float, min_id: int, max_id: int) -> list[tuple[int, int]]:
+def _scan_ids(
+    device: str, baud: int, protocol: float, min_id: int, max_id: int
+) -> list[tuple[int, int]]:
     port = PortHandler(device)
     if not port.openPort():
         raise RuntimeError(f"openPort failed: {device}")
@@ -45,7 +47,9 @@ def _run_protocols(
     any_found = False
 
     for proto in protocols:
-        print(f"[dxl-scan] scanning protocol={proto} device={device} baud={baud} ids={min_id}-{max_id}")
+        print(
+            f"[dxl-scan] scanning protocol={proto} device={device} baud={baud} ids={min_id}-{max_id}"
+        )
         try:
             found = _scan_ids(device, baud, proto, min_id, max_id)
         except RuntimeError as e:
@@ -65,7 +69,9 @@ def _run_protocols(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Scan Dynamixel IDs on serial bus")
-    parser.add_argument("--device", required=True, help="Serial device, e.g. /dev/dynamixel_flipper")
+    parser.add_argument(
+        "--device", required=True, help="Serial device, e.g. /dev/dynamixel_flipper"
+    )
     parser.add_argument("--baud", type=int, default=1000000, help="Baud rate")
     parser.add_argument("--protocol", type=float, default=2.0, choices=[1.0, 2.0], help="Protocol")
     parser.add_argument("--both-protocols", action="store_true", help="Scan protocol 2.0 and 1.0")

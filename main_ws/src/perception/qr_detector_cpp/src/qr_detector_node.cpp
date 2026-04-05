@@ -137,8 +137,8 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
       return;
     }
     cv::Mat gray = gray_ptr->image.isContinuous() ? gray_ptr->image : gray_ptr->image.clone();
-    zbar::Image zbar_img(gray.cols, gray.rows, "Y800",
-                         gray.data, static_cast<unsigned long>(gray.cols * gray.rows));
+    zbar::Image zbar_img(gray.cols, gray.rows, "Y800", gray.data,
+                         static_cast<unsigned long>(gray.cols * gray.rows));
     zbar_scanner_.scan(zbar_img);
     for (auto sym = zbar_img.symbol_begin(); sym != zbar_img.symbol_end(); ++sym)
     {
