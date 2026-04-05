@@ -21,8 +21,8 @@ graph LR
   end
 
   T_joy{{/joy<br/>sensor_msgs/Joy}}:::topic_style
-  T_ope_audio{{/operator/audio<br/>AudioChunk}}:::topic_style
-  T_robot_audio{{/robot/audio<br/>AudioChunk}}:::topic_style
+  T_ope_audio{{/operator/audio<br/>AudioChunk (Opus)}}:::topic_style
+  T_robot_audio{{/robot/audio<br/>AudioChunk (Opus)}}:::topic_style
 
   joy --> T_joy
   ope_audio_sender --> T_ope_audio
@@ -36,8 +36,8 @@ graph LR
     T_joy --> op
   end
 
-  T_estop{{/emergency_stop<br/>std_msgs/Bool}}:::topic_style
-  op --> T_estop
+  T_estop{{/emergency_stop<br/>std_msgs/Bool<br/>QoS: Reliable/Transient}}:::topic_style
+  op -- "Latch Trigger" --> T_estop
 
   %% =============================================
   %% Mobility (Drive + Flippers)
@@ -58,11 +58,11 @@ graph LR
 
     HW_roboclaw[Roboclaw Controller]:::hw_style
     HW_dxl_f[Dynamixel Flippers x4]:::hw_style
-    crawler -- "USB Serial" --> HW_roboclaw
-    flipper -- "USB U2D2" --> HW_dxl_f
+    crawler -- "USB Serial (115200)" --> HW_roboclaw
+    flipper -- "USB U2D2 (115200)" --> HW_dxl_f
 
     %% Diagnostics
-    D_crawl_v{{/crawler_driver/diagnostics/*}}:::diag_style
+    D_crawl_v{{/crawler_driver/diagnostics/*<br/>Stall Detection}}:::diag_style
     crawler -.-> D_crawl_v
   end
 
@@ -70,11 +70,11 @@ graph LR
   %% Manipulation (Arm + Gripper)
   %% =============================================
   subgraph Manipulation["Manipulation System"]
-    arm_ik[arm_controller]:::node_style
-    arm_drv[arm_gripper_driver]:::node_style
+    arm_ik[arm_controller<br/>Rust IK Engine]:::node_style
+    arm_drv[arm_gripper_driver<br/>Rust Unified Driver]:::node_style
 
-    T_a_cmd{{/arm_cmd_vel<br/>Twist}}:::topic_style
-    T_a_jvel{{/arm_joint_cmd_vel<br/>JointState}}:::topic_style
+    T_a_cmd{{/arm_cmd_vel<br/>Twist (Cartesian)}}:::topic_style
+    T_a_jvel{{/arm_joint_cmd_vel<br/>JointState (Direct)}}:::topic_style
     T_a_joint{{/arm_joint_commands<br/>JointState}}:::topic_style
     T_ee_pose{{/arm_ee_pose<br/>PoseStamped}}:::topic_style
     T_g_cmd{{/gripper_cmd<br/>GripperCommand}}:::topic_style
@@ -91,10 +91,10 @@ graph LR
     T_estop --> arm_ik & arm_drv
 
     HW_dxl_ag[Dynamixel Arm 6DOF + Gripper]:::hw_style
-    arm_drv -- "USB U2D2 (1Mbps)" --> HW_dxl_ag
+    arm_drv -- "USB U2D2 (1Mbps Sync)" --> HW_dxl_ag
 
     %% Diagnostics
-    D_arm_ik{{/arm_controller/diagnostics/*}}:::diag_style
+    D_arm_ik{{/arm_controller/diagnostics/*<br/>Manipulability/DLS}}:::diag_style
     arm_ik -.-> D_arm_ik
   end
 
@@ -107,12 +107,12 @@ graph LR
     ffmpeg_conv[ffmpeg_to_foxglove_video]:::node_style
 
     T_cam{{/camera/image_raw<br/>sensor_msgs/Image}}:::topic_style
-    T_cam_ffmpeg{{/camera/image_raw/ffmpeg<br/>FFMPEGPacket}}:::topic_style
-    T_comp_video{{/camera/compressed_video<br/>foxglove_msgs/CompressedVideo}}:::topic_style
+    T_cam_ffmpeg{{/camera/image_raw/ffmpeg<br/>FFMPEGPacket (H.264)}}:::topic_style
+    T_comp_video{{/camera/compressed_video<br/>CompressedVideo}}:::topic_style
     T_qr{{/camera/qr_codes<br/>std_msgs/String}}:::topic_style
 
-    HW_cam[USB Camera /dev/video0]:::hw_style
-    HW_cam --> v4l2 -- "Intra-process" --> qr --> T_qr
+    HW_cam[USB Camera<br/>320x240 @ 5fps YUYV]:::hw_style
+    HW_cam --> v4l2 -- "Zero-copy" --> qr --> T_qr
     v4l2 --> T_cam_ffmpeg --> ffmpeg_conv --> T_comp_video
   end
 
@@ -133,15 +133,15 @@ graph LR
   %% Localization & SLAM
   %% =============================================
   subgraph SLAM_Loc["Localization & SLAM"]
-    gateway[sensor_gateway]:::node_style
+    gateway[sensor_gateway<br/>Rust]:::node_style
     spark_lio[spark_fast_lio]:::node_style
     pc2ls[pointcloud_to_laserscan]:::node_style
     slam[slam_toolbox]:::node_style
 
     T_imu{{/imu/data<br/>sensor_msgs/Imu}}:::topic_style
     T_imu_h{{/imu/health<br/>std_msgs/Bool}}:::topic_style
-    T_raw_pts{{/velodyne_points<br/>sensor_msgs/PointCloud2}}:::topic_style
-    T_scan{{/scan<br/>sensor_msgs/LaserScan}}:::topic_style
+    T_raw_pts{{/velodyne_points<br/>PointCloud2}}:::topic_style
+    T_scan{{/scan<br/>LaserScan}}:::topic_style
     T_odom{{/odom<br/>nav_msgs/Odometry}}:::topic_style
     T_map{{/map<br/>nav_msgs/OccupancyGrid}}:::topic_style
 
@@ -159,32 +159,9 @@ graph LR
   end
 
   %% =============================================
-  %% Environmental Sensing
-  %% =============================================
-  subgraph Environmental["Environmental"]
-    omron[omron_bridge]:::node_style
-    T_omron{{omron/*<br/>std_msgs/Float32}}:::topic_style
-
-    HW_omron[Omron 2JCIE-BU01]:::hw_style
-    HW_omron -- "USB Serial" --> omron --> T_omron
-    T_odom --> omron
-  end
-
-  %% =============================================
-  %% TF Tree (Static & Dynamic)
-  %% =============================================
-  subgraph TF["TF Tree Summary"]
-    TF_map_odom["map → odom<br/>(slam_toolbox)"]:::tf_style
-    TF_odom_base["odom → base_link<br/>(spark_fast_lio)"]:::tf_style
-    TF_base_all["base_link → sensors/links<br/>(robot_state_publisher)"]:::tf_style
-
-    TF_map_odom --- TF_odom_base --- TF_base_all
-  end
-
-  %% =============================================
-  %% Connectivity to Operator
+  %% Connectivity to Operator (Zenoh)
   %% =============================================
   fgbridge[foxglove_bridge<br/>:8765]:::node_style
 
-  T_comp_video & T_map & T_odom & T_scan & T_joint & T_imu & T_qr & T_omron --> fgbridge
-  fgbridge == "WebSocket" ==> foxglove
+  T_comp_video & T_map & T_odom & T_scan & T_joint & T_imu & T_qr & T_robot_audio & T_ope_audio --> fgbridge
+  fgbridge == "WebSocket / Zenoh" ==> foxglove

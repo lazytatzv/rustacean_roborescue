@@ -1,43 +1,51 @@
 # crawler_driver
 
-Low-level driver for Roboclaw motor controllers to drive the main crawler tracks.
+High-performance driver for Roboclaw motor controllers, designed for heavy-duty crawler tracks.
 
-Implemented in **C++** using `rclcpp` and `boost::asio` for serial communication.
+Implemented in **C++** using `rclcpp` and `boost::asio`.
 
-## Features
+## Features & Logic
 
-- **PID Velocity Control**: Sends QPPS (Quadratic Pulses Per Second) commands to Roboclaw for precise speed control.
-- **Differential Drive Math**: Automatically converts `/cmd_vel` (Twist) into individual motor speeds.
-- **Stall Protection**: Detects motor stalls by comparing commanded vs. actual speed. Reduces output power to prevent motor burnout.
-- **Hardware Telemetry**: Publishes current, voltage, temperature, and status flags from the Roboclaw.
-- **Safety**:
-  - **Watchdog**: Stops motors if command is lost for > 500ms.
-  - **E-Stop**: Instant halt upon receiving `/emergency_stop`.
-  - **Fail-safe Reconnect**: Automatically re-opens the serial port if a communication error is detected.
+### 1. PID Velocity Control
+The driver bypasses raw PWM and uses Roboclaw's internal PID velocity loop. It maps ROS 2 velocity commands (m/s) to Quadrature Pulses Per Second (QPPS) based on the crawler's physical dimensions:
+- `counts_per_meter = (counts_per_rev * gear_ratio * pulley_ratio) / circumference`
+
+### 2. Stall Protection Algorithm
+To prevent motor burnout during collisions or when stuck in rubble, the driver implements a software-level stall detection:
+- **Error Ratio**: If `abs(commanded - actual) > commanded * stall_error_ratio`, a stall is suspected.
+- **Score Accumulation**: A "stall score" increases while the error persists.
+- **Output Scaling**: As the score increases, the driver automatically scales down the output power (up to `stall_max_reduction`, e.g., 50%) to protect the motors.
+- **Recovery**: Once the error disappears, the output scale returns to 1.0 at double the speed of accumulation.
+
+### 3. Hardware Safety & Watchdog
+- **Command Watchdog**: If no valid ROS 2 message is received for $> 500ms$ (default), the driver sends a hard-stop command to the Roboclaw.
+- **Hardware Timeout**: The Roboclaw itself is configured with a serial timeout. If the NUC crashes or the USB cable is unplugged, the controller will stop the motors autonomously.
+- **Thermal & Voltage Monitoring**: Telemetry is polled at 10Hz. Warnings are logged if the battery voltage is low or the driver temperature exceeds safety limits.
 
 ## Topics
 
 ### Subscriptions
 | Topic | Type | Description |
 |-------|------|-------------|
-| `/crawler_driver` | `custom_interfaces/CrawlerVelocity` | Direct m/s command per crawler |
-| `/cmd_vel` | `geometry_msgs/Twist` | Autonomous velocity command |
-| `/emergency_stop` | `std_msgs/Bool` | Hard stop trigger |
+| `/crawler_driver` | `CrawlerVelocity` | Direct left/right crawler velocity [m/s]. |
+| `/cmd_vel` | `geometry_msgs/Twist` | Standard ROS 2 drive command (Diff-drive math applied). |
+| `/emergency_stop` | `std_msgs/Bool` | Hard stop trigger (Reliable/TransientLocal). |
 
-### Publications
+### Publications (Diagnostics)
 | Topic | Type | Description |
 |-------|------|-------------|
-| `~/diagnostics/m1_current_ma` | `std_msgs/Float64` | Motor 1 current |
-| `~/diagnostics/m1_speed_actual` | `std_msgs/Float64` | Motor 1 measured speed [qpps] |
-| `~/diagnostics/temperature_c` | `std_msgs/Float64` | Controller temperature |
-| `~/diagnostics/battery_volts` | `std_msgs/Float64` | Main battery voltage |
+| `~/diagnostics/m1_current_ma` | `Float64` | Motor 1 current (Real-time). |
+| `~/diagnostics/m1_speed_actual`| `Float64` | Measured speed in QPPS. |
+| `~/diagnostics/m1_stall_scale` | `Float64` | Current power scaling (1.0 = normal, 0.5 = stalled). |
+| `~/diagnostics/battery_volts` | `Float64` | Main 12-24V battery voltage. |
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `serial_port` | string | `/dev/roboclaw` | Device path |
-| `baud_rate` | int | `115200` | Serial speed |
-| `track_width` | double | `0.4` | Distance between tracks [m] |
-| `m1_kp / ki / kd` | double | - | PID gains for Motor 1 |
-| `stall_max_reduction`| double | `0.5` | Max power reduction during stall |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `serial_port` | `/dev/roboclaw` | Path to the USB-Serial device. |
+| `baud_rate` | `115200` | Baud rate (must match Roboclaw firmware). |
+| `m1_kp / ki / kd` | - | Velocity PID gains for Motor 1 (Left). |
+| `m2_kp / ki / kd` | - | Velocity PID gains for Motor 2 (Right). |
+| `stall_error_ratio` | `0.5` | Threshold for speed error to be considered a stall. |
+| `stall_max_reduction` | `0.5` | Max power drop during stall events. |
