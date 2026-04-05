@@ -1,61 +1,43 @@
-# Roboclaw Driver for ROS2
+# crawler_driver
 
-## 概要
-このパッケージは、Roboclaw モータードライバを ROS2 で制御するためのノードを提供します。同期シリアル通信を用いてモーターの速度制御やエンコーダーのリセットを行います。ウォッチドッグタイマーにより、一定時間指令が途絶えた場合は自動停止します。
+Low-level driver for Roboclaw motor controllers to drive the main crawler tracks.
 
-## 必要な依存関係
+Implemented in **C++** using `rclcpp` and `boost::asio` for serial communication.
 
-- ROS2 Humble 以降
-- Boost Asio (`boost::asio`)
-- `rclcpp`
-- `custom_interfaces`（`custom_interfaces/msg/CrawlerVelocity`）
+## Features
 
-## ビルド方法
+- **PID Velocity Control**: Sends QPPS (Quadratic Pulses Per Second) commands to Roboclaw for precise speed control.
+- **Differential Drive Math**: Automatically converts `/cmd_vel` (Twist) into individual motor speeds.
+- **Stall Protection**: Detects motor stalls by comparing commanded vs. actual speed. Reduces output power to prevent motor burnout.
+- **Hardware Telemetry**: Publishes current, voltage, temperature, and status flags from the Roboclaw.
+- **Safety**:
+  - **Watchdog**: Stops motors if command is lost for > 500ms.
+  - **E-Stop**: Instant halt upon receiving `/emergency_stop`.
+  - **Fail-safe Reconnect**: Automatically re-opens the serial port if a communication error is detected.
 
-```sh
-colcon build --packages-select crawler_driver
-source install/setup.bash
-```
+## Topics
 
-## 使用方法
+### Subscriptions
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/crawler_driver` | `custom_interfaces/CrawlerVelocity` | Direct m/s command per crawler |
+| `/cmd_vel` | `geometry_msgs/Twist` | Autonomous velocity command |
+| `/emergency_stop` | `std_msgs/Bool` | Hard stop trigger |
 
-ノードを起動します。
+### Publications
+| Topic | Type | Description |
+|-------|------|-------------|
+| `~/diagnostics/m1_current_ma` | `std_msgs/Float64` | Motor 1 current |
+| `~/diagnostics/m1_speed_actual` | `std_msgs/Float64` | Motor 1 measured speed [qpps] |
+| `~/diagnostics/temperature_c` | `std_msgs/Float64` | Controller temperature |
+| `~/diagnostics/battery_volts` | `std_msgs/Float64` | Main battery voltage |
 
-```sh
-ros2 run crawler_driver crawler_driver_node
-```
+## Parameters
 
-`/crawler_driver` トピックに速度コマンドを送信すると、モーターが動作します。
-
-```sh
-ros2 topic pub /crawler_driver custom_interfaces/msg/CrawlerVelocity "{m1_vel: 1.0, m2_vel: 1.0}"
-```
-
-ウォッチドッグにより、指令が `watchdog_timeout_ms` ミリ秒以上途絶えるとモーターが自動停止します。
-
-## トピック
-
-| トピック名         | 型                                        | 説明                            |
-|--------------------|-------------------------------------------|---------------------------------|
-| `/crawler_driver`  | `custom_interfaces/msg/CrawlerVelocity`   | クローラ速度指令をSubscribe     |
-
-## パラメータ
-
-| パラメータ名            | デフォルト値    | 説明                                |
-|-------------------------|-----------------|-------------------------------------|
-| `serial_port`           | `/dev/roboclaw` | シリアルポートのパス                |
-| `baud_rate`             | `115200`        | Roboclaw シリアルボーレート         |
-| `crawler_circumference` | `0.39`          | クローラーの円周（m）               |
-| `counts_per_rev`        | `256`           | 1回転あたりのエンコーダーカウント数 |
-| `gearhead_ratio`        | `66`            | 減速機の比率                        |
-| `pulley_ratio`          | `2`             | プーリーの比率                      |
-| `watchdog_timeout_ms`   | `500`           | ウォッチドッグタイムアウト（ms）    |
-
-パラメータは YAML ファイルまたは起動時に指定できます。
-
-```sh
-ros2 run crawler_driver crawler_driver_node --ros-args -p serial_port:=/dev/ttyACM0
-```
-
-## ライセンス
-MIT
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `serial_port` | string | `/dev/roboclaw` | Device path |
+| `baud_rate` | int | `115200` | Serial speed |
+| `track_width` | double | `0.4` | Distance between tracks [m] |
+| `m1_kp / ki / kd` | double | - | PID gains for Motor 1 |
+| `stall_max_reduction`| double | `0.5` | Max power reduction during stall |

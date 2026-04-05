@@ -1,70 +1,58 @@
-# Rustacean RoboRescue — Rescue Robot Control Platform
+# Rustacean RoboRescue
 
-Rustacean RoboRescue は、屋内救助・探索タスク向けの ROS 2 ベース統合ロボット制御プラットフォームです。Rust / C++ / Python を混ぜたワークスペース構成で、実機・シミュレーション・オペレータ用ノードをまとめて管理します。
+A high-performance, multi-language ROS 2 platform for rescue robots, featuring a robust **Rust** core for low-level control and **Zenoh** for low-latency remote operation.
 
-## Repository Layout
+![System Topology](main_ws/topology/system_topology.png)
 
-| Path | Purpose |
-|------|---------|
-| [main_ws/](main_ws) | Robot-side ROS 2 workspace. Drivers, bringup, control, perception, and vendored dependencies live here. |
-| [operator_ws/](operator_ws) | Operator PC workspace. Zenoh client and operator launch files live here. |
-| [stm32_ws/](stm32_ws) | STM32 firmware workspace for the IMU bridge and embedded support code. |
-| [docs/](docs) | Architecture, operation, package inventory, and setup guides. |
-| [deploy/](deploy) | NUC deployment scripts, udev rules, and systemd units. |
+## Core Technologies
 
-## What The Stack Covers
+- **Communication**: Zenoh (`rmw_zenoh_cpp`) with QUIC mTLS for secure, low-latency telemetry over unstable Wi-Fi.
+- **Hardware Drivers**: Safety-critical drivers (IMU, Arm) implemented in **Rust**; high-speed motion control (Tracks, Flippers) in **C++**.
+- **Perception**: LiDAR-IMU fusion (FAST-LIO2), SLAM (slam_toolbox), and hardware-accelerated QR detection.
+- **Operation**: Foxglove Studio integration + dual-mode (IK/Direct) arm control with PS4 controller.
+- **Environment**: Nix-based reproducible development environment.
 
-- 実機とシミュレーションの両方で動く bringup / launch 群
-- クローラ、フリッパ、アーム、IMU のハードウェアドライバ
-- 低遅延音声転送とカメラ映像のブリッジ
-- Nav2 / SLAM / LiDAR / QR 検出 / 外部センサの統合
-- Zenoh ベースの operator 連携と Foxglove 監視
+## Repository Structure
 
-## Quick Start
+- `main_ws/`: Robot-side ROS 2 workspace (Drivers, Control, SLAM).
+- `operator_ws/`: Operator Station workspace (UI, Controller Bridge).
+- `docs/`: Technical documentation and operation manuals.
+- `deploy/`: Deployment scripts for Intel NUC and udev rules.
+- `stm32_ws/`: Embedded firmware for sensor processing.
 
-詳細は [docs/DEV_QUICKSTART.md](docs/DEV_QUICKSTART.md) を参照してください。
+## Quick Setup
 
+### 1. Requirements
+- Linux (Ubuntu 24.04 or NixOS recommended)
+- [Nix](https://nixos.org/download.html) with Flakes enabled.
+
+### 2. Enter Development Environment
 ```bash
-# 1. 初回のみビルド
-cd main_ws
-just forge
-cd ..
-
-# 2. 実機起動 (1コマンド)
-just robot-up
-
-# 3. 通信確認用の最小起動 (トラブル時)
-just robot-up-min
+nix develop --accept-flake-config
 ```
 
-オペレータ側は [operator_ws/README.md](operator_ws/README.md) と [docs/OPERATION.md](docs/OPERATION.md) を参照してください。
+### 3. Build & Launch (Robot)
+```bash
+cd main_ws
+just forge
+just launch
+```
 
-## Package Guide
-
-workspace 内の package 一覧と役割は [docs/PACKAGES.md](docs/PACKAGES.md) にまとめています。
+### 4. Launch (Operator)
+```bash
+cd operator_ws
+# Acquire security certificate from robot
+just get-cert <ROBOT_IP>
+# Start operator station
+just launch
+```
 
 ## Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [docs/PACKAGES.md](docs/PACKAGES.md) | Workspace package inventory and entry points |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture, node graph, topics, TF, and data flow |
-| [docs/OPERATION.md](docs/OPERATION.md) | Build, run, deploy, and troubleshooting guide |
-| [docs/DEV_QUICKSTART.md](docs/DEV_QUICKSTART.md) | Fast setup guide for Nix / Docker / Just |
-| [docs/NIX.md](docs/NIX.md) | Nix flake and dev-shell details |
-
-## Hardware Map
-
-| Component | Interface | Driver |
-|-----------|-----------|--------|
-| Crawler motors (Roboclaw) | UART `/dev/roboclaw` | `crawler_driver` |
-| Flippers (Dynamixel XM) | RS485 `/dev/ttyUSB_flipper` | `flipper_driver` |
-| 6-DOF arm + gripper (Dynamixel XM) | RS485 `/dev/ttyUSB_arm` | `arm_driver` |
-| IMU (BNO055 via STM32) | UART `/dev/stm32` | `sensor_gateway` |
-| Camera (USB / UVC / RealSense depending on the setup) | `/dev/video*` | `v4l2_camera`, `qr_detector`, `h264_republisher` |
-| Audio I/O | PulseAudio / GStreamer | `audio_bridge` |
-| LiDAR (real robot) | Ethernet | vendor LiDAR driver, pointcloud bridge, SLAM stack |
+- [Operation Manual](docs/OPERATION.md): Step-by-step guide for deployment and control.
+- [System Architecture](docs/ARCHITECTURE.md): Detailed node graph, networking, and data flow.
+- [Package Inventory](docs/PACKAGES.md): List of all modules and their roles.
+- [Networking & Security](main_ws/topology/network_topology.mmd): Mermaid diagram of the Zenoh QUIC setup.
 
 ## License
-
-Apache-2.0. See [LICENSE](LICENSE) for details.
+Apache-2.0

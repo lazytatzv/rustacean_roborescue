@@ -1,20 +1,35 @@
 # omron_bridge
 
-Bridge node to publish OMRON 2JCIE-BU01 sensor readings to ROS2 topics.
+Bridge for the OMRON 2JCIE-BU01 USB environmental sensor.
 
-Usage (after colcon build):
+Implemented in **Python**.
 
-ros2 run omron_bridge omron_bridge_node --ros-args -p serial_port:=/dev/ttyUSB0 -p poll_period:=1.0
+## Features
 
-It uses the `main_ws/src/external/omron-2jcie-bu01` submodule when available, or the
-`main_ws/third_party/omron-2jcie-bu01` location if the project keeps the library vendored there.
+- **Polls data**: Reads temperature, humidity, light, and pressure from the sensor.
+- **POI Export**: Automatically logs "Heat Signal" detections to CSV/CSV for RoboCup Rescue competition if temperature exceeds a threshold.
+- **Odom integration**: Subscribes to `/odom` to tag POI detections with robot coordinates.
 
-RoboCup usage (implemented):
-- POI CSV export for `heat_sig` detections when temperature >= `heat_threshold_c` (default 40.0°C).
-- Output file is written to `docs/outputs/RoboCup<year>-<Team>-Mission-<time>-pois.csv`.
+## Topics
 
-Parameters:
-- `enable_poi_export` (bool, default true)
-- `team_name` (string)
-- `country` (string)
-- `heat_threshold_c` (float)
+### Subscriptions
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/odom` | `nav_msgs/Odometry` | Used for spatial tagging of detections |
+
+### Publications
+| Topic | Type | Description |
+|-------|------|-------------|
+| `omron/temperature` | `std_msgs/Float32` | Temp in Celsius |
+| `omron/humidity` | `std_msgs/Float32` | Relative humidity % |
+| `omron/light` | `std_msgs/Float32` | Luminance in lx |
+| `omron/pressure` | `std_msgs/Float32` | Pressure in hPa |
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `serial_port` | string | `/dev/ttyUSB0` | Device path |
+| `poll_period` | double | `1.0` | Sampling interval [s] |
+| `heat_threshold_c`| double | `40.0` | Temperature to trigger Heat POI |
+| `enable_poi_export`| bool | `true` | Save detections to file |

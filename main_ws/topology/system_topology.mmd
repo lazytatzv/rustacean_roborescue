@@ -1,18 +1,19 @@
 graph LR
   %% =============================================
   %% Rustacean RoboRescue — System Topology
-  %% 全ノード・全トピック・TF 接続図
+  %% Full Node, Topic, and Hardware Connectivity
   %% =============================================
 
   classDef node_style fill:#fff,stroke:#333,stroke-width:2px;
   classDef topic_style fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+  classDef diag_style fill:#fce4ec,stroke:#c2185b,stroke-width:1px,stroke-dasharray: 5 5;
   classDef tf_style fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
   classDef hw_style fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
 
   %% =============================================
-  %% Operator PC
+  %% Operator Station
   %% =============================================
-  subgraph Operator["Operator PC"]
+  subgraph Operator["Operator Station (PC)"]
     joy[joy_node]:::node_style
     ope_audio_sender[operator_audio_sender]:::node_style
     ope_audio_receiver[operator_audio_receiver]:::node_style
@@ -20,17 +21,17 @@ graph LR
   end
 
   T_joy{{/joy<br/>sensor_msgs/Joy}}:::topic_style
-  T_ope_audio{{/operator/audio<br/>custom_interfaces/AudioChunk}}:::topic_style
-  T_robot_audio{{/robot/audio<br/>custom_interfaces/AudioChunk}}:::topic_style
+  T_ope_audio{{/operator/audio<br/>AudioChunk}}:::topic_style
+  T_robot_audio{{/robot/audio<br/>AudioChunk}}:::topic_style
 
   joy --> T_joy
   ope_audio_sender --> T_ope_audio
   T_robot_audio --> ope_audio_receiver
 
   %% =============================================
-  %% Control Input
+  %% Teleop & Control Logic (NUC)
   %% =============================================
-  subgraph Control_Input["Control Input (NUC)"]
+  subgraph Control_Logic["Control Logic (NUC)"]
     op[joy_controller]:::node_style
     T_joy --> op
   end
@@ -39,188 +40,151 @@ graph LR
   op --> T_estop
 
   %% =============================================
-  %% Mobility
+  %% Mobility (Drive + Flippers)
   %% =============================================
-  subgraph Mobility["Mobility"]
+  subgraph Mobility["Mobility System"]
     crawler[crawler_driver]:::node_style
     flipper[flipper_driver]:::node_style
 
-    T_c_cmd{{/crawler_driver<br/>custom_interfaces/CrawlerVelocity}}:::topic_style
-    T_f_cmd{{/flipper_driver<br/>custom_interfaces/FlipperVelocity}}:::topic_style
+    T_c_cmd{{/crawler_driver<br/>CrawlerVelocity}}:::topic_style
+    T_f_cmd{{/flipper_driver<br/>FlipperVelocity}}:::topic_style
     T_joint{{/joint_states<br/>sensor_msgs/JointState}}:::topic_style
 
     op --> T_c_cmd --> crawler
     op --> T_f_cmd --> flipper
     flipper --> T_joint
 
-    T_estop --> crawler
-    T_estop --> flipper
+    T_estop --> crawler & flipper
 
-    HW_roboclaw[Roboclaw]:::hw_style
-    HW_dxl_f[Dynamixel Flippers]:::hw_style
-    crawler --> HW_roboclaw
-    flipper --> HW_dxl_f
+    HW_roboclaw[Roboclaw Controller]:::hw_style
+    HW_dxl_f[Dynamixel Flippers x4]:::hw_style
+    crawler -- "USB Serial" --> HW_roboclaw
+    flipper -- "USB U2D2" --> HW_dxl_f
+
+    %% Diagnostics
+    D_crawl_v{{/crawler_driver/diagnostics/*}}:::diag_style
+    crawler -.-> D_crawl_v
   end
 
   %% =============================================
-  %% Arm & Gripper
+  %% Manipulation (Arm + Gripper)
   %% =============================================
-  subgraph Manipulation["Arm & Gripper"]
-    arm[arm_controller]:::node_style
-    arm_drv[arm_driver]:::node_style
+  subgraph Manipulation["Manipulation System"]
+    arm_ik[arm_controller]:::node_style
+    arm_drv[arm_gripper_driver]:::node_style
 
-    T_a_cmd{{/arm_cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
-    T_a_jvel{{/arm_joint_cmd_vel<br/>sensor_msgs/JointState}}:::topic_style
-    T_a_joint{{/arm_joint_commands<br/>sensor_msgs/JointState}}:::topic_style
-    T_ee_pose{{/arm_ee_pose<br/>geometry_msgs/PoseStamped}}:::topic_style
-    T_g_cmd{{/gripper_cmd<br/>custom_interfaces/GripperCommand}}:::topic_style
-    T_g_status{{/gripper_status<br/>custom_interfaces/GripperStatus}}:::topic_style
+    T_a_cmd{{/arm_cmd_vel<br/>Twist}}:::topic_style
+    T_a_jvel{{/arm_joint_cmd_vel<br/>JointState}}:::topic_style
+    T_a_joint{{/arm_joint_commands<br/>JointState}}:::topic_style
+    T_ee_pose{{/arm_ee_pose<br/>PoseStamped}}:::topic_style
+    T_g_cmd{{/gripper_cmd<br/>GripperCommand}}:::topic_style
+    T_g_status{{/gripper_status<br/>GripperStatus}}:::topic_style
 
-    op --> T_a_cmd --> arm
-    op --> T_a_jvel --> arm
+    op --> T_a_cmd --> arm_ik
+    op --> T_a_jvel --> arm_ik
     op --> T_g_cmd --> arm_drv
-    arm --> T_a_joint --> arm_drv
-    arm --> T_ee_pose
-    T_joint --> arm
+    arm_ik --> T_a_joint --> arm_drv
+    arm_ik --> T_ee_pose
+    T_joint --> arm_ik
     arm_drv --> T_g_status
     arm_drv --> T_joint
-    T_estop --> arm & arm_drv
+    T_estop --> arm_ik & arm_drv
 
-    HW_dxl_ag[Dynamixel Arm+Gripper]:::hw_style
-    arm_drv --> HW_dxl_ag
+    HW_dxl_ag[Dynamixel Arm 6DOF + Gripper]:::hw_style
+    arm_drv -- "USB U2D2 (1Mbps)" --> HW_dxl_ag
+
+    %% Diagnostics
+    D_arm_ik{{/arm_controller/diagnostics/*}}:::diag_style
+    arm_ik -.-> D_arm_ik
   end
 
   %% =============================================
-  %% Camera & QR Detection
+  %% Vision & Perception
   %% =============================================
-  subgraph Camera["Camera"]
+  subgraph Vision["Vision & QR"]
     v4l2[v4l2_camera]:::node_style
     qr[qr_detector_cpp]:::node_style
     ffmpeg_conv[ffmpeg_to_foxglove_video]:::node_style
 
     T_cam{{/camera/image_raw<br/>sensor_msgs/Image}}:::topic_style
     T_cam_ffmpeg{{/camera/image_raw/ffmpeg<br/>FFMPEGPacket}}:::topic_style
-    T_comp_video{{/camera/compressed_video<br/>foxglove_msgs/CompressedVideo H264}}:::topic_style
-    T_qr{{/qr_codes<br/>std_msgs/String}}:::topic_style
-    T_poi_det{{/poi_detections<br/>std_msgs/String}}:::topic_style
+    T_comp_video{{/camera/compressed_video<br/>foxglove_msgs/CompressedVideo}}:::topic_style
+    T_qr{{/camera/qr_codes<br/>std_msgs/String}}:::topic_style
 
-    HW_cam[USB Camera]:::hw_style
-    HW_cam --> v4l2 --> T_cam --> qr --> T_qr
-    qr --> T_poi_det
+    HW_cam[USB Camera /dev/video0]:::hw_style
+    HW_cam --> v4l2 -- "Intra-process" --> qr --> T_qr
     v4l2 --> T_cam_ffmpeg --> ffmpeg_conv --> T_comp_video
   end
 
   %% =============================================
-  %% Audio (双方向)
+  %% Audio Bridge
   %% =============================================
-  subgraph Audio["Audio"]
+  subgraph Audio["Audio Bridge"]
     robot_sender[robot_audio_sender]:::node_style
     robot_receiver[robot_audio_receiver]:::node_style
 
-    HW_mic[マイク]:::hw_style
-    HW_spk[スピーカー]:::hw_style
+    HW_mic[Robot Microphone]:::hw_style
+    HW_spk[Robot Speaker]:::hw_style
     HW_mic --> robot_sender --> T_robot_audio
     T_ope_audio --> robot_receiver --> HW_spk
   end
 
   %% =============================================
-  %% Perception & Localization
+  %% Localization & SLAM
   %% =============================================
-  subgraph Perception["Perception & Localization"]
+  subgraph SLAM_Loc["Localization & SLAM"]
     gateway[sensor_gateway]:::node_style
-    v_driver[velodyne_driver]:::node_style
-    v_pc[velodyne_pointcloud]:::node_style
-    time_fix[fix_pointcloud_time]:::node_style
     spark_lio[spark_fast_lio]:::node_style
     pc2ls[pointcloud_to_laserscan]:::node_style
     slam[slam_toolbox]:::node_style
 
     T_imu{{/imu/data<br/>sensor_msgs/Imu}}:::topic_style
-    T_raw{{/velodyne_points<br/>sensor_msgs/PointCloud2}}:::topic_style
-    T_fixed{{/velodyne_points_fixed<br/>sensor_msgs/PointCloud2}}:::topic_style
+    T_imu_h{{/imu/health<br/>std_msgs/Bool}}:::topic_style
+    T_raw_pts{{/velodyne_points<br/>sensor_msgs/PointCloud2}}:::topic_style
     T_scan{{/scan<br/>sensor_msgs/LaserScan}}:::topic_style
     T_odom{{/odom<br/>nav_msgs/Odometry}}:::topic_style
     T_map{{/map<br/>nav_msgs/OccupancyGrid}}:::topic_style
-    T_cloud_map{{/cloud_map<br/>sensor_msgs/PointCloud2}}:::topic_style
 
     HW_stm32[STM32 + BNO055]:::hw_style
     HW_vlp16[VLP-16 LiDAR]:::hw_style
 
-    HW_stm32 --> gateway --> T_imu --> spark_lio
-    HW_vlp16 --> v_driver --> v_pc --> T_raw
-    T_raw --> time_fix --> T_fixed --> spark_lio
-    T_raw --> pc2ls --> T_scan --> slam
-    spark_lio --> T_odom & T_cloud_map
+    HW_stm32 -- "USB Serial" --> gateway --> T_imu & T_imu_h
+    T_imu --> spark_lio
+    HW_vlp16 -- "Ethernet (UDP)" --> T_raw_pts
+    T_raw_pts --> spark_lio & pc2ls
+    T_scan --> slam
+    pc2ls --> T_scan
+    spark_lio --> T_odom
     slam --> T_map
   end
 
   %% =============================================
-  %% POI & Map Export
+  %% Environmental Sensing
   %% =============================================
-  subgraph Export["POI & Map Export"]
+  subgraph Environmental["Environmental"]
     omron[omron_bridge]:::node_style
-    map_exp[robo_map_exporter]:::node_style
-
-    T_omron_temp{{omron/temperature<br/>std_msgs/Float32}}:::topic_style
-    T_omron_hum{{omron/humidity<br/>std_msgs/Float32}}:::topic_style
-    T_omron_light{{omron/light<br/>std_msgs/Float32}}:::topic_style
-    T_omron_pres{{omron/pressure<br/>std_msgs/Float32}}:::topic_style
+    T_omron{{omron/*<br/>std_msgs/Float32}}:::topic_style
 
     HW_omron[Omron 2JCIE-BU01]:::hw_style
-    HW_omron --> omron
-    omron --> T_omron_temp & T_omron_hum & T_omron_light & T_omron_pres
+    HW_omron -- "USB Serial" --> omron --> T_omron
     T_odom --> omron
-
-    T_cloud_map & T_map & T_odom --> map_exp
   end
 
-  qr --> T_poi_det
-
   %% =============================================
-  %% TF Tree
+  %% TF Tree (Static & Dynamic)
   %% =============================================
-  subgraph TF["TF Tree"]
+  subgraph TF["TF Tree Summary"]
     TF_map_odom["map → odom<br/>(slam_toolbox)"]:::tf_style
-    TF_odom_bf["odom → base_footprint<br/>(spark_fast_lio)"]:::tf_style
-    TF_bf_base["base_footprint → base_link<br/>(robot_state_publisher)"]:::tf_style
-    TF_base_vel["base_link → velodyne<br/>(robot_state_publisher)"]:::tf_style
-    TF_base_imu["base_link → imu_link"]:::tf_style
-    TF_base_cam["base_link → camera_link"]:::tf_style
-    TF_flippers["base_link → flipper_fl/fr/bl/br"]:::tf_style
-    TF_arm["base_link → arm_base → arm1..arm6"]:::tf_style
+    TF_odom_base["odom → base_link<br/>(spark_fast_lio)"]:::tf_style
+    TF_base_all["base_link → sensors/links<br/>(robot_state_publisher)"]:::tf_style
 
-    TF_map_odom --- TF_odom_bf --- TF_bf_base
-    TF_bf_base --- TF_base_vel & TF_base_imu & TF_base_cam & TF_flippers & TF_arm
-  end
-
-  slam -.->|"TF"| TF_map_odom
-  spark_lio -.->|"TF"| TF_odom_bf
-
-  %% =============================================
-  %% Nav2
-  %% =============================================
-  subgraph Navigation["Autonomous Navigation — Nav2"]
-    lm[lifecycle_manager]:::node_style
-    bt[bt_navigator]:::node_style
-    planner[planner_server]:::node_style
-    controller[controller_server]:::node_style
-    behavior[behavior_server]:::node_style
-    smoother[velocity_smoother]:::node_style
-
-    T_goal{{/goal_pose<br/>geometry_msgs/PoseStamped}}:::topic_style
-    T_cmd_vel{{/cmd_vel<br/>geometry_msgs/Twist}}:::topic_style
-
-    lm --> bt & planner & controller & behavior & smoother
-    T_goal --> bt --> planner & controller & behavior
-    controller --> smoother --> T_cmd_vel --> crawler
-    T_map --> planner
-    T_scan --> controller
+    TF_map_odom --- TF_odom_base --- TF_base_all
   end
 
   %% =============================================
-  %% Foxglove Bridge (NUC)
+  %% Connectivity to Operator
   %% =============================================
   fgbridge[foxglove_bridge<br/>:8765]:::node_style
 
-  T_comp_video & T_map & T_odom & T_scan & T_joint & T_imu --> fgbridge
+  T_comp_video & T_map & T_odom & T_scan & T_joint & T_imu & T_qr & T_omron --> fgbridge
   fgbridge == "WebSocket" ==> foxglove

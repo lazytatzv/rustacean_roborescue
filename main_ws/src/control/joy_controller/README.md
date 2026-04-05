@@ -1,43 +1,48 @@
 # joy_controller
 
-`joy_controller` is the joystick-to-command bridge for the robot. It converts `/joy` input into crawler, flipper, and arm commands, and it is launched from [bringup/launch/control.launch.py](../../bringup/launch/control.launch.py).
+High-level teleoperation logic for converting PS4 controller inputs into robot commands.
 
-## Modes
+Implemented in **C++** using `rclcpp`.
 
-| Button | Mode | Purpose |
-|--------|------|---------|
-| `PS` | `STOP` | Latches the emergency stop and zeroes all outputs |
-| `OPTIONS` | `DRIVE` | Drives the crawler and flipper actuators |
-| `SHARE` | `ARM` | Sends arm velocity commands to the IK pipeline |
+## Operation Modes
+
+| Mode | Trigger | Description |
+|------|---------|-------------|
+| **STOP** | **PS Button** | **Emergency Stop.** Latch-style lockout. Publishes `/emergency_stop`. |
+| **DRIVE** | **OPTIONS** | Controls crawlers and flippers. |
+| **ARM (IK)** | **SHARE** (1st) | Controls the robotic arm using Cartesian velocity (IK). |
+| **ARM (Direct)** | **SHARE** (2nd) | Controls the robotic arm joints directly. |
+
+### DRIVE Mode Details
+- **Left Stick Y**: Left crawler velocity.
+- **Right Stick Y**: Right crawler velocity.
+- **D-Pad Up/Down**: Front flippers.
+- **L1/R1 / L2/R2**: Individual flipper control.
+
+### ARM (IK) Mode Details
+- **Left Stick**: Horizontal (XY) translation.
+- **Right Stick Y**: Vertical (Z) translation.
+- **Right Stick X**: Yaw rotation.
+- **L2/R2 Triggers**: Roll rotation.
+- **D-Pad Up/Down**: Pitch rotation.
 
 ## Topics
 
-| Direction | Topic | Type |
-|-----------|-------|------|
-| Subscribe | `/joy` | `sensor_msgs/msg/Joy` |
-| Publish | `/crawler_driver` | `custom_interfaces/msg/CrawlerVelocity` |
-| Publish | `/flipper_driver` | `custom_interfaces/msg/FlipperVelocity` |
-| Publish | `/arm_cmd_vel` | `geometry_msgs/msg/Twist` |
-| Publish | `/arm_joint_cmd_vel` | `sensor_msgs/msg/JointState` |
-| Publish | `/gripper_cmd` | `custom_interfaces/msg/GripperCommand` |
-| Publish | `/emergency_stop` | `std_msgs/msg/Bool` |
+### Subscriptions
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/joy` | `sensor_msgs/Joy` | Raw controller axes and buttons |
 
-## Quick Run
+### Publications
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/crawler_driver` | `custom_interfaces/CrawlerVelocity` | Target m/s for crawlers |
+| `/flipper_driver` | `custom_interfaces/FlipperVelocity` | Raw units for flippers |
+| `/arm_cmd_vel` | `geometry_msgs/Twist` | Cartesian velocity for IK |
+| `/arm_joint_cmd_vel` | `sensor_msgs/JointState` | Joint velocities for direct control |
+| `/emergency_stop` | `std_msgs/Bool` | Hard stop trigger (Reliable/TransientLocal) |
 
-```bash
-cd main_ws
-source install/setup.bash
-ros2 run joy_controller joy_controller_node
-```
-
-## Notes
-
-- Button edges are handled explicitly so holding a button does not flood the downstream nodes.
-- `PS` triggers E-STOP, and `OPTIONS` or `SHARE` clears it and switches mode.
-- The package is tuned for the current Jazzy workspace and the launch wiring in `bringup`.
-
-## Troubleshooting (crawler does not move)
-
-- Verify `/joy` is arriving: `ros2 topic hz /joy`
-- Verify drive command is published after pressing `OPTIONS`: `ros2 topic echo /crawler_driver --once`
-- If `OPTIONS` does not switch mode, inspect button indices from `ros2 topic echo /joy` while pressing buttons.
+## Safety Features
+- **Rising-edge detection**: Buttons only trigger once per press.
+- **Latched E-Stop**: The PS button locks the robot in STOP mode. Clearing require switching to another mode.
+- **Deadzone handling**: Prevents ghost movements from analog sticks.

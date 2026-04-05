@@ -1,78 +1,50 @@
-arm_driver (Dynamixel arm + gripper)
+# arm_driver
 
-Overview
+Unified Dynamixel driver for a 6-DOF robotic arm and an attached gripper sharing the same RS485 bus.
 
-This package provides a unified driver for a 6-DOF Dynamixel-based robotic arm (XM-series style) and an attached gripper sharing the same RS485 bus. It wraps a Rust `ArmDynamixelDriver` implementation and exposes ROS 2 parameters, topics, and a hardware polling thread.
+Implemented in **Rust** using `rclrs` and `dynamixel2`.
 
-Intended use
+## Features
 
-- Run as a ROS 2 node named `arm_gripper_driver`.
-- Publish joint states on `/joint_states` and gripper status on `/gripper_status`.
-- Subscribe to `/arm_joint_commands` (a `sensor_msgs/JointState`) for desired arm joint positions, and `/gripper_cmd` (a `custom_interfaces/GripperCommand`) to control gripper position.
+- **High-speed Synchronous Control**: Communicates with multiple servos in a dedicated hardware thread at 50Hz.
+- **Arm + Gripper Integration**: Manages arm joints (position control) and gripper (current-limited position control) on a single serial port.
+- **Safety**:
+  - **Torque Management**: Automatically enables/disables torque during E-Stop and shutdown.
+  - **Temperature Monitoring**: Periodically checks motor temperatures and triggers a torque-off if critical levels are reached.
+  - **E-Stop**: Instant lockout and torque-off upon receiving `/emergency_stop`.
+- **Flexible Offsets**: Supports per-joint zero-point offsets to align physical motor positions with the URDF model.
 
-Key files
+## Topics
 
-- `src/main.rs` — Node entrypoint, parameter handling, subscriptions, publishers, and hardware thread spawn.
-- `src/driver.rs` — The `ArmDynamixelDriver` that handles serial comms to motors (motor read/write, init, torque_off, emergency_stop, etc.).
-- `package.xml`, `Cargo.toml` — package metadata and build config.
+### Subscriptions
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/arm_joint_commands` | `sensor_msgs/JointState` | Target positions for arm joints |
+| `/gripper_cmd` | `custom_interfaces/GripperCommand` | Target position and current for the gripper |
+| `/emergency_stop` | `std_msgs/Bool` | Hard stop trigger |
 
-ROS 2 parameters (declared by node)
+### Publications
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/joint_states` | `sensor_msgs/JointState` | Actual arm joint positions |
+| `/gripper_status` | `custom_interfaces/GripperStatus` | Gripper position, current, and temperature |
 
-- `port_name` (string) — Serial port path. Default: `/dev/ttyUSB0`.
-- `baud_rate` (int) — Baud rate for bus. Default: `1000000`.
-- `arm_joints` (string[]) — Names of the arm joints in order. Default: `["arm_joint1"]`.
-- `arm_ids` (int[]) — Dynamixel IDs for arm motors in the same order as `arm_joints`. Default: `[21]`.
-- `gripper_id` (int) — Dynamixel ID of the gripper. Default: `10`.
-- `gripper_max_current` (int) — Gripper current limit (mA). Default: `500`.
-- `profile_velocity` (int) — Motor profile velocity used on initialization. Default: `100`.
+## Parameters
 
-Topics
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `port_name` | string | `/dev/ttyUSB0` | Serial port path |
+| `baud_rate` | int | `1000000` | Dynamixel bus speed |
+| `arm_ids` | int[] | `[1, 2, 3, 4, 5, 6]` | Dynamixel IDs for arm joints |
+| `gripper_id` | int | `10` | Dynamixel ID for the gripper |
+| `arm_offsets` | double[] | `[0.0, ...]` | Radian offsets for each joint |
 
-- Publishes:
-  - `/joint_states` (`sensor_msgs/JointState`): current arm joint positions. Header stamp is set in code.
-  - `/gripper_status` (`custom_interfaces/GripperStatus`): gripper telemetry (position/current/temperature).
-- Subscribes:
-  - `/arm_joint_commands` (`sensor_msgs/JointState`): desired joint positions. Only positions for names matching `arm_joints` are used.
-  - `/gripper_cmd` (`custom_interfaces/GripperCommand`): desired gripper position.
-
-Concurrency & architecture
-
-- A hardware thread (spawned via `std::thread::spawn`) runs the polling/control loop at `HW_LOOP_HZ` (50 Hz by default).
-- Inter-thread communication uses an `std::sync::mpsc::channel` for high-level commands (`HwCommand` struct).
-- The ROS node threads handle subscriptions and publish; the hardware thread interacts with the physical motors through `ArmDynamixelDriver`.
-- Two `Arc<AtomicBool>` flags (`shutdown_flag`, `estop_flag`) provide shutdown and emergency-stop coordination.
-
-Safety notes
-
-- When `estop_flag` is set, the hardware thread calls `driver.emergency_stop()` and stops interacting with motors.
-- On shutdown the driver calls `torque_off_all()` to release motor torque.
-- Ensure wiring and current limits are configured properly for your gripper motor to avoid damage.
-
-Building and running
-
-From workspace root (colcon/ament):
-
-1. Build the workspace (assuming ament/cargo is configured in your environment):
+## Build & Run
 
 ```bash
-colcon build --packages-select arm_driver
+# Build
+just forge-packages arm_driver
+
+# Run
+ros2 run arm_driver arm_driver --ros-args --params-file src/bringup/config/arm_gripper_driver.yaml
 ```
-
-2. Source the workspace and run the node:
-
-```bash
-source install/setup.bash
-ros2 run arm_driver arm_driver
-```
-
-3. Alternatively, launch using your bringup config that sets parameters (see `main_ws/src/bringup/config/arm_gripper_driver.yaml`).
-
-Troubleshooting
-
-- Serial permissions: ensure the user has permission to open `/dev/ttyUSB*`. Use udev rules or run under appropriate user.
-- Parameter mismatch: ensure `arm_ids` length matches `arm_joints` length.
-- If motors don't respond, check bus termination, power, and that `baud_rate` matches motor settings.
-
-Contact
-
-For implementation questions, see the repository or contact the maintainer in `package.xml`.
