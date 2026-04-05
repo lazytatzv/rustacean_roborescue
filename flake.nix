@@ -113,8 +113,8 @@
           fish fishPlugins.bass just
           git lazygit ripgrep fd btop zellij tmux
           nodePackages."mermaid-cli"    # topology/*.mmd 図の生成
-          pkgs."foxglove-studio"        # HMI: 可視化ツール
-
+        ] ++ (if pkgs ? "foxglove-studio" then [ pkgs."foxglove-studio" ] else if pkgs ? "foxglove" then [ pkgs."foxglove" ] else [])
+        ++ [
           # --- ROS 2 ビルドインフラ (buildTools 側に置く) ---
           ros.ros-core
           ros.ament-cmake
