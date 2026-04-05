@@ -14,7 +14,8 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # Set RMW implementation and Zenoh config URI for all nodes launched here
     # Compute zenoh config path relative to this file: ../zenoh_ope.json5
-    this_dir = os.path.dirname(__file__)
+    this_file = os.path.abspath(__file__)
+    this_dir = os.path.dirname(this_file)
     repo_root = os.path.dirname(this_dir)
     zenoh_config_path = os.path.join(repo_root, "zenoh_ope.json5")
     zenoh_config_uri = f"file://{zenoh_config_path}"
