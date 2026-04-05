@@ -197,7 +197,7 @@ class JoyController : public rclcpp::Node
     auto flipper_msg = custom_interfaces::msg::FlipperVelocity();
     if (mode_ == Mode::DRIVE)
     {
-      float m1 = std::clamp(-apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
+      float m1 = std::clamp(apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
                             -max_speed_, max_speed_);
       float m2 = std::clamp(apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_,
                             -max_speed_, max_speed_);
