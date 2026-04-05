@@ -203,4 +203,4 @@ graph LR
   fgbridge[foxglove_bridge<br/>:8765]:::node_style
 
   T_comp_video & T_map & T_odom & T_scan & T_joint & T_imu & T_qr & T_robot_audio & T_ope_audio --> fgbridge
-  fgbridge == "WebSocket / Zenoh" ==> foxglove
+  fgbridge -- "WebSocket / Zenoh" --> foxglove

@@ -11,39 +11,39 @@ graph LR
   %% ロボット実機 (Intel NUC)
   %% =============================================
   subgraph Robot["ロボット実機 (Intel NUC)"]
-    NUC[Intel NUC<br/>Ubuntu + ROS 2 Jazzy]:::device
+    NUC["Intel NUC<br/>Ubuntu + ROS 2 Jazzy"]:::device
 
     subgraph Sensors["センサ"]
-      STM32[STM32F446<br/>BNO055 IMU]:::device
-      VLP16[VLP-16 LiDAR]:::device
-      USB_CAM[USB Camera<br/>/dev/video0]:::device
-      OMRON[Omron 2JCIE-BU01<br/>環境センサ]:::device
+      STM32["STM32F446<br/>BNO055 IMU"]:::device
+      VLP16["VLP-16 LiDAR"]:::device
+      USB_CAM["USB Camera<br/>/dev/video0"]:::device
+      OMRON["Omron 2JCIE-BU01<br/>環境センサ"]:::device
     end
 
     subgraph Actuators["アクチュエータ"]
-      ROBOCLAW[Roboclaw<br/>クローラモータ]:::device
-      DXL_F[Dynamixel XM<br/>フリッパ ×4]:::device
-      DXL_AG[Dynamixel XM<br/>アーム 6軸 + グリッパ]:::device
+      ROBOCLAW["Roboclaw<br/>クローラモータ"]:::device
+      DXL_F["Dynamixel XM<br/>フリッパ ×4"]:::device
+      DXL_AG["Dynamixel XM<br/>アーム 6軸 + グリッパ"]:::device
     end
 
     subgraph ROS_Nodes["ROS 2 ノード (NUC)"]
-      N_gateway[sensor_gateway<br/>Rust]:::ros_node
-      N_vlp[velodyne_driver<br/>+ velodyne_pointcloud]:::ros_node
-      N_cam[v4l2_camera]:::ros_node
-      N_ffmpeg[ffmpeg_to_foxglove_video]:::ros_node
-      N_qr[qr_detector_cpp]:::ros_node
-      N_crawler[crawler_driver]:::ros_node
-      N_flipper[flipper_driver]:::ros_node
-      N_spark[spark_fast_lio]:::ros_node
-      N_slam[slam_toolbox]:::ros_node
-      N_arm[arm_controller<br/>Rust / IK]:::ros_node
-      N_arm_drv[arm_driver<br/>Rust]:::ros_node
-      N_omron[omron_bridge]:::ros_node
-      N_map_exp[robo_map_exporter]:::ros_node
-      N_nav2[Nav2 Stack]:::ros_node
-      N_joyctrl[joy_controller]:::ros_node
-      N_audio_robot[robot_audio_sender<br/>robot_audio_receiver]:::ros_node
-      N_fgbridge[foxglove_bridge<br/>WebSocket :8765]:::ros_node
+      N_gateway["sensor_gateway<br/>Rust"]:::ros_node
+      N_vlp["velodyne_driver<br/>+ velodyne_pointcloud"]:::ros_node
+      N_cam["v4l2_camera"]:::ros_node
+      N_ffmpeg["ffmpeg_to_foxglove_video"]:::ros_node
+      N_qr["qr_detector_cpp"]:::ros_node
+      N_crawler["crawler_driver"]:::ros_node
+      N_flipper["flipper_driver"]:::ros_node
+      N_spark["spark_fast_lio"]:::ros_node
+      N_slam["slam_toolbox"]:::ros_node
+      N_arm["arm_controller<br/>Rust / IK"]:::ros_node
+      N_arm_drv["arm_driver<br/>Rust"]:::ros_node
+      N_omron["omron_bridge"]:::ros_node
+      N_map_exp["robo_map_exporter"]:::ros_node
+      N_nav2["Nav2 Stack"]:::ros_node
+      N_joyctrl["joy_controller"]:::ros_node
+      N_audio_robot["robot_audio_sender<br/>robot_audio_receiver"]:::ros_node
+      N_fgbridge["foxglove_bridge<br/>WebSocket :8765"]:::ros_node
     end
 
     NUC -- "USB Serial /dev/stm32<br/>115200 bps" --> STM32
@@ -62,9 +62,9 @@ graph LR
     N_flipper -.-> DXL_F
     N_arm_drv -.-> DXL_AG
 
-    N_cam -. "/camera/image_raw/ffmpeg" .-> N_ffmpeg
-    N_cam -. "/camera/image_raw" .-> N_qr
-    N_arm -. "/arm_joint_commands" .-> N_arm_drv
+    N_cam -- "/camera/image_raw/ffmpeg" --> N_ffmpeg
+    N_cam -- "/camera/image_raw" --> N_qr
+    N_arm -- "/arm_joint_commands" --> N_arm_drv
   end
 
   %% =============================================
@@ -76,19 +76,20 @@ graph LR
     
     ZENOH_O{{"zenohd オペレータ側<br/>QUIC connect<br/>zenoh_ope.json5<br/>(mTLS CA Cert)"}}:::proto
     
-    ZENOH_R == "Wi-Fi / Ethernet<br/>QUIC (UDP :7447) mTLS" == ZENOH_O
-    ZENOH_R_FB -. "Fallback Connection<br/>TCP :7447" .- ZENOH_O
+    ZENOH_R -- "Wi-Fi / Ethernet (QUIC mTLS)" --> ZENOH_O
+    ZENOH_O -- "Feedback" --> ZENOH_R
+    ZENOH_R_FB -. "Fallback Connection (TCP)" .-> ZENOH_O
   end
 
   %% =============================================
   %% オペレータ PC
   %% =============================================
   subgraph Operator["オペレータ PC"]
-    OPE_PC[Operator PC<br/>Ubuntu + ROS 2 Jazzy]:::device
-    PS4[PS4 Controller]:::device
-    N_joy[joy_node]:::ros_node
-    N_audio_ope[operator_audio_sender<br/>operator_audio_receiver]:::ros_node
-    FOXGLOVE[Foxglove Studio<br/>ws://robot:8765]:::ros_node
+    OPE_PC["Operator PC<br/>Ubuntu + ROS 2 Jazzy"]:::device
+    PS4["PS4 Controller"]:::device
+    N_joy["joy_node"]:::ros_node
+    N_audio_ope["operator_audio_sender<br/>operator_audio_receiver"]:::ros_node
+    FOXGLOVE["Foxglove Studio<br/>ws://robot:8765"]:::ros_node
 
     PS4 -- "USB / Bluetooth" --> OPE_PC
     OPE_PC -.-> N_joy
@@ -108,10 +109,10 @@ graph LR
   N_joyctrl       -. "/gripper_cmd" .->             N_arm_drv
   N_joyctrl       -. "/emergency_stop" .->          N_crawler & N_flipper & N_arm & N_arm_drv
 
-  N_audio_ope     -. "/operator/audio<br/>(AudioChunk)" .->  ZENOH_O
-  ZENOH_R         -. "/operator/audio" .->          N_audio_robot
-  N_audio_robot   -. "/robot/audio<br/>(AudioChunk)" .->     ZENOH_R
-  ZENOH_O         -. "/robot/audio" .->             N_audio_ope
+  N_audio_ope     -- "/operator/audio (AudioChunk)" -->  ZENOH_O
+  ZENOH_R         -- "/operator/audio" -->          N_audio_robot
+  N_audio_robot   -- "/robot/audio (AudioChunk)" -->     ZENOH_R
+  ZENOH_O         -- "/robot/audio" -->             N_audio_ope
 
   %% =============================================
   %% Foxglove Bridge 経由 (WebSocket)
