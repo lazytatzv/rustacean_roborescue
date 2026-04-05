@@ -106,14 +106,14 @@
 
           # --- colcon ---
           colcon
-          python3Packages.colcon-cargo
-          python3Packages.colcon-ros-cargo
+          python3Packages."colcon-cargo"
+          python3Packages."colcon-ros-cargo"
 
           # --- Shell & DevTools ---
           fish fishPlugins.bass just
           git lazygit ripgrep fd btop zellij tmux
-          nodePackages.mermaid-cli    # topology/*.mmd 図の生成
-          foxglove-studio             # HMI: 可視化ツール
+          nodePackages."mermaid-cli"    # topology/*.mmd 図の生成
+          pkgs."foxglove-studio"        # HMI: 可視化ツール
 
           # --- ROS 2 ビルドインフラ (buildTools 側に置く) ---
           ros.ros-core
