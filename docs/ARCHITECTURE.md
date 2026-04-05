@@ -1053,3 +1053,22 @@ graph LR
 | `rosidl_defaults/` | rosidl デフォルト生成器 / ランタイム |
 | `unique_identifier_msgs/` | UUID メッセージ |
 | `test_interface_files/` | テスト用メッセージ定義 |
+
+---
+
+## 9. フェールセーフおよびフォールバック機構
+
+過酷な救助環境やハードウェアの故障に備え、システム全体で多層的なフォールバック機構が実装されています。これにより、一部のセンサやモジュールが破損・切断された場合でも、ロボットの運用を最大限継続できるよう設計されています。
+
+### 9.1 通信ネットワーク (Zenoh) のフォールバック
+- **QUIC から TCP への自動切替**: `network.launch.py` では、最初に QUIC プロトコル (UDP 7447) を用いた mTLS 通信での `zenohd` 起動を試みます。証明書の生成に失敗したり、OS の制限により QUIC ソケットがバインドできなかった場合、即座に **TCP のみのフォールバック設定 (`zenoh_router_tcp_fallback.json5`)** で `zenohd` を再起動するシェルループが組まれています。
+- **Tailscale / ローカル IP の並行試行**: Zenoh はルーターのディスカバリにおいて、複数のインターフェース（例: `10.42.0.1` のローカル IP、`100.x.x.x` の Tailscale IP）に対して同時に接続を試行し、最初に繋がった最速の経路を採用します。
+
+### 9.2 オドメトリと SLAM のフォールバック (`odom_selector`)
+- **Primary (FAST-LIO2)**: 通常時、オドメトリは LiDAR と IMU を統合した `spark_fast_lio` が担当します（非常に高精度）。
+- **Fallback (KISS-ICP)**: もし IMU (`/imu/data` または `/imu/health`) が故障・切断され、FAST-LIO2 が動作不能になった場合、`odom_selector` ノードがタイムアウト（デフォルト5秒）を検知します。その後、LiDAR の点群のみからオドメトリを計算する `kiss_icp_node` に自動的に切り替わり、`/odom` トピックの供給を継続します。
+- **Static TF Fallback**: LiDAR 自体が完全に故障して無効化された場合 (`use_lidar=false`)、`odom_base_fallback_tf` (静的 TF パブリッシャ) が自動で起動し、`odom -> base_link` を常にゼロで固定配信します。これにより、Nav2 や他の座標変換依存ノードが TF ツリーの断絶によってクラッシュするのを防ぎます。
+
+### 9.3 ハードウェア構成の動的フォールバック
+- **Joint State Publisher Fallback**: クローラ (`crawler_driver`)、アーム (`arm_driver`)、フリッパ (`flipper_driver`) の物理モータがすべて無効化されている状態（純粋なセンサテストなど）では、誰も `/joint_states` をパブリッシュしません。この状態では `robot_state_publisher` の TF ツリーが崩壊するため、`system.launch.py` は自動的に `joint_state_publisher_fallback` ノードを起動し、初期状態のジョイント角度で TF を補完します。
+- **Arm Backend 切り替え**: `use_arm=true` かつ `arm_backend=ros2_control` が要求されていても、依存パッケージ (`dynamixel_hardware_interface`) がシステムに見つからない場合、自動的に `arm_backend=direct` (Rust 実装のスタンドアロンドライバ) にフォールバックし、アームの基本操作を維持します。
