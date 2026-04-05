@@ -1,0 +1,33 @@
+set shell := ["bash", "-c"]
+
+# パス設定
+install_dir := shell("pwd") + "/install"
+zenoh_config := shell("pwd") + "/zenoh_ope.json5"
+
+default:
+	@just --list
+
+# オペレータ・ステーションを起動
+launch:
+	source install/setup.bash && ros2 launch launch/operator.launch.py
+
+# 環境変数を設定するためのコマンドを出力する (eval $(just set-env) で使用)
+set-env:
+	@echo "export ZENOH_SESSION_CONFIG_URI=$(pwd)/zenoh_ope.json5"
+
+# ロボット側のトピックをリストアップ
+topics:
+	export ZENOH_SESSION_CONFIG_URI="$(pwd)/zenoh_ope.json5" && ros2 topic list
+
+# ロボットから証明書を取得 (例: just get-cert 10.42.0.1)
+get-cert robot_ip:
+	mkdir -p quic
+	scp yano@{{robot_ip}}:~/rustacean_roborescue/main_ws/src/bringup/config/quic/server.crt quic/server.crt
+
+# ── 開発用 ──
+
+build:
+	colcon build --merge-install --symlink-install
+
+clean:
+	rm -rf build/ install/ log/

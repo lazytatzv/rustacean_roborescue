@@ -43,7 +43,7 @@ def _build_network_actions(context):
         actions.append(SetEnvironmentVariable("LD_LIBRARY_PATH", patched_ld_library_path))
 
     # Config paths
-    zenoh_robot_config = os.path.abspath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
+    zenoh_robot_config = os.path.realpath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
 
     # Certificates paths - Final fixed locations
     # 1. 実際の実行で使われる場所 (install内)
@@ -54,32 +54,71 @@ def _build_network_actions(context):
     os.makedirs(project_quic_dir, exist_ok=True)
     cert = os.path.join(project_quic_dir, "server.crt")
     key = os.path.join(project_quic_dir, "server.key")
+    ca_cert = os.path.join(project_quic_dir, "ca.crt")
+    ca_key = os.path.join(project_quic_dir, "ca.key")
 
     quic_available = True
-    if not os.path.isfile(cert) or not os.path.isfile(key):
+    if not os.path.isfile(cert) or not os.path.isfile(key) or not os.path.isfile(ca_cert):
         try:
-            # Generate a compatible End-Entity cert for QUIC (not a CA)
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.conf') as f:
-                f.write("[req]\ndistinguished_name=req_distinguished_name\nx509_extensions=v3_req\nprompt=no\n")
-                f.write("[req_distinguished_name]\nCN=roborescue-zenoh-quic\n")
-                f.write("[v3_req]\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.42.0.1,IP:100.114.200.30\n")
-                f.flush()
-                
+            # 1. CA 証明書の生成 (CA:TRUE)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.conf') as f_ca:
+                f_ca.write("[req]\ndistinguished_name=req_distinguished_name\nx509_extensions=v3_ca\nprompt=no\n")
+                f_ca.write("[req_distinguished_name]\nCN=roborescue-ca\n")
+                f_ca.write("[v3_ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,digitalSignature,keyCertSign\n")
+                f_ca.flush()
                 subprocess.run(
                     [
                         "openssl", "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes", "-days", "3650",
-                        "-keyout", key, "-out", cert, "-config", f.name
+                        "-keyout", ca_key, "-out", ca_cert, "-config", f_ca.name
                     ],
                     check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                 )
-            actions.append(LogInfo(msg="[network.launch] generated high-compatibility QUIC TLS cert/key"))
+
+            # 2. サーバー証明書の生成 (CA:FALSE, signed by CA)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.conf') as f_srv:
+                f_srv.write("[req]\ndistinguished_name=req_distinguished_name\nreq_extensions=v3_req\nprompt=no\n")
+                f_srv.write("[req_distinguished_name]\nCN=roborescue-server\n")
+                f_srv.write("[v3_req]\nbasicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n"
+                            "extendedKeyUsage=serverAuth,clientAuth\n"
+                            "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.42.0.1,IP:100.114.200.30\n")
+                f_srv.flush()
+                
+                # CSR 生成
+                csr = cert + ".csr"
+                subprocess.run(
+                    [
+                        "openssl", "req", "-new", "-keyout", key, "-out", csr, "-nodes", "-config", f_srv.name
+                    ],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                
+                # CA で署名 (有効期間開始を1日前にずらす)
+                subprocess.run(
+                    [
+                        "openssl", "x509", "-req", "-in", csr, "-CA", ca_cert, "-CAkey", ca_key,
+                        "-CAcreateserial", "-out", cert, "-days", "3650", "-sha256",
+                        "-extfile", f_srv.name, "-extensions", "v3_req"
+                    ],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                os.remove(csr)
+
+            actions.append(LogInfo(msg="[network.launch] generated high-compatibility CA and Server certs"))
             
-            # ソースディレクトリへコピー (これで scp が通るようになる)
+            # ソースディレクトリへコピー
+            # 互換性のため、operator 用の server.crt はロボットの ca.crt をコピーして使う
             if os.path.isdir(os.path.dirname(src_quic_dir)):
                 os.makedirs(src_quic_dir, exist_ok=True)
-                shutil.copy2(cert, os.path.join(src_quic_dir, "server.crt"))
+                shutil.copy2(ca_cert, os.path.join(src_quic_dir, "server.crt"))
                 shutil.copy2(key, os.path.join(src_quic_dir, "server.key"))
-                actions.append(LogInfo(msg=f"[network.launch] synced certs to {src_quic_dir} for scp"))
+                actions.append(LogInfo(msg=f"[network.launch] synced CA cert to {src_quic_dir} for operator"))
+
+            # operator_ws へのコピー (ローカル実行用)
+            operator_quic_dir = os.path.abspath(os.path.join(bringup_dir, "..", "..", "..", "..", "operator_ws", "quic"))
+            if os.path.isdir(os.path.dirname(operator_quic_dir)):
+                os.makedirs(operator_quic_dir, exist_ok=True)
+                shutil.copy2(ca_cert, os.path.join(operator_quic_dir, "server.crt"))
+                actions.append(LogInfo(msg=f"[network.launch] synced CA cert to {operator_quic_dir}"))
         except Exception as e:
             quic_available = False
             actions.append(LogInfo(msg=f"[network.launch] failed to prepare QUIC TLS assets: {e}"))
@@ -98,15 +137,18 @@ def _build_network_actions(context):
     else:
         router_config_for_launch = tcp_only_cfg
 
+    # 接続イベントを表示するために RUST_LOG を設定 (info で十分)
     router_cmd = (
         "pkill -9 -x zenohd || true; "
         "while true; do "
+        "  RUST_LOG=info "
         "  zenohd --config " + shlex.quote(router_config_for_launch) + " || zenohd --config " + shlex.quote(tcp_only_cfg) + "; "
         "  sleep 2; "
         "done"
     )
 
     actions.extend([
+        # SetEnvironmentVariable("LD_LIBRARY_PATH", patched_ld_library_path),
         SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
         SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
         SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", zenoh_robot_config),

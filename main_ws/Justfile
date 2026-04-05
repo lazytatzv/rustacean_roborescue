@@ -117,15 +117,16 @@ mm:
 sim:
 	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && export LIBGL_ALWAYS_SOFTWARE=1 && export MESA_GL_VERSION_OVERRIDE=3.3 && export MESA_GLSL_VERSION_OVERRIDE=330 && export QT_QPA_PLATFORM=xcb && export GZ_PARTITION=roborescue && export IGN_PARTITION=roborescue && export GZ_IP=127.0.0.1 && export IGN_IP=127.0.0.1 && ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=false use_gz_gui:=false use_rviz:=true use_sim_time:=true spawn_delay_sec:=15.0
 
-# Deploy Zenoh TLS certificates from install to src for persistence
-setup-zenoh-certs:
-	mkdir -p src/bringup/config/quic/
-	mkdir -p ../operator_ws/quic/
-	if [ -f install/share/bringup/config/quic/server.key ]; then \
-		cp install/share/bringup/config/quic/server.key src/bringup/config/quic/; \
-	fi
-	if [ -f install/share/bringup/config/quic/server.crt ]; then \
-		cp install/share/bringup/config/quic/server.crt src/bringup/config/quic/; \
-		cp install/share/bringup/config/quic/server.crt ../operator_ws/quic/; \
-	fi
-	@echo "Zenoh certificates deployed to src/ directories."
+# ── Zenoh Utils ──
+
+# 環境変数を設定するためのコマンドを出力する (eval $(just set-env) で使用)
+set-env:
+	@echo "export ZENOH_SESSION_CONFIG_URI=$(realpath install/share/bringup/config/zenoh_robot.json5)"
+
+# 直接トピックリストを表示する
+topics:
+	export ZENOH_SESSION_CONFIG_URI="$(realpath install/share/bringup/config/zenoh_robot.json5)" && ros2 topic list
+
+# 直接トピック情報を表示する (例: just topic-info /joy)
+topic-info topic:
+	export ZENOH_SESSION_CONFIG_URI="$(realpath install/share/bringup/config/zenoh_robot.json5)" && ros2 topic info -v {{topic}}

@@ -175,7 +175,7 @@ def generate_launch_description():
     # )
 
         # Zenoh設定ファイルの絶対パスを確定
-        zenoh_robot_config = os.path.abspath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
+        zenoh_robot_config = os.path.realpath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
 
         actions = [
             LogInfo(msg="[system.launch] starting with fail-safe guards"),

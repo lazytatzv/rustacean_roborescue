@@ -41,9 +41,9 @@ cameras:
     driver: v4l2
     enabled: true
     device: /dev/video0
-    width: 640
-    height: 480
-    fps: 10
+    width: 320
+    height: 240
+    fps: 5
     pixel_format: YUYV
     frame_id: front_camera_link
     use_qr: true
@@ -53,11 +53,11 @@ cameras:
   # バックカメラ: BUFFALO USB 2.0 Camera (usb-0000:00:14.0-3.1.4.4)
   - name: back
     driver: v4l2
-    enabled: true
+    enabled: false
     device: /dev/video2
     width: 320
     height: 240
-    fps: 10
+    fps: 5
     pixel_format: YUYV
     frame_id: back_camera_link
     use_qr: false
@@ -67,11 +67,11 @@ cameras:
   # アームカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.4)
   - name: arm
     driver: v4l2
-    enabled: true
+    enabled: false
     device: /dev/video4
     width: 320
     height: 240
-    fps: 10
+    fps: 5
     pixel_format: YUYV
     frame_id: arm_camera_link
     use_qr: true
@@ -85,7 +85,7 @@ cameras:
     width: 640
     height: 480
     fps: 15
-    pixel_format: YUYV
+    pixel_format: MJPG
     frame_id: left_camera_link
     use_qr: false
     encoder: libx264
@@ -98,7 +98,7 @@ cameras:
     width: 640
     height: 480
     fps: 15
-    pixel_format: YUYV
+    pixel_format: MJPG
     frame_id: right_camera_link
     use_qr: false
     encoder: libx264
