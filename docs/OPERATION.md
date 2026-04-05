@@ -157,7 +157,9 @@ just operator-up-min
 
 ### 4.3 Foxglove Studio の設定
 
-1. Foxglove Studio を起動
+1. **Foxglove Studio を起動**
+   - **インストール済みの場合**: アプリを起動。
+   - **Docker を使う場合 (推奨)**: リポジトリルートで `just foxglove` を実行し、ブラウザで `http://localhost:8080` を開く。
 2. 「Open connection」→「Foxglove WebSocket」→ `ws://127.0.0.1:8765`
 3. カメラ映像: 「+」→「Video」パネル→ トピックに `/camera/image_raw/foxglove_video`
   （または `/camera_front/compressed_video`）を選択

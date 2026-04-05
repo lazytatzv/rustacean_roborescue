@@ -288,3 +288,13 @@ mm:
 	mmdc -i topology/network_topology.mmd -o docs/images/network_topology.png -s 3 -p .puppeteer-config.json
 	@rm .puppeteer-config.json
 	@echo "Topology diagrams generated in docs/images/"
+
+# Start Foxglove Studio (Web version) via Docker
+foxglove:
+	@echo "Starting Foxglove Studio on http://localhost:8080 ..."
+	docker compose up -d foxglove
+	@echo "Foxglove is running. Open your browser and go to http://localhost:8080"
+
+# Stop Foxglove Studio
+foxglove-down:
+	docker compose stop foxglove
