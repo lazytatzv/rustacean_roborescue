@@ -327,6 +327,9 @@ class CrawlerDriver : public rclcpp::Node
     declare_parameter("m2_ki", 0.020);
     declare_parameter("m2_kd", 0.0);
     declare_parameter("m2_qpps", 50062);
+    // Motor direction sign (+1 or -1). Use when wiring/gear orientation differs.
+    declare_parameter("m1_direction_sign", 1);
+    declare_parameter("m2_direction_sign", 1);
 
     // ── スタック保護パラメータ ────────────────────────────────────────────
     // 指令速度に対して実速度がこの割合以下ならスタックとみなす
@@ -416,6 +419,8 @@ class CrawlerDriver : public rclcpp::Node
   int m1_qpps_;
   double m2_kp_, m2_ki_, m2_kd_;
   int m2_qpps_;
+  int m1_direction_sign_;
+  int m2_direction_sign_;
 
   double stall_error_ratio_;
   int stall_cmd_threshold_qpps_;
@@ -471,6 +476,8 @@ class CrawlerDriver : public rclcpp::Node
     m2_ki_ = get_parameter("m2_ki").as_double();
     m2_kd_ = get_parameter("m2_kd").as_double();
     m2_qpps_ = get_parameter("m2_qpps").as_int();
+    m1_direction_sign_ = normalizeDirectionSign(get_parameter("m1_direction_sign").as_int());
+    m2_direction_sign_ = normalizeDirectionSign(get_parameter("m2_direction_sign").as_int());
 
     stall_error_ratio_ = get_parameter("stall_error_ratio").as_double();
     stall_cmd_threshold_qpps_ = get_parameter("stall_cmd_threshold_qpps").as_int();
@@ -488,6 +495,15 @@ class CrawlerDriver : public rclcpp::Node
     }
 
     if (debug_log_period_ms_ <= 0) debug_log_period_ms_ = 200;
+
+    RCLCPP_INFO(get_logger(), "Motor direction signs: m1=%d m2=%d", m1_direction_sign_,
+                m2_direction_sign_);
+  }
+
+  int normalizeDirectionSign(int value)
+  {
+    if (value >= 0) return 1;
+    return -1;
   }
 
   void tryConnect()
@@ -663,15 +679,18 @@ class CrawlerDriver : public rclcpp::Node
   {
     if (!hw_connected_) return;
 
-    m1_cmd_qpps_ = static_cast<int32_t>(m1_vel * counts_per_meter_);
-    m2_cmd_qpps_ = static_cast<int32_t>(m2_vel * counts_per_meter_);
+    m1_cmd_qpps_ = static_cast<int32_t>(m1_vel * counts_per_meter_) * m1_direction_sign_;
+    m2_cmd_qpps_ = static_cast<int32_t>(m2_vel * counts_per_meter_) * m2_direction_sign_;
+
+    const int32_t m1_actual_qpps = telemetry_.m1_speed_qpps * m1_direction_sign_;
+    const int32_t m2_actual_qpps = telemetry_.m2_speed_qpps * m2_direction_sign_;
 
     // スタック検出 (テレメトリが有効な場合のみ)
     const double dt = watchdog_timeout_ms_ / 1000.0;  // 近似 dt
     if (telemetry_.valid)
     {
-      updateStall(m1_stall_, m1_cmd_qpps_, telemetry_.m1_speed_qpps, dt);
-      updateStall(m2_stall_, m2_cmd_qpps_, telemetry_.m2_speed_qpps, dt);
+      updateStall(m1_stall_, m1_cmd_qpps_, m1_actual_qpps, dt);
+      updateStall(m2_stall_, m2_cmd_qpps_, m2_actual_qpps, dt);
     }
 
     // stall scale を publish
@@ -692,8 +711,8 @@ class CrawlerDriver : public rclcpp::Node
           get_logger(), *get_clock(), debug_log_period_ms_,
           "[debug_io] cmd_vel=(%.3f, %.3f) qpps_raw=(%d, %d) qpps_out=(%d, %d) actual=(%d, %d)"
           " stall=(%.2f, %.2f)",
-          m1_vel, m2_vel, m1_cmd_qpps_, m2_cmd_qpps_, m1, m2, telemetry_.m1_speed_qpps,
-          telemetry_.m2_speed_qpps, m1_stall_.scale, m2_stall_.scale);
+          m1_vel, m2_vel, m1_cmd_qpps_, m2_cmd_qpps_, m1, m2, m1_actual_qpps, m2_actual_qpps,
+          m1_stall_.scale, m2_stall_.scale);
     }
 
     const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
