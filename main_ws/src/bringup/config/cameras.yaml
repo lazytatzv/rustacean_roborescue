@@ -50,7 +50,7 @@ cameras:
     encoder: libx264
     bitrate: 1000000
 
-  # バックカメラ: BUFFALO USB 2.0 Camera (usb-0000:00:14.0-3.1.4.4)
+  # バックカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.1)
   - name: back
     driver: v4l2
     enabled: false
@@ -107,15 +107,16 @@ cameras:
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   - name: theta
     driver: theta_s
-    device: /dev/video4
+    enabled: false
+    device: /dev/video1
     width: 1280
     height: 720
     fps: 15
-    enabled: false
+    pixel_format: MJPG
     frame_id: theta_camera_link
     use_qr: false
     encoder: libx264
-    bitrate: 4000000
+    bitrate: 2000000
 
   # ── RealSense ─────────────────────────────────────────────────────────────
   - name: realsense_arm
