@@ -218,11 +218,8 @@ dxl-scan-flipper *extra_args:
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
     env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
   else \
-    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
-    python3 -m venv tools/maintenance/.venv; \
-    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
-    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
+    echo "[dxl-scan] Error: 'uv' or 'nix' is required. Please install 'uv' or enter the nix environment."; \
+    exit 1; \
   fi
 
 dxl-scan-arm *extra_args:
@@ -232,11 +229,8 @@ dxl-scan-arm *extra_args:
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
     env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
   else \
-    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
-    python3 -m venv tools/maintenance/.venv; \
-    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
-    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --baud 1000000 --both-protocols --allow-empty {{extra_args}}; \
+    echo "[dxl-scan] Error: 'uv' or 'nix' is required. Please install 'uv' or enter the nix environment."; \
+    exit 1; \
   fi
 
 dxl-scan-flipper-sweep:
@@ -246,11 +240,8 @@ dxl-scan-flipper-sweep:
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
     env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
   else \
-    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
-    python3 -m venv tools/maintenance/.venv; \
-    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
-    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+    echo "[dxl-scan] Error: 'uv' or 'nix' is required. Please install 'uv' or enter the nix environment."; \
+    exit 1; \
   fi
 
 dxl-scan-arm-sweep:
@@ -260,11 +251,8 @@ dxl-scan-arm-sweep:
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
     env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
   else \
-    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
-    python3 -m venv tools/maintenance/.venv; \
-    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
-    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+    echo "[dxl-scan] Error: 'uv' or 'nix' is required. Please install 'uv' or enter the nix environment."; \
+    exit 1; \
   fi
 
 # Faster sweeps for bring-up: narrow ID range + common baud rates only
@@ -275,11 +263,8 @@ dxl-scan-flipper-fast:
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
     env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
   else \
-    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
-    python3 -m venv tools/maintenance/.venv; \
-    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
-    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 32 --allow-empty; \
+    echo "[dxl-scan] Error: 'uv' or 'nix' is required. Please install 'uv' or enter the nix environment."; \
+    exit 1; \
   fi
 
 dxl-scan-arm-fast:
@@ -289,11 +274,8 @@ dxl-scan-arm-fast:
     echo "[dxl-scan] uv not found. Falling back to nix develop + uv."; \
     env -u PYTHONPATH -u VIRTUAL_ENV nix develop --accept-flake-config --command env -u PYTHONPATH -u VIRTUAL_ENV uv run --project tools/maintenance python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
   else \
-    echo "[dxl-scan] uv not found. Falling back to Python venv bootstrap."; \
-    python3 -m venv tools/maintenance/.venv; \
-    tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
-    tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
+    echo "[dxl-scan] Error: 'uv' or 'nix' is required. Please install 'uv' or enter the nix environment."; \
+    exit 1; \
   fi
 
 # ── Diagrams (Mermaid) ──
