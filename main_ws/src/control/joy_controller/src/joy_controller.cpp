@@ -213,12 +213,13 @@ class JoyController : public rclcpp::Node
     }
     else
     {
-      const bool wants_drive =
-          std::abs(axis(msg, AXIS_LEFT_Y)) > deadzone_ || std::abs(axis(msg, AXIS_RIGHT_Y)) > deadzone_;
+      const bool wants_drive = std::abs(axis(msg, AXIS_LEFT_Y)) > deadzone_ ||
+                               std::abs(axis(msg, AXIS_RIGHT_Y)) > deadzone_;
       if (wants_drive)
       {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                             "Drive input ignored in STOP mode. Press OPTIONS to enter DRIVE mode.");
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 2000,
+            "Drive input ignored in STOP mode. Press OPTIONS to enter DRIVE mode.");
       }
     }
     crawler_publisher_->publish(crawler_msg);

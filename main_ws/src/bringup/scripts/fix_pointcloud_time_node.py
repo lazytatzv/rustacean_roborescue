@@ -26,7 +26,9 @@ def _fields_dtype(fields, point_step: int) -> np.dtype:
         names.append(f.name)
         formats.append(_FIELD_TYPE_TO_NUMPY[f.datatype])
         offsets.append(f.offset)
-    return np.dtype({"names": names, "formats": formats, "offsets": offsets, "itemsize": point_step})
+    return np.dtype(
+        {"names": names, "formats": formats, "offsets": offsets, "itemsize": point_step}
+    )
 
 
 class FixPointCloudTimeNode(Node):
@@ -59,7 +61,9 @@ class FixPointCloudTimeNode(Node):
             arr = np.frombuffer(bytes(msg.data), dtype=dtype).copy()
 
             # アジマス角を一括ベクトル演算
-            azimuth_deg = np.degrees(np.arctan2(arr["y"].astype(np.float64), arr["x"].astype(np.float64)))
+            azimuth_deg = np.degrees(
+                np.arctan2(arr["y"].astype(np.float64), arr["x"].astype(np.float64))
+            )
             azimuth_deg[azimuth_deg < 0] += 360.0
             arr["time"] = ((azimuth_deg / 360.0) * _SCAN_DURATION_MS).astype(arr.dtype["time"])
 

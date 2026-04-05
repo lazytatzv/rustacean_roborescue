@@ -56,19 +56,27 @@ def generate_launch_description() -> LaunchDescription:
     availability_warnings = []
     if crawler_port and not crawler_available:
         availability_warnings.append(
-            LogInfo(msg=f"[WARN][control.launch] crawler device not found: {crawler_port} -> disabling crawler")
+            LogInfo(
+                msg=f"[WARN][control.launch] crawler device not found: {crawler_port} -> disabling crawler"
+            )
         )
     if flipper_port and not flipper_available:
         availability_warnings.append(
-            LogInfo(msg=f"[WARN][control.launch] flipper device not found: {flipper_port} -> disabling flipper")
+            LogInfo(
+                msg=f"[WARN][control.launch] flipper device not found: {flipper_port} -> disabling flipper"
+            )
         )
     if sensor_port and not sensor_available:
         availability_warnings.append(
-            LogInfo(msg=f"[WARN][control.launch] imu gateway device not found: {sensor_port} -> disabling imu gateway")
+            LogInfo(
+                msg=f"[WARN][control.launch] imu gateway device not found: {sensor_port} -> disabling imu gateway"
+            )
         )
     if arm_port and not arm_available:
         availability_warnings.append(
-            LogInfo(msg=f"[WARN][control.launch] arm device not found: {arm_port} -> disabling arm drivers")
+            LogInfo(
+                msg=f"[WARN][control.launch] arm device not found: {arm_port} -> disabling arm drivers"
+            )
         )
 
     # ── Launch arguments ──────────────────────────────────────────────────
@@ -133,7 +141,7 @@ def generate_launch_description() -> LaunchDescription:
             "dxl_model",
         )
         robot_description = _load_robot_description(dxl_model_folder)
-    except Exception as e:
+    except Exception:
         ros2_control_available = False
         ros2_control_warning = LogInfo(
             msg=(
@@ -235,7 +243,10 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(
             PythonExpression(
                 [
-                    "'", LaunchConfiguration("use_arm"), "' == 'true' and ", str(arm_available),
+                    "'",
+                    LaunchConfiguration("use_arm"),
+                    "' == 'true' and ",
+                    str(arm_available),
                     " and ('",
                     LaunchConfiguration("arm_backend"),
                     "' != 'ros2_control' or not ",

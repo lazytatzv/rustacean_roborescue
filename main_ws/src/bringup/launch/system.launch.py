@@ -12,7 +12,12 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+    SetEnvironmentVariable,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
@@ -139,9 +144,13 @@ def generate_launch_description():
                     condition=IfCondition(
                         PythonExpression(
                             [
-                                "'", use_crawler, "' == 'false' and '",
-                                use_arm, "' == 'false' and '",
-                                use_flipper, "' == 'false'",
+                                "'",
+                                use_crawler,
+                                "' == 'false' and '",
+                                use_arm,
+                                "' == 'false' and '",
+                                use_flipper,
+                                "' == 'false'",
                             ]
                         )
                     ),
@@ -157,25 +166,27 @@ def generate_launch_description():
                 )
             )
 
-    # foxglove bridgeはOperator側で立ち上げる想定
-    # # Foxglove Bridge — Foxglove Studio が WebSocket (ws://robot_ip:8765) で接続
-    # foxglove_bridge_node = Node(
-    #     package='foxglove_bridge',
-    #     executable='foxglove_bridge',
-    #     name='foxglove_bridge',
-    #     output='screen',
-    #     parameters=[{
-    #         'port': 8765,
-    #         'address': '0.0.0.0',
-    #         'send_buffer_limit': 10000000,       # 10 MB
-    #         'max_qos_depth': 10,
-    #         'num_threads': 0,                    # 0 = auto
-    #         'use_compression': False,
-    #     }],
-    # )
+        # foxglove bridgeはOperator側で立ち上げる想定
+        # # Foxglove Bridge — Foxglove Studio が WebSocket (ws://robot_ip:8765) で接続
+        # foxglove_bridge_node = Node(
+        #     package='foxglove_bridge',
+        #     executable='foxglove_bridge',
+        #     name='foxglove_bridge',
+        #     output='screen',
+        #     parameters=[{
+        #         'port': 8765,
+        #         'address': '0.0.0.0',
+        #         'send_buffer_limit': 10000000,       # 10 MB
+        #         'max_qos_depth': 10,
+        #         'num_threads': 0,                    # 0 = auto
+        #         'use_compression': False,
+        #     }],
+        # )
 
         # Zenoh設定ファイルの絶対パスを確定
-        zenoh_robot_config = os.path.realpath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
+        zenoh_robot_config = os.path.realpath(
+            os.path.join(bringup_dir, "config", "zenoh_robot.json5")
+        )
 
         actions = [
             LogInfo(msg="[system.launch] starting with fail-safe guards"),
@@ -196,7 +207,6 @@ def generate_launch_description():
             SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
             SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
             SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", zenoh_robot_config),
-            
             # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
             *robot_state_publisher_actions,
             # 1. Foxglove Bridge (WebSocket :8765)

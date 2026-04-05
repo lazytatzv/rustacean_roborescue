@@ -537,15 +537,15 @@ class CrawlerDriver : public rclcpp::Node
     if (!roboclaw_.connect(port, baud_rate_))
     {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
-                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...", port.c_str(),
-                           baud_rate_);
+                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...",
+                           port.c_str(), baud_rate_);
       return;
     }
 
     if (debug_io_)
     {
-      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d", port.c_str(),
-                  baud_rate_);
+      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d",
+                  port.c_str(), baud_rate_);
     }
 
     if (!initHardware())
@@ -571,12 +571,12 @@ class CrawlerDriver : public rclcpp::Node
     ok &= roboclaw_.setPIDConstants(CMD_SET_M2_PID, m2_kp_, m2_ki_, m2_kd_, m2_qpps_);
 
     const bool should_reset_encoders =
-      reset_encoders_on_connect_ && (!has_connected_once_ || reset_encoders_on_reconnect_);
+        reset_encoders_on_connect_ && (!has_connected_once_ || reset_encoders_on_reconnect_);
     if (should_reset_encoders)
     {
       ok &= roboclaw_.resetEncoders();
       RCLCPP_INFO(get_logger(), "Encoders reset (%s)",
-            has_connected_once_ ? "reconnect" : "startup");
+                  has_connected_once_ ? "reconnect" : "startup");
     }
 
     // ハードウェア電流制限 (0 はスキップ)
@@ -659,10 +659,10 @@ class CrawlerDriver : public rclcpp::Node
 
     pub_f64(pub_m1_current_, telemetry_.m1_current_ma);
     pub_f64(pub_m2_current_, telemetry_.m2_current_ma);
-        pub_f64(pub_m1_speed_actual_,
-          static_cast<double>(telemetry_.m1_speed_qpps * m1_direction_sign_));
-        pub_f64(pub_m2_speed_actual_,
-          static_cast<double>(telemetry_.m2_speed_qpps * m2_direction_sign_));
+    pub_f64(pub_m1_speed_actual_,
+            static_cast<double>(telemetry_.m1_speed_qpps * m1_direction_sign_));
+    pub_f64(pub_m2_speed_actual_,
+            static_cast<double>(telemetry_.m2_speed_qpps * m2_direction_sign_));
     pub_f64(pub_temperature_, telemetry_.temperature_c);
     pub_f64(pub_battery_voltage_, telemetry_.battery_volts);
 
@@ -833,9 +833,10 @@ class CrawlerDriver : public rclcpp::Node
     roboclaw_.disconnect();
     if (connect_timer_) connect_timer_->reset();
 
-    RCLCPP_ERROR(get_logger(),
-                 "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
-                 reason);
+    RCLCPP_ERROR(
+        get_logger(),
+        "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
+        reason);
 
     if (debug_io_)
     {
