@@ -24,8 +24,10 @@ constexpr uint8_t CMD_M2_VELOCITY = 36;
 constexpr uint8_t CMD_SET_M1_PID = 28;
 constexpr uint8_t CMD_SET_M2_PID = 29;
 constexpr uint8_t CMD_RESET_ENCODERS = 20;
-constexpr uint8_t CMD_READ_M1_SPEED = 18;
-constexpr uint8_t CMD_READ_M2_SPEED = 19;
+//constexpr uint8_t CMD_READ_M1_SPEED = 18;
+//constexpr uint8_t CMD_READ_M2_SPEED = 19;
+constexpr uint8_t CMD_READ_M1_SPEED = 30;
+constexpr uint8_t CMD_READ_M2_SPEED = 31;
 constexpr uint8_t CMD_READ_CURRENTS = 49;
 constexpr uint8_t CMD_READ_TEMPERATURE = 47;
 constexpr uint8_t CMD_READ_MAIN_VOLTAGE = 90;
@@ -696,8 +698,9 @@ class CrawlerDriver : public rclcpp::Node
           telemetry_.m2_speed_qpps, m1_stall_.scale, m2_stall_.scale);
     }
 
-    const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
+    //const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
     const bool ok2 = roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, m2);
+    const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
     if (!ok1) RCLCPP_ERROR(get_logger(), "Failed to send M1 command");
     if (!ok2) RCLCPP_ERROR(get_logger(), "Failed to send M2 command");
     if (!ok1 || !ok2)

@@ -1,6 +1,6 @@
 crawler_driver:
   ros__parameters:
-    serial_port: "/dev/roboclaw" # ここはudevで名前を縛る必要がある
+    serial_port: "/dev/ttyACM1" # ここはudevで名前を縛る必要がある
     baud_rate: 115200 # Roboclaw本体設定に合わせる
     crawler_circumference: 0.39
     counts_per_rev: 256
@@ -39,5 +39,5 @@ crawler_driver:
     telemetry_hz: 10
 
     # ── デバッグ出力 (切り分け時のみ true 推奨) ─────────────────────────────
-    debug_io: false
+    debug_io: true
     debug_log_period_ms: 200
