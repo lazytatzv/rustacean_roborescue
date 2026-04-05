@@ -160,7 +160,7 @@ graph LR
     HW_vlp16 -- "Ethernet (UDP)" --> T_raw_pts
     T_raw_pts --> spark_lio & pc2ls
     T_raw_pts -.-> kiss_icp
-    
+
     T_imu_h --> odom_sel
     spark_lio --> odom_sel
     kiss_icp -.-> odom_sel
@@ -190,7 +190,7 @@ graph LR
     TF_map_odom["map → odom<br/>(slam_toolbox)"]:::tf_style
     TF_odom_base["odom → base_link<br/>(spark_fast_lio OR kiss_icp)"]:::tf_style
     TF_base_all["base_link → sensors/links<br/>(robot_state_publisher)"]:::tf_style
-    
+
     TF_fallback["odom → base_link<br/>odom_base_fallback_tf<br/>(Activates if LiDAR disabled)"]:::fallback_style
 
     TF_map_odom --- TF_odom_base --- TF_base_all

@@ -60,7 +60,7 @@ just topic-info /joy
 
 ## Security (mTLS)
 
-The operator station uses **Mutual TLS** for the QUIC transport. 
+The operator station uses **Mutual TLS** for the QUIC transport.
 - The robot acts as the CA and issues its own server certificate.
 - The operator must have the robot's `ca.crt` (saved as `quic/server.crt`) to verify the connection.
 - This prevents unauthorized peers from subscribing to sensitive robot data or sending malicious control commands.

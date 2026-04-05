@@ -7,11 +7,12 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
 def _build_operator_actions(context):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     # operator_ws 直下を探す
     repo_root = os.path.dirname(this_dir)
-    
+
     # 証明書の場所を特定
     project_cert = os.path.join(repo_root, "quic", "server.crt")
     # もし見つからなければ、指示された scp 先を想定
@@ -53,6 +54,7 @@ def _build_operator_actions(context):
         SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0"),
     ]
 
+
 def generate_launch_description():
     use_audio = DeclareLaunchArgument("use_audio", default_value="true")
     use_joy = DeclareLaunchArgument("use_joy", default_value="true")
@@ -64,27 +66,43 @@ def generate_launch_description():
     foxglove_port = DeclareLaunchArgument("foxglove_port", default_value="8765")
 
     joy_node = Node(
-        package="joy", executable="joy_node", name="joy_node",
+        package="joy",
+        executable="joy_node",
+        name="joy_node",
         condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     foxglove_node = Node(
-        package="foxglove_bridge", executable="foxglove_bridge", name="foxglove_bridge",
+        package="foxglove_bridge",
+        executable="foxglove_bridge",
+        name="foxglove_bridge",
         condition=IfCondition(LaunchConfiguration("use_foxglove")),
-        parameters=[{
-            "port": LaunchConfiguration("foxglove_port"),
-            "address": LaunchConfiguration("foxglove_address"),
-        }],
+        parameters=[
+            {
+                "port": LaunchConfiguration("foxglove_port"),
+                "address": LaunchConfiguration("foxglove_address"),
+            }
+        ],
     )
 
     audio_sender = Node(
-        package="audio_bridge", executable="audio_sender", name="operator_audio_sender",
+        package="audio_bridge",
+        executable="audio_sender",
+        name="operator_audio_sender",
         condition=IfCondition(LaunchConfiguration("use_audio")),
-        parameters=[{"topic": "/operator/audio", "device": LaunchConfiguration("ope_mic_device"), "bitrate": LaunchConfiguration("bitrate")}],
+        parameters=[
+            {
+                "topic": "/operator/audio",
+                "device": LaunchConfiguration("ope_mic_device"),
+                "bitrate": LaunchConfiguration("bitrate"),
+            }
+        ],
     )
 
     audio_receiver = Node(
-        package="audio_bridge", executable="audio_receiver", name="operator_audio_receiver",
+        package="audio_bridge",
+        executable="audio_receiver",
+        name="operator_audio_receiver",
         condition=IfCondition(LaunchConfiguration("use_audio")),
         parameters=[{"topic": "/robot/audio", "device": LaunchConfiguration("ope_spk_device")}],
     )
