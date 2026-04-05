@@ -70,6 +70,7 @@ reforge: clean forge
 
 launch *launch_args:
 	ROOT=$(cd .. && pwd); \
+	export ZENOH_ROUTER_CHECK_ATTEMPTS=-1; \
 	if command -v python3 >/dev/null 2>&1 && python3 -c 'import ctypes; ctypes.CDLL("libtbb.so.12")' >/dev/null 2>&1; then \
 		cd "$ROOT/main_ws" && source install/setup.bash && ros2 launch bringup system.launch.py {{launch_args}}; \
 	elif command -v nix >/dev/null 2>&1 && [ -f "$ROOT/flake.nix" ]; then \
