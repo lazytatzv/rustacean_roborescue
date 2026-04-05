@@ -121,11 +121,11 @@ class FlipperDriver : public rclcpp::Node
         RCLCPP_WARN(get_logger(), "Failed to set wheel mode for ID %ld. Retrying...", id);
         return;
       }
-      if (!dxl_wb_.itemWrite(id, "Velocity_Limit", velocity_limit_))
-      {
-        RCLCPP_WARN(get_logger(), "Failed to set velocity limit for ID %ld. Retrying...", id);
-        return;
-      }
+      //if (!dxl_wb_.itemWrite(id, "Velocity_Limit", velocity_limit_))
+      //{
+      //  RCLCPP_WARN(get_logger(), "Failed to set velocity limit for ID %ld. Retrying...", id);
+      //  return;
+     // }
     }
 
     initialized_ = true;
