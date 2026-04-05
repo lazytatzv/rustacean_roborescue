@@ -74,7 +74,6 @@ def generate_launch_description():
         parameters=[{
             "port": LaunchConfiguration("foxglove_port"),
             "address": LaunchConfiguration("foxglove_address"),
-            "topic_whitelist": ["^(?!/camera_)", "/camera_[^/]+/(?!(image_raw$|image_raw/ffmpeg))"],
         }],
     )
 
