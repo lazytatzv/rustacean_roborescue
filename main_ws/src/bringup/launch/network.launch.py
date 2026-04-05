@@ -2,6 +2,7 @@ import os
 import shlex
 import subprocess
 import tempfile
+import shutil
 
 from ament_index_python.packages import (
     PackageNotFoundError,
@@ -18,12 +19,10 @@ from launch.actions import (
 
 
 def _build_network_actions(context):
-    # bringupパッケージのshareディレクトリから設定ファイルの絶対パスを動的に取得
     bringup_dir = get_package_share_directory("bringup")
     actions = []
 
-    # Nix環境では rmw_zenoh_cpp の .so が LD_LIBRARY_PATH に
-    # 自動で入らないケースがあるため、起動時に補完する。
+    # LD_LIBRARY_PATH patch for Zenoh
     zenoh_lib_paths = []
     try:
         zenoh_prefix = get_package_prefix("rmw_zenoh_cpp")
@@ -32,7 +31,7 @@ def _build_network_actions(context):
             if os.path.isdir(candidate):
                 zenoh_lib_paths.append(candidate)
     except PackageNotFoundError:
-        zenoh_lib_paths = []
+        pass
 
     current_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
     ld_parts = [p for p in zenoh_lib_paths if p]
@@ -41,93 +40,60 @@ def _build_network_actions(context):
     patched_ld_library_path = ":".join(ld_parts)
 
     if patched_ld_library_path:
-        actions.append(
-            SetEnvironmentVariable("LD_LIBRARY_PATH", patched_ld_library_path)
-        )
+        actions.append(SetEnvironmentVariable("LD_LIBRARY_PATH", patched_ld_library_path))
 
-    zenoh_router_config = os.path.join(bringup_dir, "config", "zenoh_router.json5")
-    zenoh_robot_config = os.path.join(bringup_dir, "config", "zenoh_robot.json5")
+    # Config paths
+    zenoh_robot_config = os.path.abspath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
 
-    if not os.path.isfile(zenoh_router_config) or not os.path.isfile(zenoh_robot_config):
-        raise RuntimeError("[network.launch] zenoh HA config files are missing")
-
-    # ~/.ros/zenoh_quic/ に置くことでオペレーター側から scp しやすくする
-    quic_dir = os.path.join(os.path.expanduser("~"), ".ros", "zenoh_quic")
-    cert = os.path.join(quic_dir, "server.crt")
-    key = os.path.join(quic_dir, "server.key")
-    os.makedirs(quic_dir, exist_ok=True)
+    # Certificates paths - Final fixed locations
+    # 1. 実際の実行で使われる場所 (install内)
+    project_quic_dir = os.path.abspath(os.path.join(bringup_dir, "config", "quic"))
+    # 2. scp 用のソースディレクトリ
+    src_quic_dir = os.path.abspath(os.path.join(bringup_dir, "..", "..", "..", "src", "bringup", "config", "quic"))
+    
+    os.makedirs(project_quic_dir, exist_ok=True)
+    cert = os.path.join(project_quic_dir, "server.crt")
+    key = os.path.join(project_quic_dir, "server.key")
 
     quic_available = True
     if not os.path.isfile(cert) or not os.path.isfile(key):
         try:
-            subprocess.run(
-                [
-                    "openssl",
-                    "req",
-                    "-x509",
-                    "-newkey",
-                    "rsa:2048",
-                    "-sha256",
-                    "-nodes",
-                    "-days",
-                    "3650",
-                    "-subj",
-                    "/CN=roborescue-zenoh-quic",
-                    "-keyout",
-                    key,
-                    "-out",
-                    cert,
-                ],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            actions.append(LogInfo(msg="[network.launch] generated self-signed QUIC TLS cert/key"))
+            # Generate a compatible End-Entity cert for QUIC (not a CA)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.conf') as f:
+                f.write("[req]\ndistinguished_name=req_distinguished_name\nx509_extensions=v3_req\nprompt=no\n")
+                f.write("[req_distinguished_name]\nCN=roborescue-zenoh-quic\n")
+                f.write("[v3_req]\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.42.0.1,IP:100.114.200.30\n")
+                f.flush()
+                
+                subprocess.run(
+                    [
+                        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes", "-days", "3650",
+                        "-keyout", key, "-out", cert, "-config", f.name
+                    ],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            actions.append(LogInfo(msg="[network.launch] generated high-compatibility QUIC TLS cert/key"))
+            
+            # ソースディレクトリへコピー (これで scp が通るようになる)
+            if os.path.isdir(os.path.dirname(src_quic_dir)):
+                os.makedirs(src_quic_dir, exist_ok=True)
+                shutil.copy2(cert, os.path.join(src_quic_dir, "server.crt"))
+                shutil.copy2(key, os.path.join(src_quic_dir, "server.key"))
+                actions.append(LogInfo(msg=f"[network.launch] synced certs to {src_quic_dir} for scp"))
         except Exception as e:
             quic_available = False
-            actions.append(
-                LogInfo(
-                    msg=(
-                        "[network.launch] failed to prepare QUIC TLS assets; "
-                        "router will run TCP-only for availability: "
-                        + str(e)
-                    )
-                )
-            )
+            actions.append(LogInfo(msg=f"[network.launch] failed to prepare QUIC TLS assets: {e}"))
 
+    # Router config (zenohd用)
     fd, tcp_only_cfg = tempfile.mkstemp(prefix="zenoh_router_tcp_fallback_", suffix=".json5")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(
-            '{\n'
-            '  mode: "router",\n'
-            '  listen: { endpoints: ["tcp/0.0.0.0:7447"] },\n'
-            '  scouting: { multicast: { enabled: false } },\n'
-            '  transport: { shared_memory: { enabled: true } }\n'
-            '}\n'
-        )
+        f.write('{\n  mode: "router",\n  listen: { endpoints: ["tcp/0.0.0.0:7447"] },\n  scouting: { multicast: { enabled: false } },\n  transport: { shared_memory: { enabled: true } }\n}\n')
 
     if quic_available:
-        # QUIC 用: 証明書の絶対パスを注入して動的生成する
-        # (zenoh_router.json5 は相対パスで書かれているため cwd 依存になるのを避ける)
         fd2, quic_cfg = tempfile.mkstemp(prefix="zenoh_router_quic_", suffix=".json5")
         with os.fdopen(fd2, "w", encoding="utf-8") as f:
-            f.write(
-                '{\n'
-                '  mode: "router",\n'
-                '  listen: { endpoints: ["quic/0.0.0.0:7447", "tcp/0.0.0.0:7447"] },\n'
-                '  scouting: { multicast: { enabled: false } },\n'
-                '  transport: {\n'
-                '    shared_memory: { enabled: true },\n'
-                '    link: {\n'
-                '      tls: {\n'
-                f'        listen_private_key: "{key}",\n'
-                f'        listen_certificate: "{cert}"\n'
-                '      }\n'
-                '    }\n'
-                '  }\n'
-                '}\n'
-            )
-        actions.append(LogInfo(msg=f"[network.launch] QUIC cert for operator: scp robot@<IP>:{cert} ./quic/server.crt"))
+            f.write('{\n  mode: "router",\n  listen: { endpoints: ["quic/0.0.0.0:7447", "tcp/0.0.0.0:7447"] },\n  scouting: { multicast: { enabled: false } },\n  transport: {\n    shared_memory: { enabled: true },\n    link: {\n      tls: {\n' + f'        listen_private_key: "{key}",\n        listen_certificate: "{cert}"\n' + '      }\n    }\n  }\n}\n')
+        actions.append(LogInfo(msg=f"[network.launch] QUIC cert for operator is ready at {src_quic_dir}/server.crt"))
         router_config_for_launch = quic_cfg
     else:
         router_config_for_launch = tcp_only_cfg
@@ -135,68 +101,20 @@ def _build_network_actions(context):
     router_cmd = (
         "pkill -9 -x zenohd || true; "
         "while true; do "
-        "  echo '[network.launch] launching local zenohd (QUIC preferred, TCP fallback) on :7447'; "
-        "  if ! zenohd --config "
-        + shlex.quote(router_config_for_launch)
-        + "; then "
-        "    echo '[network.launch] zenohd config failed on :7447; retrying TCP-only profile'; "
-        "    if ! zenohd --config "
-        + shlex.quote(tcp_only_cfg)
-        + "; then "
-        "      echo '[network.launch] zenohd failed on :7447; trying :17447'; "
-        "      _tmp_cfg=$(mktemp --suffix=.json5); "
-        "      sed 's#:7447#:17447#g' "
-        + shlex.quote(router_config_for_launch)
-        + " > \"$_tmp_cfg\"; "
-        "      if ! zenohd --config \"$_tmp_cfg\"; then "
-        "        _tmp_tcp=$(mktemp --suffix=.json5); "
-        "        sed 's#:7447#:17447#g' "
-        + shlex.quote(tcp_only_cfg)
-        + " > \"$_tmp_tcp\"; "
-        "        zenohd --config \"$_tmp_tcp\" || true; "
-        "        rm -f \"$_tmp_tcp\"; "
-        "      fi; "
-        "      rm -f \"$_tmp_cfg\"; "
-        "    fi; "
-        "  fi; "
-        "  echo '[network.launch] local zenohd exited, retrying in 2s'; "
+        "  zenohd --config " + shlex.quote(router_config_for_launch) + " || zenohd --config " + shlex.quote(tcp_only_cfg) + "; "
         "  sleep 2; "
         "done"
     )
 
-    actions.extend(
-        [
-        # ==========================================
-        # 1. RMW (ミドルウェア) の環境変数を強制上書き
-        # ==========================================
-        # このLaunchファイル（およびこれをincludeした親Launch）から
-        # 起動されるすべてのROS 2ノードは、強制的にZenohプロトコルで通信します。
+    actions.extend([
         SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
-        # ルーター起動直後でも接続待ちを続け、初期化時の取りこぼしを減らす。
         SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
-        # ROS2ノードは zenohd (client として localhost:7447 に接続) を使う。
-        SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", f"file://{zenoh_robot_config}"),
-        # ==========================================
-        # 2. Zenohルーター (zenohd) のデーモン起動
-        # ==========================================
-        # QUIC優先/TCPフォールバック構成でルーターを起動する。
-        # SHM は zenohd 側でも有効にする必要があるため --config で渡す。
-        ExecuteProcess(
-            cmd=["bash", "-lc", router_cmd],
-            output="screen",
-            respawn=False,
-            name="zenoh_router_daemon",
-            cwd=os.path.join(bringup_dir, "config"),
-        ),
-        ]
-    )
+        SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", zenoh_robot_config),
+        ExecuteProcess(cmd=["bash", "-lc", router_cmd], output="screen", name="zenoh_router_daemon", cwd=bringup_dir),
+    ])
 
     return actions
 
 
 def generate_launch_description():
-    return LaunchDescription(
-        [
-            OpaqueFunction(function=_build_network_actions),
-        ]
-    )
+    return LaunchDescription([OpaqueFunction(function=_build_network_actions)])

@@ -174,6 +174,9 @@ def generate_launch_description():
     #     }],
     # )
 
+        # Zenoh設定ファイルの絶対パスを確定
+        zenoh_robot_config = os.path.abspath(os.path.join(bringup_dir, "config", "zenoh_robot.json5"))
+
         actions = [
             LogInfo(msg="[system.launch] starting with fail-safe guards"),
             arg_use_nav2,
@@ -185,11 +188,15 @@ def generate_launch_description():
             arg_use_arm,
             arg_use_flipper,
             arg_use_imu,
-            # network.launch.py 側でも再設定するが、初期化順で取りこぼさないよう先に注入する
+            # ==========================================
+            # Zenoh / RMW 設定 (すべてのノードより前に実行)
+            # ==========================================
             SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
             SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0"),
             SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
             SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
+            SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", zenoh_robot_config),
+            
             # 0. Robot State Publisher (URDF TF: base_link→各センサ/アーム/フリッパ)
             *robot_state_publisher_actions,
             # 1. Foxglove Bridge (WebSocket :8765)

@@ -1,144 +1,97 @@
 # Operator側起動スクリプト
-# 操縦側で立ち上げるのはこれだけで完結させること
-
 import os
-
+import tempfile
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
-from launch.actions import SetEnvironmentVariable
 from launch_ros.actions import Node
 
+def _build_operator_actions(context):
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    # operator_ws 直下を探す
+    repo_root = os.path.dirname(this_dir)
+    
+    # 証明書の場所を特定
+    project_cert = os.path.join(repo_root, "quic", "server.crt")
+    # もし見つからなければ、指示された scp 先を想定
+    if not os.path.isfile(project_cert):
+        project_cert = "/home/yano/working/rustacean_roborescue/operator_ws/quic/server.crt"
+
+    # Zenoh 設定を動的に生成 (相対パス問題を完全に回避)
+    ope_cfg_content = f"""
+    {{
+      mode: "client",
+      connect: {{
+        endpoints: [
+          "quic/100.114.200.30:7447",
+          "tcp/100.114.200.30:7447",
+          "quic/10.42.0.1:7447",
+          "tcp/10.42.0.1:7447"
+        ]
+      }},
+      scouting: {{ multicast: {{ enabled: false }} }},
+      transport: {{
+        shared_memory: {{ enabled: true }},
+        link: {{
+          tls: {{
+            root_ca_certificate: "{project_cert}"
+          }}
+        }}
+      }}
+    }}
+    """
+    fd, dynamic_ope_cfg = tempfile.mkstemp(prefix="zenoh_ope_dynamic_", suffix=".json5")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(ope_cfg_content)
+
+    return [
+        SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
+        SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", dynamic_ope_cfg),
+        SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
+        SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
+        SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0"),
+    ]
 
 def generate_launch_description():
-    # Set RMW implementation and Zenoh config URI for all nodes launched here
-    # Compute zenoh config path relative to this file: ../zenoh_ope.json5
-    this_file = os.path.abspath(__file__)
-    this_dir = os.path.dirname(this_file)
-    repo_root = os.path.dirname(this_dir)
-    zenoh_config_path = os.path.join(repo_root, "zenoh_ope.json5")
-    zenoh_config_uri = f"file://{zenoh_config_path}"
-
-    set_rmw = SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp")
-    set_ros_domain = SetEnvironmentVariable("ROS_DOMAIN_ID", "0")
-    set_ros_localhost_only = SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0")
-    # ZENOH_ROUTER_CHECK_ATTEMPTS=-1 skips the router check so nodes start immediately
-    set_router_check_attempts = SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1")
-    set_zenoh_uri = SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", zenoh_config_uri)
-    # ZENOH_CONFIG_OVERRIDE: Force peer mode and disable multicast for stability, 
-    # and provide the absolute path for the TLS certificate.
-    zenoh_cert_path = os.path.join(repo_root, "quic", "server.crt")
-    set_zenoh_override = SetEnvironmentVariable(
-        "ZENOH_CONFIG_OVERRIDE",
-        f'mode="peer";scouting/multicast/enabled=false;transport/link/tls/root_ca_certificate="{zenoh_cert_path}"',
-    )
-
-    use_audio = DeclareLaunchArgument(
-        "use_audio", default_value="true", description="音声ノードを起動するか"
-    )
-    use_joy = DeclareLaunchArgument(
-        "use_joy", default_value="true", description="joy_node を起動するか"
-    )
-    use_foxglove = DeclareLaunchArgument(
-        "use_foxglove", default_value="true", description="foxglove_bridge を起動するか"
-    )
-    ope_mic_device = DeclareLaunchArgument(
-        "ope_mic_device",
-        default_value="",
-        description="オペレータ マイクの PulseAudio デバイス名 (空=デフォルト)",
-    )
-    ope_spk_device = DeclareLaunchArgument(
-        "ope_spk_device",
-        default_value="",
-        description="オペレータ スピーカーの PulseAudio デバイス名 (空=デフォルト)",
-    )
-    bitrate = DeclareLaunchArgument(
-        "bitrate", default_value="32000", description="Opus ビットレート [bps]"
-    )
-    foxglove_address = DeclareLaunchArgument(
-        "foxglove_address",
-        default_value="0.0.0.0",
-        description="foxglove_bridge bind address",
-    )
-    foxglove_port = DeclareLaunchArgument(
-        "foxglove_port",
-        default_value="8765",
-        description="foxglove_bridge WebSocket port",
-    )
+    use_audio = DeclareLaunchArgument("use_audio", default_value="true")
+    use_joy = DeclareLaunchArgument("use_joy", default_value="true")
+    use_foxglove = DeclareLaunchArgument("use_foxglove", default_value="true")
+    ope_mic_device = DeclareLaunchArgument("ope_mic_device", default_value="")
+    ope_spk_device = DeclareLaunchArgument("ope_spk_device", default_value="")
+    bitrate = DeclareLaunchArgument("bitrate", default_value="32000")
+    foxglove_address = DeclareLaunchArgument("foxglove_address", default_value="0.0.0.0")
+    foxglove_port = DeclareLaunchArgument("foxglove_port", default_value="8765")
 
     joy_node = Node(
-        package="joy",
-        executable="joy_node",
-        name="joy_node",
-        output="screen",
+        package="joy", executable="joy_node", name="joy_node",
         condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     foxglove_node = Node(
-        package="foxglove_bridge",
-        executable="foxglove_bridge",
-        name="foxglove_bridge",
-        output="screen",
+        package="foxglove_bridge", executable="foxglove_bridge", name="foxglove_bridge",
         condition=IfCondition(LaunchConfiguration("use_foxglove")),
-        parameters=[
-            {
-                "port": LaunchConfiguration("foxglove_port"),
-                "address": LaunchConfiguration("foxglove_address"),
-                "send_buffer_limit": 10000000,
-                "max_qos_depth": 10,
-                "num_threads": 0,
-                "use_compression": False,
-                # image_raw (生ピクセル) と image_raw/ffmpeg (内部変換用) を除外。
-                # front/back/arm それぞれ image_raw は 14〜42 Mbps 出るため operator 側に流さない。
-                # 代わりに compressed_video (H264) か image_raw/compressed (JPEG) を使う。
-                "topic_whitelist": [
-                    "^(?!/camera_)",                              # カメラ以外は全て通す
-                    "/camera_[^/]+/(?!(image_raw$|image_raw/ffmpeg))",  # カメラは raw/ffmpeg だけ除外
-                ],
-            }
-        ],
+        parameters=[{
+            "port": LaunchConfiguration("foxglove_port"),
+            "address": LaunchConfiguration("foxglove_address"),
+            "topic_whitelist": ["^(?!/camera_)", "/camera_[^/]+/(?!(image_raw$|image_raw/ffmpeg))"],
+        }],
     )
 
-    # マイク → /operator/audio (Zenoh 経由で NUC へ)
     audio_sender = Node(
-        package="audio_bridge",
-        executable="audio_sender",
-        name="operator_audio_sender",
-        output="screen",
+        package="audio_bridge", executable="audio_sender", name="operator_audio_sender",
         condition=IfCondition(LaunchConfiguration("use_audio")),
-        parameters=[
-            {
-                "topic": "/operator/audio",
-                "device": LaunchConfiguration("ope_mic_device"),
-                "bitrate": LaunchConfiguration("bitrate"),
-            }
-        ],
+        parameters=[{"topic": "/operator/audio", "device": LaunchConfiguration("ope_mic_device"), "bitrate": LaunchConfiguration("bitrate")}],
     )
 
-    # /robot/audio → スピーカー
     audio_receiver = Node(
-        package="audio_bridge",
-        executable="audio_receiver",
-        name="operator_audio_receiver",
-        output="screen",
+        package="audio_bridge", executable="audio_receiver", name="operator_audio_receiver",
         condition=IfCondition(LaunchConfiguration("use_audio")),
-        parameters=[
-            {
-                "topic": "/robot/audio",
-                "device": LaunchConfiguration("ope_spk_device"),
-            }
-        ],
+        parameters=[{"topic": "/robot/audio", "device": LaunchConfiguration("ope_spk_device")}],
     )
 
     ld = LaunchDescription()
-    # environment first
-    ld.add_action(set_rmw)
-    ld.add_action(set_ros_domain)
-    ld.add_action(set_ros_localhost_only)
-    ld.add_action(set_router_check_attempts)
-    ld.add_action(set_zenoh_uri)
-    ld.add_action(set_zenoh_override)
+    ld.add_action(OpaqueFunction(function=_build_operator_actions))
     ld.add_action(use_audio)
     ld.add_action(use_joy)
     ld.add_action(use_foxglove)
