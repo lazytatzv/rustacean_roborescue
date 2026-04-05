@@ -57,11 +57,19 @@ class OdomSelector(Node):
         self._pub = self.create_publisher(Odometry, "/odom", 10)
         self._tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
-        self.create_subscription(Bool, "/imu/health", self._health_cb, 10, callback_group=self._cb_group)
-        self.create_subscription(Odometry, "/spark_lio/odom", self._spark_cb, 10, callback_group=self._cb_group)
-        self.create_subscription(Odometry, "/kiss/odometry", self._kiss_cb, 10, callback_group=self._cb_group)
+        self.create_subscription(
+            Bool, "/imu/health", self._health_cb, 10, callback_group=self._cb_group
+        )
+        self.create_subscription(
+            Odometry, "/spark_lio/odom", self._spark_cb, 10, callback_group=self._cb_group
+        )
+        self.create_subscription(
+            Odometry, "/kiss/odometry", self._kiss_cb, 10, callback_group=self._cb_group
+        )
 
-        self._timeout_timer = self.create_timer(health_timeout, self._health_timeout_cb, callback_group=self._cb_group)
+        self._timeout_timer = self.create_timer(
+            health_timeout, self._health_timeout_cb, callback_group=self._cb_group
+        )
         self.create_timer(1.0, self._spark_watchdog_cb, callback_group=self._cb_group)
 
         self.get_logger().info(

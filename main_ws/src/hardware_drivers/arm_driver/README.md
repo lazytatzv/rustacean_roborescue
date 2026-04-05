@@ -9,18 +9,18 @@ Implemented in **Rust** using `rclrs` and `dynamixel2`. Designed for low-latency
 The driver uses a **Dual-Thread Design** to isolate ROS 2 overhead from hardware-critical timing:
 
 1. **ROS Node Thread**: Handles asynchronous ROS 2 subscriptions (`/arm_joint_commands`, `/gripper_cmd`, `/emergency_stop`) and buffers the latest requests.
-2. **Hardware Polling Thread**: Runs a deterministic loop at **50Hz**. 
+2. **Hardware Polling Thread**: Runs a deterministic loop at **50Hz**.
    - Uses `std::sync::mpsc` to receive commands from the ROS thread.
    - Synchronously reads/writes all motor positions in a single bus cycle using SyncRead/SyncWrite (where supported).
    - Monitors motor health (Temperature, Error status) and publishes feedback.
 
 ## Safety & Fault Handling
 
-- **Emergency Stop (E-Stop)**: 
+- **Emergency Stop (E-Stop)**:
   - Subscribes to `/emergency_stop` with `TransientLocal` durability (receives state even if node restarts).
   - On E-Stop, it immediately calls `torque_off_all()`.
   - Torque can only be re-enabled by switching the E-Stop state to `false`.
-- **Thermal Protection**: 
+- **Thermal Protection**:
   - Periodically polls internal temperature of all servos.
   - Logs warnings at $55^\circ C$.
   - **Auto-Lockout**: If any motor hits $70^\circ C$ (configurable in Dynamixel firmware), the driver forces torque-off and triggers a software E-Stop to protect the hardware.

@@ -1,6 +1,8 @@
 #ifndef QR_DETECTOR_CPP__QR_DETECTOR_NODE_HPP_
 #define QR_DETECTOR_CPP__QR_DETECTOR_NODE_HPP_
 
+#include <zbar.h>
+
 #include <cv_bridge/cv_bridge.hpp>
 #include <memory>
 #include <opencv2/opencv.hpp>
@@ -11,7 +13,6 @@
 #include <std_msgs/msg/string.hpp>
 #include <string>
 #include <vector>
-#include <zbar.h>
 
 namespace qr_detector_cpp
 {
