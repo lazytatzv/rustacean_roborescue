@@ -21,6 +21,7 @@
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixgl.url = "github:nix-community/nixGL";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -29,7 +30,7 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nix-ros-overlay, nixpkgs, rust-overlay, flake-utils, nixgl }:
+  outputs = { self, nix-ros-overlay, nixpkgs, nixpkgs-unstable, rust-overlay, flake-utils, nixgl }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -54,6 +55,12 @@
           config.permittedInsecurePackages = [
             "freeimage-3.18.0-unstable-2024-04-18"
           ];
+        };
+
+        # 最新のパッケージ (Foxglove 等) を取得するための pkgsUnstable
+        pkgsUnstable = import nixpkgs-unstable {
+          inherit system;
+          config.allowUnfree = true;
         };
 
         ROS_VERSION = "jazzy";
@@ -113,8 +120,8 @@
           fish fishPlugins.bass just
           git lazygit ripgrep fd btop zellij tmux
           nodePackages."mermaid-cli"    # topology/*.mmd 図の生成
-        ] ++ (if pkgs ? "foxglove-studio" then [ pkgs."foxglove-studio" ] else if pkgs ? "foxglove" then [ pkgs."foxglove" ] else [])
-        ++ [
+          pkgsUnstable."foxglove-studio" # HMI: 可視化ツール (Unstable から取得)
+        ] ++ [
           # --- ROS 2 ビルドインフラ (buildTools 側に置く) ---
           ros.ros-core
           ros.ament-cmake
