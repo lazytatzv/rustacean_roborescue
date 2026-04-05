@@ -76,8 +76,8 @@ graph LR
     
     ZENOH_O{{"zenohd オペレータ側<br/>QUIC connect<br/>zenoh_ope.json5<br/>(mTLS CA Cert)"}}:::proto
     
-    ZENOH_R <== "Wi-Fi / Ethernet<br/>QUIC (UDP :7447) mTLS" ==> ZENOH_O
-    ZENOH_R_FB <.- "Fallback Connection<br/>TCP :7447" .-> ZENOH_O
+    ZENOH_R == "Wi-Fi / Ethernet<br/>QUIC (UDP :7447) mTLS" == ZENOH_O
+    ZENOH_R_FB -. "Fallback Connection<br/>TCP :7447" .- ZENOH_O
   end
 
   %% =============================================
