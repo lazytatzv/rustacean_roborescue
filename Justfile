@@ -283,6 +283,8 @@ dxl-scan-arm-fast:
 # Generate system and network topology images from Mermaid files
 mm:
 	@mkdir -p docs/images
-	mmdc -i topology/system_topology.mmd -o docs/images/system_topology.png -s 3
-	mmdc -i topology/network_topology.mmd -o docs/images/network_topology.png -s 3
+	@echo '{"args": ["--no-sandbox"]}' > .puppeteer-config.json
+	mmdc -i topology/system_topology.mmd -o docs/images/system_topology.png -s 3 -p .puppeteer-config.json
+	mmdc -i topology/network_topology.mmd -o docs/images/network_topology.png -s 3 -p .puppeteer-config.json
+	@rm .puppeteer-config.json
 	@echo "Topology diagrams generated in docs/images/"
