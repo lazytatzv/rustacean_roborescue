@@ -7,8 +7,19 @@ zenoh_config := shell("pwd") + "/zenoh_ope.json5"
 default:
 	@just --list
 
-# オペレータ・ステーションを起動
+# オペレータ・ステーションを起動 (ロボットのIPを引数で指定)
 launch:
+	source install/setup.bash && ros2 launch launch/operator.launch.py
+
+# 1台のPCでテスト用 (localhost に接続)
+launch-local:
+	@mkdir -p quic
+	@if [ ! -f quic/server.crt ]; then \
+		echo "Copying local certs for testing..."; \
+		cp ../main_ws/src/bringup/config/quic/server.crt quic/server.crt; \
+	fi
+	export ZENOH_SESSION_CONFIG_URI="$(pwd)/zenoh_ope.json5" && \
+	export ZENOH_CONFIG_OVERRIDE='connect/endpoints=["quic/127.0.0.1:7447"]' && \
 	source install/setup.bash && ros2 launch launch/operator.launch.py
 
 # 環境変数を設定するためのコマンドを出力する (eval $(just set-env) で使用)
