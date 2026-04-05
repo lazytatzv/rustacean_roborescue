@@ -534,15 +534,15 @@ class CrawlerDriver : public rclcpp::Node
     if (!roboclaw_.connect(port, baud_rate_))
     {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
-                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...", port.c_str(),
-                           baud_rate_);
+                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...",
+                           port.c_str(), baud_rate_);
       return;
     }
 
     if (debug_io_)
     {
-      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d", port.c_str(),
-                  baud_rate_);
+      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d",
+                  port.c_str(), baud_rate_);
     }
 
     if (!initHardware())
@@ -572,7 +572,8 @@ class CrawlerDriver : public rclcpp::Node
     if (should_reset_encoders)
     {
       ok &= roboclaw_.resetEncoders();
-      RCLCPP_INFO(get_logger(), "Encoders reset (%s)", has_connected_once_ ? "reconnect" : "startup");
+      RCLCPP_INFO(get_logger(), "Encoders reset (%s)",
+                  has_connected_once_ ? "reconnect" : "startup");
     }
 
     // ハードウェア電流制限 (0 はスキップ)
@@ -817,9 +818,10 @@ class CrawlerDriver : public rclcpp::Node
     roboclaw_.disconnect();
     if (connect_timer_) connect_timer_->reset();
 
-    RCLCPP_ERROR(get_logger(),
-                 "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
-                 reason);
+    RCLCPP_ERROR(
+        get_logger(),
+        "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
+        reason);
 
     if (debug_io_)
     {
