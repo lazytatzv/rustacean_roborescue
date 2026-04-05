@@ -298,3 +298,17 @@ foxglove:
 # Stop Foxglove Studio
 foxglove-down:
 	docker compose stop foxglove
+
+# ── Desktop Visualization (No Browser required) ──
+
+# Quick camera view (Requires Nix shell and GUI)
+view-camera:
+	nix develop --accept-flake-config --command bash -lc 'source main_ws/install/setup.bash && rqt_image_view'
+
+# Show live node graph (Requires Nix shell and GUI)
+view-graph:
+	nix develop --accept-flake-config --command bash -lc 'source main_ws/install/setup.bash && rqt_graph'
+
+# View robot in RViz2 (Requires Nix shell and GUI)
+view-rviz:
+	nix develop --accept-flake-config --command bash -lc 'cd main_ws && source install/setup.bash && ros2 launch bringup display.launch.py'

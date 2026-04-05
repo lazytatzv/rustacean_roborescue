@@ -1033,7 +1033,19 @@ graph LR
   end
 ```
 
-詳細なトピック接続図は `topology/system_topology.mmd` を参照。
+### 4.4 システムトポロジー
+
+詳細なトピック接続図およびネットワーク構成は以下の通りです。
+
+#### システム構成図 (全ノード・全トピック)
+![System Topology](images/system_topology.png)
+> [!TIP]
+> ソースファイル: [topology/system_topology.mmd](../topology/system_topology.mmd)
+
+#### ネットワーク構成図 (Zenoh / mTLS)
+![Network Topology](images/network_topology.png)
+> [!TIP]
+> ソースファイル: [topology/network_topology.mmd](../topology/network_topology.mmd)
 
 ---
 
