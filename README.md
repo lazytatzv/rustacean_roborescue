@@ -2,7 +2,7 @@
 
 A high-performance, multi-language ROS 2 platform for rescue robots, featuring a robust **Rust** core for low-level control and **Zenoh** for low-latency remote operation.
 
-![System Topology](main_ws/topology/system_topology.png)
+![System Topology](docs/images/system_topology.png)
 
 ## Core Technologies
 
@@ -52,7 +52,7 @@ just launch
 - [Operation Manual](docs/OPERATION.md): Step-by-step guide for deployment and control.
 - [System Architecture](docs/ARCHITECTURE.md): Detailed node graph, networking, and data flow.
 - [Package Inventory](docs/PACKAGES.md): List of all modules and their roles.
-- [Networking & Security](main_ws/topology/network_topology.mmd): Mermaid diagram of the Zenoh QUIC setup.
+- [Networking & Security](topology/network_topology.mmd): Mermaid diagram of the Zenoh QUIC setup.
 
 ## License
 Apache-2.0

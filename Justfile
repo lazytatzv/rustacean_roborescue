@@ -250,7 +250,7 @@ dxl-scan-flipper-sweep:
     python3 -m venv tools/maintenance/.venv; \
     tools/maintenance/.venv/bin/python -m pip install -q -U pip; \
     tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
-    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
+    tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_flipper --baud 1000000 --both-protocols --bauds 1000000 57600 115200 2000000 3000000 4000000 --allow-empty; \
   fi
 
 dxl-scan-arm-sweep:
@@ -295,3 +295,12 @@ dxl-scan-arm-fast:
     tools/maintenance/.venv/bin/python -m pip install -q dynamixel-sdk pyserial; \
     tools/maintenance/.venv/bin/python tools/maintenance/dxl_scan.py --device /dev/dynamixel_arm --both-protocols --bauds 1000000 57600 115200 --min-id 1 --max-id 40 --allow-empty; \
   fi
+
+# ── Diagrams (Mermaid) ──
+
+# Generate system and network topology images from Mermaid files
+mm:
+	@mkdir -p docs/images
+	mmdc -i topology/system_topology.mmd -o docs/images/system_topology.png -s 3
+	mmdc -i topology/network_topology.mmd -o docs/images/network_topology.png -s 3
+	@echo "Topology diagrams generated in docs/images/"
