@@ -68,6 +68,21 @@ ros2 launch bringup simulation.launch.py
 ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=true
 ```
 
+## Tools & Zenoh Utilities
+
+To interact with the running robot over Zenoh, you can use the Just recipes to automatically configure `ZENOH_SESSION_CONFIG_URI`:
+
+```bash
+# Setup environment variables in the current shell
+eval $(just set-env)
+
+# List all active topics
+just topics
+
+# Get info about a specific topic
+just topic-info /joy
+```
+
 ## Notes On Implementation
 
 - Low-level drivers such as `arm_driver` and `sensor_gateway` are implemented in Rust for safety and recoverability.

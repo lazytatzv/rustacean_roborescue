@@ -239,24 +239,36 @@ ROS2 ノード自身が router になると `zenohd` とポート競合するた
 - `mode: "peer"`: router 一時停止中でも operator ノード自体は起動を継続しやすい
 - `connect.endpoints`: **ロボットの IP アドレスに変更必須**
 
-### 5.4 環境変数の設定
+### 5.4 環境変数の設定と証明書の取得
 
-`operator.launch.py` および `network.launch.py` が自動的に設定します:
+`operator.launch.py` および `network.launch.py` が起動時に自動的に設定しますが、手動で ROS 2 の CLI ツールを使う場合は以下のように `Justfile` のコマンドを活用してください。
 
+**ロボット側の証明書取得 (オペレータ PC)**:
+QUIC mTLS に必要な CA 証明書をロボットから取得します。
 ```bash
-export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-export ZENOH_SESSION_CONFIG_URI=file:///path/to/zenoh_xxx.json5
-export ZENOH_ROUTER_CHECK_ATTEMPTS=-1
-export ZENOH_CONFIG_OVERRIDE='mode="peer";connect/endpoints=["tcp/<ROBOT_IP>:7447"];scouting/multicast/enabled=false'
+cd operator_ws
+just get-cert 10.42.0.1
 ```
 
-手動でターミナルから ROS 2 コマンドを実行する場合は、上記を事前に設定してください。
+**手動でトピックを確認する**:
+現在のターミナルで Zenoh の環境変数を一発で設定し、トピックを確認します。
+```bash
+# 環境変数の適用
+eval $(just set-env)
+
+# トピック一覧を表示
+just topics
+
+# トピックの詳細を表示
+just topic-info /joy
+```
 
 ### 5.5 接続確認
 
 ```bash
-# トピック一覧が表示されれば接続成功
-just operator-topic-list
+cd operator_ws
+eval $(just set-env)
+just topics
 
 # /joy がリストに含まれるか確認（joy_nodeが動いていれば）
 ros2 topic echo /joy --once
@@ -425,6 +437,7 @@ sudo usermod -aG dialout $USER
 - `/camera/image_raw/foxglove_video` または `/camera_front/compressed_video` が存在するか確認:
   `ros2 topic list | grep compressed_video`
 - Foxglove Studio の **Video** パネルで上記トピックが選択されているか確認（H.264 形式）。
+- `Failed stream start: No space left on device (28)` というエラーが出ている場合、USB バスの帯域が枯渇しています。`main_ws/src/bringup/config/cameras.yaml` を確認し、使用しないカメラを `enabled: false` にする、または解像度を `320x240`、フレームレートを `5` 以下に設定してください（現在のデフォルトは帯域節約のため 320x240 @ 5fps YUYV です）。
 
 ### 10.4 Nav2 が経路を作らない
 

@@ -71,9 +71,9 @@ graph LR
   %% 通信ミドルウェア — Zenoh (rmw_zenoh_cpp)
   %% =============================================
   subgraph Network["通信ミドルウェア — Zenoh (rmw_zenoh_cpp)"]
-    ZENOH_R{{zenohd ロボット側<br/>QUIC :7447 / SHM<br/>zenoh_router.json5}}:::proto
-    ZENOH_O{{zenohd オペレータ側<br/>QUIC connect<br/>zenoh_ope.json5}}:::proto
-    ZENOH_R <== "Wi-Fi / Ethernet<br/>QUIC (UDP :7447)" ==> ZENOH_O
+    ZENOH_R{{zenohd ロボット側<br/>QUIC :7447 / SHM<br/>zenoh_router.json5<br/>(mTLS Server Cert)}}:::proto
+    ZENOH_O{{zenohd オペレータ側<br/>QUIC connect<br/>zenoh_ope.json5<br/>(mTLS CA Cert)}}:::proto
+    ZENOH_R <== "Wi-Fi / Ethernet<br/>QUIC (UDP :7447) mTLS" ==> ZENOH_O
   end
 
   %% =============================================

@@ -719,23 +719,23 @@ Rust バインディングから OpenCV WeChatQRCode を呼び出す実験的な
 
 | コンポーネント | 設定ファイル | mode | 接続 |
 |-------------|------------|------|------|
-| `zenohd` (NUC デーモン) | `zenoh_router.json5` | `router` | listen quic/0.0.0.0:7447 + tcp/0.0.0.0:7447 |
-| ロボット ROS2 ノード (NUC) | `zenoh_robot.json5` | `client` | connect quic/tcp 127.0.0.1:7447,17447 (→ローカル zenohd) |
-| オペレータ ROS2 ノード | `zenoh_ope.json5` | `peer` | connect tcp <ROBOT_IP>:7447 (→リモート zenohd) |
+| `zenohd` (NUC デーモン) | `zenoh_router.json5` | `router` | listen quic/0.0.0.0:7447 + tcp/0.0.0.0:7447 (mTLS サーバー証明書) |
+| ロボット ROS2 ノード (NUC) | `zenoh_robot.json5` | `client` | connect tcp 127.0.0.1:7447,17447 (→ローカル zenohd) |
+| オペレータ ROS2 ノード | `zenoh_ope.json5` | `peer` | connect quic/tcp <ROBOT_IP>:7447 (mTLS CA証明書を信頼の起点として使用) |
 
 `zenohd` はロボット上で単一のルーターデーモンとして動作します。
-ROS2 ノード自身が router になることはありません（ポート競合防止のため）。
-オペレータ側は `zenohd` なし・環境変数設定のみで動作します。
+相互認証 (mTLS) によりセキュアな QUIC 接続を確立します。起動時に `network.launch.py` が CA 証明書とサーバー証明書を自動生成し、不正な通信（UnknownIssuer や CaUsedAsEndEntity 等）を防止します。
 
 ### 4.2 映像配信 (H.264)
 
-Wi-Fi 帯域を節約しつつ低遅延な映像配信を実現するため、以下のスタックを使用します。
+Wi-Fi 帯域および USB バス帯域を節約しつつ低遅延な映像配信を実現するため、以下のスタックを使用します。
 
 1. **ドライバ**: `v4l2_camera` (composable node, intra-process 通信)
-2. **エンコード**: `ffmpeg_image_transport` (H.264 / libx264)
-3. **設定**: `profile=baseline`, `preset=ultrafast`, `tune=zerolatency`, `bframes=0`
-4. **トピック**: `/camera/image_raw/ffmpeg` (FFMPEGPacket 型)
-5. **Foxglove 表示**: `ffmpeg_to_foxglove_video` ノードで `foxglove_msgs/CompressedVideo` に変換後、Foxglove Studio がネイティブデコード
+2. **形式**: `YUYV` 320x240 @ 5fps (複数カメラ同時使用時の "No space left on device" USB帯域枯渇エラーを防止)
+3. **エンコード**: `ffmpeg_image_transport` (H.264 / libx264)
+4. **設定**: `profile=baseline`, `preset=ultrafast`, `tune=zerolatency`, `bframes=0`
+5. **トピック**: `/camera_front/image_raw/ffmpeg` (FFMPEGPacket 型)
+6. **Foxglove 表示**: `ffmpeg_to_foxglove_video` ノードで `foxglove_msgs/CompressedVideo` に変換後、Foxglove Studio がネイティブデコード
 
 ### 4.3 オペレータ GUI
 
