@@ -21,9 +21,9 @@ graph LR
     foxglove[Foxglove Studio]:::node_style
   end
 
-  T_joy{{/joy<br/>sensor_msgs/Joy}}:::topic_style
-  T_ope_audio{{/operator/audio<br/>AudioChunk (Opus)}}:::topic_style
-  T_robot_audio{{/robot/audio<br/>AudioChunk (Opus)}}:::topic_style
+  T_joy{{"/joy<br/>sensor_msgs/Joy"}}:::topic_style
+  T_ope_audio{{"/operator/audio<br/>AudioChunk (Opus)"}}:::topic_style
+  T_robot_audio{{"/robot/audio<br/>AudioChunk (Opus)"}}:::topic_style
 
   joy --> T_joy
   ope_audio_sender --> T_ope_audio
@@ -37,7 +37,7 @@ graph LR
     T_joy --> op
   end
 
-  T_estop{{/emergency_stop<br/>std_msgs/Bool<br/>QoS: Reliable/Transient}}:::topic_style
+  T_estop{{"/emergency_stop<br/>std_msgs/Bool<br/>QoS: Reliable/Transient"}}:::topic_style
   op -- "Latch Trigger" --> T_estop
 
   %% =============================================
@@ -47,12 +47,12 @@ graph LR
     crawler[crawler_driver]:::node_style
     flipper[flipper_driver]:::node_style
 
-    T_c_cmd{{/crawler_driver<br/>CrawlerVelocity}}:::topic_style
-    T_f_cmd{{/flipper_driver<br/>FlipperVelocity}}:::topic_style
-    T_joint{{/joint_states<br/>sensor_msgs/JointState}}:::topic_style
+    T_c_cmd{{"/crawler_driver<br/>CrawlerVelocity"}}:::topic_style
+    T_f_cmd{{"/flipper_driver<br/>FlipperVelocity"}}:::topic_style
+    T_joint{{"/joint_states<br/>sensor_msgs/JointState"}}:::topic_style
 
     %% Fallback Joint State Publisher
-    jsp_fallback[joint_state_publisher_fallback<br/>(Activates if all HW disabled)]:::fallback_style
+    jsp_fallback["joint_state_publisher_fallback<br/>(Activates if all HW disabled)"]:::fallback_style
 
     op --> T_c_cmd --> crawler
     op --> T_f_cmd --> flipper
@@ -78,12 +78,12 @@ graph LR
     arm_ik[arm_controller<br/>Rust IK Engine]:::node_style
     arm_drv[arm_gripper_driver<br/>Rust Unified Driver]:::node_style
 
-    T_a_cmd{{/arm_cmd_vel<br/>Twist (Cartesian)}}:::topic_style
-    T_a_jvel{{/arm_joint_cmd_vel<br/>JointState (Direct)}}:::topic_style
-    T_a_joint{{/arm_joint_commands<br/>JointState}}:::topic_style
-    T_ee_pose{{/arm_ee_pose<br/>PoseStamped}}:::topic_style
-    T_g_cmd{{/gripper_cmd<br/>GripperCommand}}:::topic_style
-    T_g_status{{/gripper_status<br/>GripperStatus}}:::topic_style
+    T_a_cmd{{"/arm_cmd_vel<br/>Twist (Cartesian)"}}:::topic_style
+    T_a_jvel{{"/arm_joint_cmd_vel<br/>JointState (Direct)"}}:::topic_style
+    T_a_joint{{"/arm_joint_commands<br/>JointState"}}:::topic_style
+    T_ee_pose{{"/arm_ee_pose<br/>PoseStamped"}}:::topic_style
+    T_g_cmd{{"/gripper_cmd<br/>GripperCommand"}}:::topic_style
+    T_g_status{{"/gripper_status<br/>GripperStatus"}}:::topic_style
 
     op --> T_a_cmd --> arm_ik
     op --> T_a_jvel --> arm_ik
@@ -111,10 +111,10 @@ graph LR
     qr[qr_detector_cpp]:::node_style
     ffmpeg_conv[ffmpeg_to_foxglove_video]:::node_style
 
-    T_cam{{/camera/image_raw<br/>sensor_msgs/Image}}:::topic_style
-    T_cam_ffmpeg{{/camera/image_raw/ffmpeg<br/>FFMPEGPacket (H.264)}}:::topic_style
-    T_comp_video{{/camera/compressed_video<br/>CompressedVideo}}:::topic_style
-    T_qr{{/camera/qr_codes<br/>std_msgs/String}}:::topic_style
+    T_cam{{"/camera/image_raw<br/>sensor_msgs/Image"}}:::topic_style
+    T_cam_ffmpeg{{"/camera/image_raw/ffmpeg<br/>FFMPEGPacket (H.264)"}}:::topic_style
+    T_comp_video{{"/camera/compressed_video<br/>CompressedVideo"}}:::topic_style
+    T_qr{{"/camera/qr_codes<br/>std_msgs/String"}}:::topic_style
 
     HW_cam[USB Camera<br/>320x240 @ 5fps YUYV]:::hw_style
     HW_cam --> v4l2 -- "Zero-copy" --> qr --> T_qr
@@ -145,12 +145,12 @@ graph LR
     pc2ls[pointcloud_to_laserscan]:::node_style
     slam[slam_toolbox]:::node_style
 
-    T_imu{{/imu/data<br/>sensor_msgs/Imu}}:::topic_style
-    T_imu_h{{/imu/health<br/>std_msgs/Bool}}:::topic_style
-    T_raw_pts{{/velodyne_points<br/>PointCloud2}}:::topic_style
-    T_scan{{/scan<br/>LaserScan}}:::topic_style
-    T_odom{{/odom<br/>nav_msgs/Odometry}}:::topic_style
-    T_map{{/map<br/>nav_msgs/OccupancyGrid}}:::topic_style
+    T_imu{{"/imu/data<br/>sensor_msgs/Imu"}}:::topic_style
+    T_imu_h{{"/imu/health<br/>std_msgs/Bool"}}:::topic_style
+    T_raw_pts{{"/velodyne_points<br/>PointCloud2"}}:::topic_style
+    T_scan{{"/scan<br/>LaserScan"}}:::topic_style
+    T_odom{{"/odom<br/>nav_msgs/Odometry"}}:::topic_style
+    T_map{{"/map<br/>nav_msgs/OccupancyGrid"}}:::topic_style
 
     HW_stm32[STM32 + BNO055]:::hw_style
     HW_vlp16[VLP-16 LiDAR]:::hw_style
@@ -176,7 +176,7 @@ graph LR
   %% =============================================
   subgraph Environmental["Environmental"]
     omron[omron_bridge]:::node_style
-    T_omron{{omron/*<br/>std_msgs/Float32}}:::topic_style
+    T_omron{{"omron/*<br/>std_msgs/Float32"}}:::topic_style
 
     HW_omron[Omron 2JCIE-BU01]:::hw_style
     HW_omron -- "USB Serial" --> omron --> T_omron
