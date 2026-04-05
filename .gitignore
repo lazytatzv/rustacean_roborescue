@@ -32,3 +32,11 @@ __pycache__/
 
 
 *.png
+
+# --- Security / Certificates (Zenoh QUIC) ---
+# Runtime generated certificates and keys should not be committed
+**/*.crt
+**/*.key
+**/*.csr
+**/*.srl
+quic/
