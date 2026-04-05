@@ -6,7 +6,7 @@ services:
   # Foxglove Studio (Web version)
   # Access via: http://localhost:8080
   foxglove:
-    image: ghcr.io/foxglove/studio:latest
+    image: foxglove/studio:latest
     container_name: foxglove_studio
     ports:
       - "8080:8080"
