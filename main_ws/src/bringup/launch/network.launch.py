@@ -163,10 +163,16 @@ def _build_network_actions(context):
 
             # ソースディレクトリへコピー
             # 互換性のため、operator 用の server.crt はロボットの ca.crt をコピーして使う
+            # colcon symlink-install 環境では install/ → src/ がシンボリックリンクになるため
+            # 同一ファイルチェックが必要
             if os.path.isdir(os.path.dirname(src_quic_dir)):
                 os.makedirs(src_quic_dir, exist_ok=True)
-                shutil.copy2(ca_cert, os.path.join(src_quic_dir, "server.crt"))
-                shutil.copy2(key, os.path.join(src_quic_dir, "server.key"))
+                dst_crt = os.path.join(src_quic_dir, "server.crt")
+                dst_key = os.path.join(src_quic_dir, "server.key")
+                if not os.path.isfile(dst_crt) or not os.path.samefile(ca_cert, dst_crt):
+                    shutil.copy2(ca_cert, dst_crt)
+                if not os.path.isfile(dst_key) or not os.path.samefile(key, dst_key):
+                    shutil.copy2(key, dst_key)
                 actions.append(
                     LogInfo(msg=f"[network.launch] synced CA cert to {src_quic_dir} for operator")
                 )
@@ -177,7 +183,9 @@ def _build_network_actions(context):
             )
             if os.path.isdir(os.path.dirname(operator_quic_dir)):
                 os.makedirs(operator_quic_dir, exist_ok=True)
-                shutil.copy2(ca_cert, os.path.join(operator_quic_dir, "server.crt"))
+                dst_ope_crt = os.path.join(operator_quic_dir, "server.crt")
+                if not os.path.isfile(dst_ope_crt) or not os.path.samefile(ca_cert, dst_ope_crt):
+                    shutil.copy2(ca_cert, dst_ope_crt)
                 actions.append(
                     LogInfo(msg=f"[network.launch] synced CA cert to {operator_quic_dir}")
                 )

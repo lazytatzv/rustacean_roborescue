@@ -48,7 +48,7 @@ cameras:
     width: 320
     height: 240
     fps: 5
-    pixel_format: YUYV
+    pixel_format: MJPG  # カメラのネイティブフォーマット (YUYVはstream start失敗)
     frame_id: front_camera_link
     use_qr: true
     jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)
