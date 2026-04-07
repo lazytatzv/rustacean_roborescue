@@ -1,8 +1,8 @@
+# パッチはメッセージ型生成物 (install/) を参照する。
+# ワークスペースメンバー (rclrs, arm_driver 等) は Cargo.toml で管理するためここには書かない。
+
 [patch.crates-io.test_msgs]
 path = "../install/share/test_msgs/rust"
-
-[patch.crates-io.arm_driver]
-path = "../install/share/arm_driver/rust"
 
 [patch.crates-io.type_description_interfaces]
 path = "../install/share/type_description_interfaces/rust"
@@ -25,17 +25,11 @@ path = "../install/share/sensor_msgs/rust"
 [patch.crates-io.trajectory_msgs]
 path = "../install/share/trajectory_msgs/rust"
 
-[patch.crates-io.sensor_gateway]
-path = "../install/share/sensor_gateway/rust"
-
 [patch.crates-io.visualization_msgs]
 path = "../install/share/visualization_msgs/rust"
 
 [patch.crates-io.service_msgs]
 path = "../install/share/service_msgs/rust"
-
-[patch.crates-io.depth_guard]
-path = "../install/share/depth_guard/rust"
 
 [patch.crates-io.custom_interfaces]
 path = "../install/share/custom_interfaces/rust"
@@ -66,12 +60,6 @@ path = "../install/share/unique_identifier_msgs/rust"
 
 [patch.crates-io.lifecycle_msgs]
 path = "../install/share/lifecycle_msgs/rust"
-
-[patch.crates-io.arm_controller]
-path = "../install/share/arm_controller/rust"
-
-[patch.crates-io.rclrs]
-path = "../install/share/rclrs/rust"
 
 [patch.crates-io.rcl_interfaces]
 path = "../install/share/rcl_interfaces/rust"
