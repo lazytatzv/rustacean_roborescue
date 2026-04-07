@@ -1,0 +1,17 @@
+# オペレーター起動設定
+# robot側の launch_config.yaml に相当。
+# ros2 launch launch/operator.launch.py で読み込まれる。
+
+# Foxglove Bridge (Foxglove Studio の WebSocket 接続先 ws://localhost:8765)
+use_foxglove: true
+foxglove_port: 8765
+foxglove_address: "0.0.0.0"
+
+# ジョイスティック
+use_joy: true
+
+# 音声通信 (robot 側の use_audio と合わせること)
+use_audio: true
+ope_mic_device: ""    # 空文字 = デフォルトデバイス (arecord -l で確認)
+ope_spk_device: ""    # 空文字 = デフォルトデバイス (aplay -l で確認)
+audio_bitrate: 32000

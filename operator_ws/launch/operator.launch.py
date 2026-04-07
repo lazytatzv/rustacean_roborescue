@@ -1,34 +1,47 @@
 # Operator側起動スクリプト
 import os
 import tempfile
+
+import yaml
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
+def _load_operator_config(launch_dir: str) -> dict:
+    config_path = os.path.join(launch_dir, "operator_config.yaml")
+    if not os.path.isfile(config_path):
+        return {}
+    try:
+        with open(config_path) as f:
+            loaded = yaml.safe_load(f)
+        return loaded if isinstance(loaded, dict) else {}
+    except Exception:
+        return {}
+
+
+def _b(val: bool) -> str:
+    return "true" if val else "false"
+
+
 def _build_operator_actions(context):
     this_dir = os.path.dirname(os.path.abspath(__file__))
-    # operator_ws 直下を探す
     repo_root = os.path.dirname(this_dir)
 
-    # 証明書の場所を特定
+    # TLS 証明書: robot の network.launch.py が生成して operator_ws/quic/ にコピーする
     project_cert = os.path.join(repo_root, "quic", "server.crt")
-    # もし見つからなければ、指示された scp 先を想定
-    if not os.path.isfile(project_cert):
-        project_cert = "/home/yano/working/rustacean_roborescue/operator_ws/quic/server.crt"
 
-    # Zenoh 設定を動的に生成 (相対パス問題を完全に回避)
     ope_cfg_content = f"""
     {{
       mode: "client",
       connect: {{
         endpoints: [
-          "quic/100.114.200.30:7447",
-          "tcp/100.114.200.30:7447",
           "quic/10.42.0.1:7447",
-          "tcp/10.42.0.1:7447"
+          "tcp/10.42.0.1:7447",
+          "quic/100.114.200.30:7447",
+          "tcp/100.114.200.30:7447"
         ]
       }},
       scouting: {{ multicast: {{ enabled: false }} }},
@@ -57,14 +70,29 @@ def _build_operator_actions(context):
 
 
 def generate_launch_description():
-    use_audio = DeclareLaunchArgument("use_audio", default_value="true")
-    use_joy = DeclareLaunchArgument("use_joy", default_value="true")
-    use_foxglove = DeclareLaunchArgument("use_foxglove", default_value="true")
-    ope_mic_device = DeclareLaunchArgument("ope_mic_device", default_value="")
-    ope_spk_device = DeclareLaunchArgument("ope_spk_device", default_value="")
-    bitrate = DeclareLaunchArgument("bitrate", default_value="32000")
-    foxglove_address = DeclareLaunchArgument("foxglove_address", default_value="0.0.0.0")
-    foxglove_port = DeclareLaunchArgument("foxglove_port", default_value="8765")
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    cfg = _load_operator_config(this_dir)
+
+    # operator_config.yaml の値をデフォルトに使う
+    default_use_foxglove = _b(cfg.get("use_foxglove", True))
+    default_use_joy = _b(cfg.get("use_joy", True))
+    default_use_audio = _b(cfg.get("use_audio", True))
+    default_foxglove_port = str(cfg.get("foxglove_port", 8765))
+    default_foxglove_address = str(cfg.get("foxglove_address", "0.0.0.0"))
+    default_mic_device = str(cfg.get("ope_mic_device", ""))
+    default_spk_device = str(cfg.get("ope_spk_device", ""))
+    default_bitrate = str(cfg.get("audio_bitrate", 32000))
+
+    use_foxglove = DeclareLaunchArgument("use_foxglove", default_value=default_use_foxglove)
+    use_joy = DeclareLaunchArgument("use_joy", default_value=default_use_joy)
+    use_audio = DeclareLaunchArgument("use_audio", default_value=default_use_audio)
+    foxglove_port = DeclareLaunchArgument("foxglove_port", default_value=default_foxglove_port)
+    foxglove_address = DeclareLaunchArgument(
+        "foxglove_address", default_value=default_foxglove_address
+    )
+    ope_mic_device = DeclareLaunchArgument("ope_mic_device", default_value=default_mic_device)
+    ope_spk_device = DeclareLaunchArgument("ope_spk_device", default_value=default_spk_device)
+    bitrate = DeclareLaunchArgument("bitrate", default_value=default_bitrate)
 
     joy_node = Node(
         package="joy",
@@ -118,14 +146,14 @@ def generate_launch_description():
 
     ld = LaunchDescription()
     ld.add_action(OpaqueFunction(function=_build_operator_actions))
-    ld.add_action(use_audio)
-    ld.add_action(use_joy)
     ld.add_action(use_foxglove)
+    ld.add_action(use_joy)
+    ld.add_action(use_audio)
+    ld.add_action(foxglove_port)
+    ld.add_action(foxglove_address)
     ld.add_action(ope_mic_device)
     ld.add_action(ope_spk_device)
     ld.add_action(bitrate)
-    ld.add_action(foxglove_address)
-    ld.add_action(foxglove_port)
     ld.add_action(joy_node)
     ld.add_action(foxglove_node)
     ld.add_action(audio_sender)
