@@ -4,7 +4,7 @@
 # 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
 # 足回り
-use_crawler: true
+use_crawler: false
 use_flipper: false
 
 use_arm: false
@@ -20,7 +20,7 @@ use_lidar: false
 
 # カメラ制御全て
 # これがfalseだと遠隔操縦は不可能
-use_camera: false
+use_camera: true
 
 use_audio: false
 

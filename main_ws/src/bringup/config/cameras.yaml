@@ -40,7 +40,9 @@
 cameras:
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
 
-  # フロントカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.3)
+  # Genius WideCam F100 (usb-0000:00:14.0-3.3)
+  # ロボットのバッテリーがある側をFRONTとする
+  # これはFRONT側のバッテリー上に付いているカメラ
   - name: front
     driver: v4l2
     enabled: true
@@ -50,10 +52,11 @@ cameras:
     fps: 5
     pixel_format: MJPG  # カメラのネイティブフォーマット (YUYVはstream start失敗)
     frame_id: front_camera_link
-    use_qr: true
+    use_qr: false
     jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)
 
-  # バックカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.1)
+  # Genius WideCam F100 (usb-0000:00:14.0-3.1)
+  # このカメラは一つはずしたので使わない
   - name: back
     driver: v4l2
     enabled: false
@@ -68,7 +71,7 @@ cameras:
   # アームカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.4)
   - name: arm
     driver: v4l2
-    enabled: false
+    enabled: true
     device: /dev/video4
     width: 320
     height: 240
@@ -76,28 +79,6 @@ cameras:
     pixel_format: YUYV
     frame_id: arm_camera_link
     use_qr: true
-
-  - name: left
-    driver: v4l2
-    enabled: false
-    device: /dev/video2
-    width: 640
-    height: 480
-    fps: 15
-    pixel_format: MJPG
-    frame_id: left_camera_link
-    use_qr: false
-
-  - name: right
-    driver: v4l2
-    enabled: false
-    device: /dev/video3
-    width: 640
-    height: 480
-    fps: 15
-    pixel_format: MJPG
-    frame_id: right_camera_link
-    use_qr: false
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   - name: theta
@@ -113,12 +94,12 @@ cameras:
     jpeg_quality: 85  # THETA S は解像度が大きいため少し高めに
 
   # ── RealSense D435i (RGB-D + IMU) ─────────────────────────────────────────
-  # アーム先端またはフロントに搭載。深度+カラー+IMU(400Hz)。
+  # アーム先端横に搭載。深度+カラー+IMU(400Hz)。
   # depth_guard ノードと組み合わせて近接障害物検出に使用する。
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
   - name: d435i
     driver: realsense
-    enabled: false
+    enabled: true
     serial: ""
     enable_color: true
     enable_depth: true
@@ -131,7 +112,7 @@ cameras:
     depth_width: 640
     depth_height: 480
     depth_fps: 30
-    use_qr: false
+    use_qr: true
     jpeg_quality: 80
 
   # ── RealSense T265 (トラッキングカメラ / Visual-Inertial Odometry) ─────────
@@ -139,6 +120,8 @@ cameras:
   # odom_selector の第3 fallback として利用するには launch_config.yaml の
   # use_t265_odom: true も必要。
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
+  # これはアーム根元後ろのカメラ
+  # 性能は良いが実際使うかは分からない
   - name: t265
     driver: realsense
     enabled: false
