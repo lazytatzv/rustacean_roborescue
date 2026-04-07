@@ -44,12 +44,15 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERI
 # ENV{ID_V4L_CAPABILITIES}==":capture:" でメタデータ専用ノードを除外し
 # キャプチャノードのみにシンボリックリンクを張る。
 
-# フロントカメラ (Buffalo/Melco 0411:02da)
+# フロントカメラ (KYE/Genius WideCam F100 0458:708c)
 # バッテリーの上にある四角いやつ
-#
-#
-#
-#
-#
-# アームの先端中のカメラ(たぶん)
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0458", ATTRS{idProduct}=="708c", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_front", MODE="0666"
+
+# アームの先端中カメラ (Buffalo/Melco 0411:02da)
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0411", ATTRS{idProduct}=="02da", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_arm", MODE="0666"
+
+# RealSense 435i カラーストリーム (Intel 8086:0b3a)
+# 深度・IRノードも同一 VID/PID で生えるが :capture: でカラーのみを対象とする
+# 深度データは librealsense 経由でアクセスすること
+# アーム先端の横
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b3a", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_realsense", MODE="0666"
