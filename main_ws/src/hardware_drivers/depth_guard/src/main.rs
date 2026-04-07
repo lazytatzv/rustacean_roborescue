@@ -256,25 +256,20 @@ fn run() -> Result<()> {
     // ---- Depth subscription -----------------------------------------------
     let state_sub = Arc::clone(&state);
     let cfg_sub = Arc::clone(&cfg);
-    let _sub = node.create_subscription::<Image, _>(
-        depth_topic.as_str(),
-        move |msg: Image| {
-            let prox = process_depth(&msg, &cfg_sub);
-            if let Ok(mut g) = state_sub.lock() {
-                g.proximity = prox;
-                g.last_update = Some(Instant::now());
-            }
-        },
-    )?;
+    let _sub = node.create_subscription::<Image, _>(depth_topic.as_str(), move |msg: Image| {
+        let prox = process_depth(&msg, &cfg_sub);
+        if let Ok(mut g) = state_sub.lock() {
+            g.proximity = prox;
+            g.last_update = Some(Instant::now());
+        }
+    })?;
 
     // ---- Publishers --------------------------------------------------------
-    let prox_pub: Publisher<Float32MultiArray> =
-        node.create_publisher("/depth_guard/proximity")?;
+    let prox_pub: Publisher<Float32MultiArray> = node.create_publisher("/depth_guard/proximity")?;
     let health_pub: Publisher<Bool> = node.create_publisher("/depth_guard/health")?;
 
     // ---- Proximity publish timer ------------------------------------------
-    let pub_interval =
-        Duration::from_secs_f64(1.0 / publish_rate_hz.clamp(0.1, 100.0));
+    let pub_interval = Duration::from_secs_f64(1.0 / publish_rate_hz.clamp(0.1, 100.0));
     let timeout_dur = Duration::from_secs_f64(timeout_s);
     let state_pub = Arc::clone(&state);
 
