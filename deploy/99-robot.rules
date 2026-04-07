@@ -41,4 +41,4 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERI
 # キャプチャノードのみにシンボリックリンクを張る。
 
 # フロントカメラ (Buffalo/Melco 0411:02da)
-SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0411", ATTRS{idProduct}=="02da", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_front", TAG+="uaccess"
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0411", ATTRS{idProduct}=="02da", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_front", MODE="0666"
