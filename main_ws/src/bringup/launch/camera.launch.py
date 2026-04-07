@@ -54,8 +54,11 @@ def _video_device_realpath_key(dev_path: str) -> str:
         return ""
 
 
-def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
+def _v4l2_nodes(cam: dict, ns: str) -> list:
     """v4l2 ドライバのコンポーザブルノードリストを返す。"""
+    # gop_size: キーフレーム間隔。小さいほど再接続/途中購読からの復旧が速い。
+    # repeat_headers=1 により SPS/PPS を毎 IDR フレームに付加するので途中参加にも対応。
+    gop_size = cam.get("gop_size", 5)
     composable = [
         ComposableNode(
             package="v4l2_camera",
@@ -71,7 +74,7 @@ def _v4l2_nodes(cam: dict, qr_model_dir: str, ns: str) -> list:
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
                     "image_raw.ffmpeg.encoder": cam.get("encoder", "libx264"),
                     "image_raw.ffmpeg.bit_rate": cam.get("bitrate", 2000000),
-                    "image_raw.ffmpeg.gop_size": 10,
+                    "image_raw.ffmpeg.gop_size": gop_size,
                     "image_raw.ffmpeg.av_options": "profile:baseline,preset:ultrafast,x264-params:repeat_headers=1",
                 }
             ],
@@ -100,7 +103,7 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
                     "image_raw.ffmpeg.encoder": cam.get("encoder", "libx264"),
                     "image_raw.ffmpeg.bit_rate": cam.get("bitrate", 4000000),
-                    "image_raw.ffmpeg.gop_size": 10,
+                    "image_raw.ffmpeg.gop_size": cam.get("gop_size", 5),
                     "image_raw.ffmpeg.av_options": "profile:baseline,preset:ultrafast,x264-params:repeat_headers=1",
                 }
             ],
@@ -180,10 +183,15 @@ def _make_camera_group(
     elif driver == "theta_s":
         composable_nodes = _theta_s_nodes(cam, ns)
     else:
-        composable_nodes = _v4l2_nodes(cam, qr_model_dir, ns)
+        composable_nodes = _v4l2_nodes(cam, ns)
 
     if use_qr:
-        composable_nodes.append(_qr_node(cam, qr_model_dir, ns, image_topic))
+        if qr_model_dir:
+            composable_nodes.append(_qr_node(cam, qr_model_dir, ns, image_topic))
+        else:
+            print(
+                f"[camera.launch] WARNING: use_qr=true for {name} but qr_detector package not found, skipping QR"
+            )
 
     container = ComposableNodeContainer(
         name=f"camera_{name}_container",
@@ -307,8 +315,12 @@ def _make_camera_group(
 
 def generate_launch_description():
     bringup_share = get_package_share_directory("bringup")
-    qr_share = get_package_share_directory("qr_detector")
-    qr_model_dir = os.path.join(qr_share, "models")
+    try:
+        qr_share = get_package_share_directory("qr_detector")
+        qr_model_dir = os.path.join(qr_share, "models")
+    except PackageNotFoundError:
+        print("[camera.launch] WARNING: qr_detector package not found, QR detection disabled")
+        qr_model_dir = ""
 
     arg_use_camera = DeclareLaunchArgument(
         "use_camera", default_value="true", description="カメラ + QR 検出を有効にする"
