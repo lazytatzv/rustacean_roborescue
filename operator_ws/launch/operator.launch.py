@@ -49,7 +49,8 @@ def _build_operator_actions(context):
     return [
         SetEnvironmentVariable("RMW_IMPLEMENTATION", "rmw_zenoh_cpp"),
         SetEnvironmentVariable("ZENOH_SESSION_CONFIG_URI", dynamic_ope_cfg),
-        SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "-1"),
+        # 0 = ロボット側 router が現れるまで無限待機 (-1 はスキップ = 即クラッシュ)
+        SetEnvironmentVariable("ZENOH_ROUTER_CHECK_ATTEMPTS", "0"),
         SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
         SetEnvironmentVariable("ROS_LOCALHOST_ONLY", "0"),
     ]
@@ -70,6 +71,8 @@ def generate_launch_description():
         executable="joy_node",
         name="joy_node",
         condition=IfCondition(LaunchConfiguration("use_joy")),
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     foxglove_node = Node(
@@ -83,6 +86,8 @@ def generate_launch_description():
                 "address": LaunchConfiguration("foxglove_address"),
             }
         ],
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     audio_sender = Node(
@@ -97,6 +102,8 @@ def generate_launch_description():
                 "bitrate": LaunchConfiguration("bitrate"),
             }
         ],
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     audio_receiver = Node(
@@ -105,6 +112,8 @@ def generate_launch_description():
         name="operator_audio_receiver",
         condition=IfCondition(LaunchConfiguration("use_audio")),
         parameters=[{"topic": "/robot/audio", "device": LaunchConfiguration("ope_spk_device")}],
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     ld = LaunchDescription()
