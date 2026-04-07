@@ -1,17 +1,19 @@
 #include <termios.h>
 
+#include <array>
+#include <atomic>
 #include <boost/asio.hpp>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <custom_interfaces/msg/crawler_velocity.hpp>
 #include <geometry_msgs/msg/twist.hpp>
-#include <memory>
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/u_int32.hpp>
-#include <stdexcept>
-#include <vector>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -19,14 +21,10 @@ using namespace std::chrono_literals;
 // Roboclaw protocol constants
 // ──────────────────────────────────────────────
 constexpr uint8_t ROBOCLAW_ADDRESS = 0x80;
-constexpr uint8_t CMD_M1_VELOCITY = 35;
-constexpr uint8_t CMD_M2_VELOCITY = 36;
+constexpr uint8_t CMD_MIXED_SPEED = 37;
 constexpr uint8_t CMD_SET_M1_PID = 28;
 constexpr uint8_t CMD_SET_M2_PID = 29;
 constexpr uint8_t CMD_RESET_ENCODERS = 20;
-//constexpr uint8_t CMD_READ_M1_SPEED = 18;
-//constexpr uint8_t CMD_READ_M2_SPEED = 19;
-// Roboclaw speed read commands (qpps + direction)
 constexpr uint8_t CMD_READ_M1_SPEED = 30;
 constexpr uint8_t CMD_READ_M2_SPEED = 31;
 constexpr uint8_t CMD_READ_CURRENTS = 49;
@@ -43,14 +41,11 @@ constexpr int DEFAULT_SERIAL_BAUD_RATE = 115200;
 // ──────────────────────────────────────────────
 constexpr uint32_t STATUS_M1_OVERCURRENT = (1u << 0);
 constexpr uint32_t STATUS_M2_OVERCURRENT = (1u << 1);
-constexpr uint32_t STATUS_ESTOP = (1u << 2);
 constexpr uint32_t STATUS_TEMP_ERROR = (1u << 3);
-constexpr uint32_t STATUS_MAIN_BATT_HIGH = (1u << 5);
 constexpr uint32_t STATUS_MAIN_BATT_LOW = (1u << 6);
 constexpr uint32_t STATUS_M1_FAULT = (1u << 8);
 constexpr uint32_t STATUS_M2_FAULT = (1u << 9);
 constexpr uint32_t STATUS_TEMP_WARNING = (1u << 10);
-constexpr uint32_t STATUS_MAIN_BATT_WARN = (1u << 11);
 
 // ──────────────────────────────────────────────
 // Telemetry snapshot
@@ -68,7 +63,59 @@ struct RoboclawTelemetry
 };
 
 // ──────────────────────────────────────────────
+// Fixed-size packet builder (zero heap allocation)
+// ──────────────────────────────────────────────
+struct Packet
+{
+  static constexpr size_t kMaxSize = 32;
+  std::array<uint8_t, kMaxSize> buf{};
+  size_t len = 0;
+
+  Packet(uint8_t addr, uint8_t cmd)
+  {
+    buf[len++] = addr;
+    buf[len++] = cmd;
+  }
+
+  void push(uint8_t b) { buf[len++] = b; }
+  void pushByte(uint8_t b) { buf[len++] = b; }
+
+  void pushInt32(int32_t v)
+  {
+    for (int i = 3; i >= 0; --i) push(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
+  }
+  void pushUInt32(uint32_t v)
+  {
+    for (int i = 3; i >= 0; --i) push(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
+  }
+  void pushFloat32(float f)
+  {
+    uint32_t bits;
+    std::memcpy(&bits, &f, sizeof(bits));
+    pushUInt32(bits);
+  }
+  void pushCRC()
+  {
+    uint16_t crc = crc16();
+    push(static_cast<uint8_t>(crc >> 8));
+    push(static_cast<uint8_t>(crc & 0xFF));
+  }
+  uint16_t crc16() const
+  {
+    uint16_t crc = 0;
+    for (size_t i = 0; i < len; ++i)
+    {
+      crc ^= static_cast<uint16_t>(buf[i]) << 8;
+      for (int j = 0; j < 8; ++j) crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : (crc << 1);
+    }
+    return crc;
+  }
+};
+
+// ──────────────────────────────────────────────
 // Synchronous Roboclaw serial driver
+// すべての I/O は呼び出し元スレッドをブロックする。
+// 呼び出し元は必ず専用スレッドから呼ぶこと (ROS executor スレッド禁止)。
 // ──────────────────────────────────────────────
 class RoboclawDriver
 {
@@ -81,7 +128,6 @@ class RoboclawDriver
     if (serial_.is_open()) serial_.close(ec);
   }
 
-  /// シリアルポートを開く。失敗した場合は false を返す (例外を投げない)
   bool connect(const std::string &port, int baud_rate)
   {
     boost::system::error_code ec;
@@ -100,18 +146,18 @@ class RoboclawDriver
     if (tcgetattr(fd, &tio) == 0)
     {
       tio.c_cc[VMIN] = 0;
-      tio.c_cc[VTIME] = 2;
+      tio.c_cc[VTIME] = 2;  // 200ms per-byte timeout
       tcsetattr(fd, TCSANOW, &tio);
     }
     return true;
   }
 
-  // ── Write commands (expect 1-byte ACK) ───────────────────────────────────
+  // ── Write (ACK-based) ─────────────────────────────────────────────────────
 
-  bool sendCommand(const std::vector<uint8_t> &data)
+  bool sendPacket(const Packet &pkt)
   {
     boost::system::error_code ec;
-    boost::asio::write(serial_, boost::asio::buffer(data), ec);
+    boost::asio::write(serial_, boost::asio::buffer(pkt.buf.data(), pkt.len), ec);
     if (ec)
     {
       RCLCPP_ERROR(rclcpp::get_logger("RoboclawDriver"), "Write error: %s", ec.message().c_str());
@@ -127,127 +173,117 @@ class RoboclawDriver
     return true;
   }
 
-  bool setMotorVelocity(uint8_t command, int32_t counts_per_sec)
+  /// M1・M2 を1トランザクションで原子的に送信 (cmd=37)
+  bool setMixedSpeed(int32_t m1_qpps, int32_t m2_qpps)
   {
-    std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, command};
-    appendInt32(data, counts_per_sec);
-    appendCRC(data);
-    return sendCommand(data);
+    Packet pkt(ROBOCLAW_ADDRESS, CMD_MIXED_SPEED);
+    pkt.pushInt32(m1_qpps);
+    pkt.pushInt32(m2_qpps);
+    pkt.pushCRC();
+    return sendPacket(pkt);
   }
 
-  bool setPIDConstants(uint8_t command, float Kp, float Ki, float Kd, int qpps)
+  bool setPIDConstants(uint8_t cmd, float Kp, float Ki, float Kd, int qpps)
   {
-    std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, command};
-    appendFloat32(data, Kd);
-    appendFloat32(data, Kp);
-    appendFloat32(data, Ki);
-    appendInt32(data, qpps);
-    appendCRC(data);
-    return sendCommand(data);
+    Packet pkt(ROBOCLAW_ADDRESS, cmd);
+    pkt.pushFloat32(Kd);
+    pkt.pushFloat32(Kp);
+    pkt.pushFloat32(Ki);
+    pkt.pushInt32(qpps);
+    pkt.pushCRC();
+    return sendPacket(pkt);
   }
 
-  /// モーター最大電流制限を設定する (単位: mA, Roboclaw内部は10mA単位)
-  /// min は常に 0 (アンダーカレント保護なし)
   bool setMaxCurrent(uint8_t cmd, float max_ma)
   {
-    const uint32_t raw = static_cast<uint32_t>(max_ma / 10.0f);
-    std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, cmd};
-    // max current (4 bytes big-endian)
-    for (int i = 3; i >= 0; --i) data.push_back(static_cast<uint8_t>((raw >> (8 * i)) & 0xFF));
-    // min current = 0 (4 bytes)
-    for (int i = 0; i < 4; ++i) data.push_back(0x00);
-    appendCRC(data);
-    return sendCommand(data);
+    Packet pkt(ROBOCLAW_ADDRESS, cmd);
+    pkt.pushUInt32(static_cast<uint32_t>(max_ma / 10.0f));  // max
+    pkt.pushUInt32(0);                                      // min = 0
+    pkt.pushCRC();
+    return sendPacket(pkt);
   }
 
   bool resetEncoders()
   {
-    std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, CMD_RESET_ENCODERS};
-    appendCRC(data);
-    return sendCommand(data);
+    Packet pkt(ROBOCLAW_ADDRESS, CMD_RESET_ENCODERS);
+    pkt.pushCRC();
+    return sendPacket(pkt);
   }
 
-  /// 通信タイムアウトを設定する (単位: 100ms)
-  /// タイムアウトを過ぎると Roboclaw が自動停止する。
   bool setSerialTimeoutDs(uint8_t timeout_ds)
   {
-    std::vector<uint8_t> data = {ROBOCLAW_ADDRESS, CMD_SET_SERIAL_TIMEOUT, timeout_ds};
-    appendCRC(data);
-    return sendCommand(data);
+    Packet pkt(ROBOCLAW_ADDRESS, CMD_SET_SERIAL_TIMEOUT);
+    pkt.push(timeout_ds);
+    pkt.pushCRC();
+    return sendPacket(pkt);
   }
 
-  // ── Read commands ─────────────────────────────────────────────────────────
+  // ── Read ──────────────────────────────────────────────────────────────────
 
-  /// 汎用読み出し: [address][cmd] を送信し data_bytes + CRC2 を受信して CRC 検証する
-  bool readCommand(uint8_t cmd, std::vector<uint8_t> &out, size_t data_bytes)
+  /// [addr][cmd] を送信し、data_bytes + CRC2 を受信して CRC 検証する
+  bool readCommand(uint8_t cmd, uint8_t *out, size_t data_bytes)
   {
-    const std::vector<uint8_t> req = {ROBOCLAW_ADDRESS, cmd};
+    const uint8_t req[2] = {ROBOCLAW_ADDRESS, cmd};
     boost::system::error_code ec;
-    boost::asio::write(serial_, boost::asio::buffer(req), ec);
+    boost::asio::write(serial_, boost::asio::buffer(req, 2), ec);
     if (ec) return false;
 
-    out.resize(data_bytes + 2);
-    size_t n = boost::asio::read(serial_, boost::asio::buffer(out), ec);
-    if (ec || n != data_bytes + 2) return false;
+    const size_t total = data_bytes + 2;
+    size_t n = boost::asio::read(serial_, boost::asio::buffer(out, total), ec);
+    if (ec || n != total) return false;
 
-    // CRC は [address][cmd][data...] 全体に対して計算する
-    std::vector<uint8_t> crc_input = {ROBOCLAW_ADDRESS, cmd};
-    crc_input.insert(crc_input.end(), out.begin(), out.begin() + data_bytes);
-    uint16_t expected = calculateCRC(crc_input);
-    uint16_t received = (static_cast<uint16_t>(out[data_bytes]) << 8) | out[data_bytes + 1];
+    // CRC 検証: [addr][cmd][data...] の crc16
+    Packet crc_pkt(ROBOCLAW_ADDRESS, cmd);
+    for (size_t i = 0; i < data_bytes; ++i) crc_pkt.push(out[i]);
+    const uint16_t expected = crc_pkt.crc16();
+    const uint16_t received = (static_cast<uint16_t>(out[data_bytes]) << 8) | out[data_bytes + 1];
     return expected == received;
   }
 
-  /// M1/M2 電流 [mA] (10mA 単位で返る)
   bool readMotorCurrents(float &m1_ma, float &m2_ma)
   {
-    std::vector<uint8_t> out;
-    if (!readCommand(CMD_READ_CURRENTS, out, 4)) return false;
-    m1_ma = static_cast<float>((static_cast<uint16_t>(out[0]) << 8) | out[1]) * 10.0f;
-    m2_ma = static_cast<float>((static_cast<uint16_t>(out[2]) << 8) | out[3]) * 10.0f;
+    uint8_t buf[6];
+    if (!readCommand(CMD_READ_CURRENTS, buf, 4)) return false;
+    m1_ma = static_cast<float>((static_cast<uint16_t>(buf[0]) << 8) | buf[1]) * 10.0f;
+    m2_ma = static_cast<float>((static_cast<uint16_t>(buf[2]) << 8) | buf[3]) * 10.0f;
     return true;
   }
 
-  /// M1 または M2 実速度 [qpps]。方向バイト込みで符号付きで返す
   bool readMotorSpeed(uint8_t cmd, int32_t &speed_qpps)
   {
-    std::vector<uint8_t> out;
-    if (!readCommand(cmd, out, 5)) return false;  // 4 byte speed + 1 byte direction
-    speed_qpps = (static_cast<int32_t>(out[0]) << 24) | (static_cast<int32_t>(out[1]) << 16) |
-                 (static_cast<int32_t>(out[2]) << 8) | static_cast<int32_t>(out[3]);
-    if (out[4] == 0) speed_qpps = -speed_qpps;  // 0=後退
+    uint8_t buf[7];
+    if (!readCommand(cmd, buf, 5)) return false;
+    speed_qpps = (static_cast<int32_t>(buf[0]) << 24) | (static_cast<int32_t>(buf[1]) << 16) |
+                 (static_cast<int32_t>(buf[2]) << 8) | static_cast<int32_t>(buf[3]);
+    if (buf[4] == 0) speed_qpps = -speed_qpps;  // 0=後退
     return true;
   }
 
-  /// 基板温度 [°C]
   bool readTemperature(float &temp_c)
   {
-    std::vector<uint8_t> out;
-    if (!readCommand(CMD_READ_TEMPERATURE, out, 2)) return false;
-    temp_c = static_cast<float>((static_cast<uint16_t>(out[0]) << 8) | out[1]) / 10.0f;
+    uint8_t buf[4];
+    if (!readCommand(CMD_READ_TEMPERATURE, buf, 2)) return false;
+    temp_c = static_cast<float>((static_cast<uint16_t>(buf[0]) << 8) | buf[1]) / 10.0f;
     return true;
   }
 
-  /// メインバッテリ電圧 [V]
   bool readBatteryVoltage(float &volts)
   {
-    std::vector<uint8_t> out;
-    if (!readCommand(CMD_READ_MAIN_VOLTAGE, out, 2)) return false;
-    volts = static_cast<float>((static_cast<uint16_t>(out[0]) << 8) | out[1]) / 10.0f;
+    uint8_t buf[4];
+    if (!readCommand(CMD_READ_MAIN_VOLTAGE, buf, 2)) return false;
+    volts = static_cast<float>((static_cast<uint16_t>(buf[0]) << 8) | buf[1]) / 10.0f;
     return true;
   }
 
-  /// ステータスフラグ (32-bit)
   bool readStatus(uint32_t &status)
   {
-    std::vector<uint8_t> out;
-    if (!readCommand(CMD_READ_STATUS, out, 4)) return false;
-    status = (static_cast<uint32_t>(out[0]) << 24) | (static_cast<uint32_t>(out[1]) << 16) |
-             (static_cast<uint32_t>(out[2]) << 8) | static_cast<uint32_t>(out[3]);
+    uint8_t buf[6];
+    if (!readCommand(CMD_READ_STATUS, buf, 4)) return false;
+    status = (static_cast<uint32_t>(buf[0]) << 24) | (static_cast<uint32_t>(buf[1]) << 16) |
+             (static_cast<uint32_t>(buf[2]) << 8) | static_cast<uint32_t>(buf[3]);
     return true;
   }
 
-  /// 全テレメトリをまとめて取得。読み取れなかった項目は前回値を保持
   RoboclawTelemetry readTelemetry()
   {
     RoboclawTelemetry t;
@@ -264,36 +300,6 @@ class RoboclawDriver
  private:
   boost::asio::io_context io_;
   boost::asio::serial_port serial_;
-
-  static uint16_t calculateCRC(const std::vector<uint8_t> &data)
-  {
-    uint16_t crc = 0;
-    for (auto byte : data)
-    {
-      crc ^= static_cast<uint16_t>(byte) << 8;
-      for (int i = 0; i < 8; i++) crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : (crc << 1);
-    }
-    return crc;
-  }
-
-  static void appendCRC(std::vector<uint8_t> &data)
-  {
-    uint16_t crc = calculateCRC(data);
-    data.push_back(static_cast<uint8_t>(crc >> 8));
-    data.push_back(static_cast<uint8_t>(crc & 0xFF));
-  }
-
-  static void appendInt32(std::vector<uint8_t> &data, int32_t value)
-  {
-    for (int i = 3; i >= 0; --i) data.push_back(static_cast<uint8_t>((value >> (8 * i)) & 0xFF));
-  }
-
-  static void appendFloat32(std::vector<uint8_t> &data, float value)
-  {
-    uint32_t bits;
-    std::memcpy(&bits, &value, sizeof(bits));
-    for (int i = 3; i >= 0; --i) data.push_back(static_cast<uint8_t>((bits >> (8 * i)) & 0xFF));
-  }
 };
 
 // ──────────────────────────────────────────────
@@ -307,6 +313,12 @@ struct StallState
 
 // ──────────────────────────────────────────────
 // ROS 2 Crawler Driver Node
+//
+// スレッド分離:
+//   ROS executor スレッド: cmd_vel/driver 受信 → コマンドスロット更新 (ノンブロッキング)
+//                          watchdog / telemetry publish / estop 処理
+//   serial スレッド       : すべての Roboclaw I/O (コマンド送信 + テレメトリ読み取り)
+//                          接続 / 再接続 / スタック検出 も担当
 // ──────────────────────────────────────────────
 class CrawlerDriver : public rclcpp::Node
 {
@@ -321,7 +333,6 @@ class CrawlerDriver : public rclcpp::Node
     declare_parameter("pulley_ratio", 2);
     declare_parameter("watchdog_timeout_ms", 500);
     declare_parameter("track_width", 0.4);
-
     declare_parameter("m1_kp", 0.464);
     declare_parameter("m1_ki", 0.021);
     declare_parameter("m1_kd", 0.0);
@@ -330,43 +341,25 @@ class CrawlerDriver : public rclcpp::Node
     declare_parameter("m2_ki", 0.020);
     declare_parameter("m2_kd", 0.0);
     declare_parameter("m2_qpps", 50062);
-    // Motor direction sign (+1 or -1). Use when wiring/gear orientation differs.
     declare_parameter("m1_direction_sign", 1);
     declare_parameter("m2_direction_sign", 1);
-    // Encoder reset policy: reset at first successful connect only by default.
     declare_parameter("reset_encoders_on_connect", true);
     declare_parameter("reset_encoders_on_reconnect", false);
-
-    // ── スタック保護パラメータ ────────────────────────────────────────────
-    // 指令速度に対して実速度がこの割合以下ならスタックとみなす
     declare_parameter("stall_error_ratio", 0.5);
-    // 指令速度がこの qpps 以下の場合はスタック判定しない (停止指令時の誤検知防止)
     declare_parameter("stall_cmd_threshold_qpps", 500);
-    // スタックスコアがこの時間 [s] 分たまると最大絞りになる
     declare_parameter("stall_window_sec", 2.0);
-    // スタック時の最大出力削減率 (0.5 = 最大50%削減)
     declare_parameter("stall_max_reduction", 0.5);
-
-    // ── 電流制限 (Roboclaw ハードウェア保護) ─────────────────────────────
-    // 0 を指定すると設定をスキップする
     declare_parameter("m1_max_current_ma", 15000.0);
     declare_parameter("m2_max_current_ma", 15000.0);
-
-    // ── テレメトリ周期 ────────────────────────────────────────────────────
     declare_parameter("telemetry_hz", 10);
-    // Roboclaw の通信タイムアウト (100ms 単位)。
-    // 例: 5 = 500ms で指令断時にハード側が自動停止。
     declare_parameter("serial_timeout_ds", 5);
-    // ── デバッグ出力 ──────────────────────────────────────────────────────
     declare_parameter("debug_io", false);
     declare_parameter("debug_log_period_ms", 200);
-    // ── ハード接続リトライ間隔 ────────────────────────────────────────────
     declare_parameter("connect_retry_sec", 3.0);
 
     initParams();
     initPublishers();
 
-    // サブスクリプションはハード未接続でも安全に設定できる
     subscription_ = create_subscription<custom_interfaces::msg::CrawlerVelocity>(
         "/crawler_driver", 10,
         std::bind(&CrawlerDriver::driver_callback, this, std::placeholders::_1));
@@ -377,9 +370,12 @@ class CrawlerDriver : public rclcpp::Node
     watchdog_timer_ = create_wall_timer(std::chrono::milliseconds(watchdog_timeout_ms_),
                                         std::bind(&CrawlerDriver::watchdog_callback, this));
 
+    // テレメトリ publish は ROS タイマーで行う。
+    // 実際の serial 読み取りは serial スレッド側で行い、shared_telemetry_ に格納する。
     const int telem_ms = static_cast<int>(1000.0 / static_cast<double>(telemetry_hz_));
-    telemetry_timer_ = create_wall_timer(std::chrono::milliseconds(telem_ms),
-                                         std::bind(&CrawlerDriver::telemetry_callback, this));
+    telemetry_timer_ =
+        create_wall_timer(std::chrono::milliseconds(telem_ms),
+                          std::bind(&CrawlerDriver::telemetry_publish_callback, this));
 
     auto estop_qos = rclcpp::QoS(1).transient_local().reliable();
     estop_sub_ = create_subscription<std_msgs::msg::Bool>(
@@ -390,7 +386,8 @@ class CrawlerDriver : public rclcpp::Node
           estop_active_ = msg->data;
           if (estop_active_ && !was_estop)
           {
-            if (hw_connected_) stopMotors();
+            force_stop_.store(true, std::memory_order_release);
+            cmd_cv_.notify_one();
             RCLCPP_FATAL(get_logger(), "⛔ EMERGENCY STOP — motors halted");
           }
           else if (!estop_active_ && was_estop)
@@ -399,22 +396,23 @@ class CrawlerDriver : public rclcpp::Node
           }
         });
 
-    // ハードウェア接続をリトライ付きで試みる
-    const double retry_sec = get_parameter("connect_retry_sec").as_double();
-    connect_timer_ = create_wall_timer(std::chrono::duration<double>(retry_sec),
-                                       std::bind(&CrawlerDriver::tryConnect, this));
-    tryConnect();
+    // serial スレッド起動 (接続 / 再接続 / コマンド送信 / テレメトリ読み取りを担当)
+    running_.store(true, std::memory_order_release);
+    serial_thread_ = std::thread(&CrawlerDriver::serialThreadFunc, this);
   }
 
   ~CrawlerDriver() override
   {
-    if (hw_connected_) stopMotors();
+    running_.store(false, std::memory_order_release);
+    cmd_cv_.notify_all();
+    if (serial_thread_.joinable()) serial_thread_.join();
   }
 
  private:
+  // ── Roboclaw ドライバ (serial スレッド専用) ────────────────────────────────
   RoboclawDriver roboclaw_;
 
-  // ── パラメータ ────────────────────────────────────────────────────────────
+  // ── パラメータ (initParams で設定、以降読み取り専用) ──────────────────────
   double counts_per_meter_;
   int watchdog_timeout_ms_;
   int baud_rate_;
@@ -427,25 +425,54 @@ class CrawlerDriver : public rclcpp::Node
   int m2_qpps_;
   int m1_direction_sign_;
   int m2_direction_sign_;
-  bool reset_encoders_on_connect_ = true;
-  bool reset_encoders_on_reconnect_ = false;
-
+  bool reset_encoders_on_connect_;
+  bool reset_encoders_on_reconnect_;
   double stall_error_ratio_;
   int stall_cmd_threshold_qpps_;
   double stall_window_sec_;
   double stall_max_reduction_;
+  float m1_max_current_ma_;
+  float m2_max_current_ma_;
+  int telemetry_hz_;
+  double telemetry_dt_sec_;
+  int serial_timeout_ds_;
+  double connect_retry_sec_;
+  std::string serial_port_;
 
-  // ── 状態 ──────────────────────────────────────────────────────────────────
+  // ── serial スレッド ────────────────────────────────────────────────────────
+  std::thread serial_thread_;
+  std::atomic<bool> running_{false};
+
+  // ── コマンドスロット (latest-wins) ────────────────────────────────────────
+  // ROS スレッドが書き、serial スレッドが読む。
+  struct MotorCmd
+  {
+    int32_t m1 = 0;
+    int32_t m2 = 0;
+  };
+  MotorCmd pending_cmd_;
+  bool pending_valid_ = false;
+  std::mutex cmd_mutex_;
+  std::condition_variable cmd_cv_;
+
+  // ── フォース停止フラグ (watchdog / estop) ────────────────────────────────
+  std::atomic<bool> force_stop_{false};
+
+  // ── 共有テレメトリ (serial スレッドが書き、ROS スレッドが publish する) ──
+  RoboclawTelemetry shared_telemetry_;
+  std::mutex telemetry_mutex_;
+
+  // ── スタールスケール (serial スレッドが書き、ROS スレッドが publish する) ─
+  std::atomic<double> m1_stall_scale_{1.0};
+  std::atomic<double> m2_stall_scale_{1.0};
+
+  // ── HW 接続状態 ───────────────────────────────────────────────────────────
+  std::atomic<bool> hw_connected_{false};
+
+  // ── ROS スレッド専用状態 ──────────────────────────────────────────────────
   rclcpp::Time last_cmd_time_;
+  bool cmd_vel_is_zero_ = true;
   bool estop_active_ = false;
-  bool hw_connected_ = false;
-  bool has_connected_once_ = false;
-  StallState m1_stall_, m2_stall_;
-  int32_t m1_cmd_qpps_ = 0, m2_cmd_qpps_ = 0;
-  RoboclawTelemetry telemetry_;
-  int telemetry_hz_ = 10;
-  double telemetry_dt_sec_ = 0.1;
-  rclcpp::Time last_stall_eval_time_;
 
   // ── タイマー / サブスクリプション ─────────────────────────────────────────
   rclcpp::Subscription<custom_interfaces::msg::CrawlerVelocity>::SharedPtr subscription_;
@@ -453,7 +480,6 @@ class CrawlerDriver : public rclcpp::Node
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   rclcpp::TimerBase::SharedPtr watchdog_timer_;
   rclcpp::TimerBase::SharedPtr telemetry_timer_;
-  rclcpp::TimerBase::SharedPtr connect_timer_;
 
   // ── パブリッシャ ───────────────────────────────────────────────────────────
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_m1_current_;
@@ -466,130 +492,223 @@ class CrawlerDriver : public rclcpp::Node
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_m1_stall_scale_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_m2_stall_scale_;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // serial スレッド
+  // ════════════════════════════════════════════════════════════════════════════
 
-  void initParams()
+  void serialThreadFunc()
   {
-    const double circumference = get_parameter("crawler_circumference").as_double();
-    const int counts_per_rev = get_parameter("counts_per_rev").as_int();
-    const int gearhead_ratio = get_parameter("gearhead_ratio").as_int();
-    const int pulley_ratio = get_parameter("pulley_ratio").as_int();
-    watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
-    baud_rate_ = get_parameter("baud_rate").as_int();
-    debug_io_ = get_parameter("debug_io").as_bool();
-    debug_log_period_ms_ = get_parameter("debug_log_period_ms").as_int();
-    track_width_ = get_parameter("track_width").as_double();
+    using clk = std::chrono::steady_clock;
 
-    m1_kp_ = get_parameter("m1_kp").as_double();
-    m1_ki_ = get_parameter("m1_ki").as_double();
-    m1_kd_ = get_parameter("m1_kd").as_double();
-    m1_qpps_ = get_parameter("m1_qpps").as_int();
-    m2_kp_ = get_parameter("m2_kp").as_double();
-    m2_ki_ = get_parameter("m2_ki").as_double();
-    m2_kd_ = get_parameter("m2_kd").as_double();
-    m2_qpps_ = get_parameter("m2_qpps").as_int();
-    m1_direction_sign_ = normalizeDirectionSign(get_parameter("m1_direction_sign").as_int());
-    m2_direction_sign_ = normalizeDirectionSign(get_parameter("m2_direction_sign").as_int());
-    reset_encoders_on_connect_ = get_parameter("reset_encoders_on_connect").as_bool();
-    reset_encoders_on_reconnect_ = get_parameter("reset_encoders_on_reconnect").as_bool();
+    // serial スレッド専用状態 (他スレッドからアクセス不可)
+    bool has_connected_once = false;
+    bool motors_stopped = true;
+    StallState m1_stall, m2_stall;
+    int32_t m1_cmd_qpps = 0, m2_cmd_qpps = 0;
+    const auto telem_period =
+        std::chrono::duration_cast<clk::duration>(std::chrono::duration<double>(telemetry_dt_sec_));
+    auto telem_deadline = clk::now();
 
-    stall_error_ratio_ = get_parameter("stall_error_ratio").as_double();
-    stall_cmd_threshold_qpps_ = get_parameter("stall_cmd_threshold_qpps").as_int();
-    stall_window_sec_ = get_parameter("stall_window_sec").as_double();
-    stall_max_reduction_ = get_parameter("stall_max_reduction").as_double();
-    telemetry_hz_ = get_parameter("telemetry_hz").as_int();
-    if (telemetry_hz_ <= 0)
+    while (running_.load(std::memory_order_relaxed))
     {
-      RCLCPP_WARN(get_logger(), "Invalid telemetry_hz=%d. Falling back to 10 Hz", telemetry_hz_);
-      telemetry_hz_ = 10;
+      // ── 1. 未接続時: 接続を試みる ─────────────────────────────────────────
+      if (!hw_connected_.load(std::memory_order_acquire))
+      {
+        if (roboclaw_.connect(serial_port_, baud_rate_))
+        {
+          // 接続成功: 状態リセット後にハードウェア初期化
+          motors_stopped = true;
+          m1_stall = StallState{};
+          m2_stall = StallState{};
+          m1_cmd_qpps = 0;
+          m2_cmd_qpps = 0;
+          telem_deadline = clk::now();
+
+          if (serialInitHardware(has_connected_once))
+          {
+            has_connected_once = true;
+            hw_connected_.store(true, std::memory_order_release);
+            RCLCPP_INFO(get_logger(), "Connected to Roboclaw on %s @ %d bps", serial_port_.c_str(),
+                        baud_rate_);
+          }
+          else
+          {
+            RCLCPP_ERROR(get_logger(), "Hardware init failed, retrying...");
+            roboclaw_.disconnect();
+            // initHardware 失敗: retry 前に待機
+            serialSleep();
+          }
+        }
+        else
+        {
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
+                               "Failed to connect to Roboclaw on %s @ %d bps. Retrying...",
+                               serial_port_.c_str(), baud_rate_);
+          serialSleep();
+        }
+        continue;
+      }
+
+      // ── 2. コマンド受信待ち (テレメトリ期限まで) ──────────────────────────
+      MotorCmd cmd;
+      bool has_cmd = false;
+      bool do_stop = false;
+
+      {
+        std::unique_lock<std::mutex> lk(cmd_mutex_);
+        cmd_cv_.wait_until(lk, telem_deadline,
+                           [this]
+                           {
+                             return !running_.load(std::memory_order_relaxed) || pending_valid_ ||
+                                    force_stop_.load(std::memory_order_relaxed);
+                           });
+
+        if (!running_.load(std::memory_order_relaxed)) break;
+
+        do_stop = force_stop_.exchange(false, std::memory_order_acq_rel);
+        if (pending_valid_)
+        {
+          cmd = pending_cmd_;
+          pending_valid_ = false;
+          has_cmd = true;
+        }
+      }
+
+      // ── 3. コマンド実行 ────────────────────────────────────────────────────
+      if (do_stop)
+      {
+        // watchdog / estop によるフォース停止: 無条件に送信
+        m1_cmd_qpps = 0;
+        m2_cmd_qpps = 0;
+        motors_stopped = true;
+        if (!roboclaw_.setMixedSpeed(0, 0))
+        {
+          serialHandleFailure("force stop failed");
+          continue;
+        }
+      }
+      else if (has_cmd)
+      {
+        if (cmd.m1 == 0 && cmd.m2 == 0)
+        {
+          // 停止指令: 遷移時のみ送信。以降は Roboclaw の serial_timeout_ds に任せる。
+          if (!motors_stopped)
+          {
+            m1_cmd_qpps = 0;
+            m2_cmd_qpps = 0;
+            motors_stopped = true;
+            if (!roboclaw_.setMixedSpeed(0, 0))
+            {
+              serialHandleFailure("stop command failed");
+              continue;
+            }
+          }
+        }
+        else
+        {
+          // 走行指令: スタールスケールを適用して送信
+          m1_cmd_qpps = cmd.m1;
+          m2_cmd_qpps = cmd.m2;
+          const int32_t m1_out = static_cast<int32_t>(static_cast<double>(cmd.m1) * m1_stall.scale);
+          const int32_t m2_out = static_cast<int32_t>(static_cast<double>(cmd.m2) * m2_stall.scale);
+
+          motors_stopped = false;
+
+          if (debug_io_)
+          {
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), debug_log_period_ms_,
+                                 "[debug_io] qpps_cmd=(%d,%d) qpps_out=(%d,%d) stall=(%.2f,%.2f)",
+                                 cmd.m1, cmd.m2, m1_out, m2_out, m1_stall.scale, m2_stall.scale);
+          }
+
+          if (!roboclaw_.setMixedSpeed(m1_out, m2_out))
+          {
+            serialHandleFailure("command send failed");
+            continue;
+          }
+        }
+      }
+
+      // ── 4. テレメトリ読み取り (telemetry_hz_ に従う) ──────────────────────
+      if (clk::now() >= telem_deadline)
+      {
+        // 次の期限を更新。積算遅延を防ぐため now() より過去にはしない。
+        telem_deadline += telem_period;
+        if (telem_deadline < clk::now()) telem_deadline = clk::now() + telem_period;
+
+        const RoboclawTelemetry t = roboclaw_.readTelemetry();
+        if (!t.valid)
+        {
+          serialHandleFailure("telemetry read failed");
+          continue;
+        }
+
+        {
+          std::lock_guard<std::mutex> lk(telemetry_mutex_);
+          shared_telemetry_ = t;
+        }
+
+        // スタール検出 (telemetry_hz_ ごとに実行 → dt が安定)
+        const int32_t m1_actual = t.m1_speed_qpps * m1_direction_sign_;
+        const int32_t m2_actual = t.m2_speed_qpps * m2_direction_sign_;
+        updateStall(m1_stall, m1_cmd_qpps, m1_actual);
+        updateStall(m2_stall, m2_cmd_qpps, m2_actual);
+        m1_stall_scale_.store(m1_stall.scale, std::memory_order_relaxed);
+        m2_stall_scale_.store(m2_stall.scale, std::memory_order_relaxed);
+      }
     }
-    telemetry_dt_sec_ = 1.0 / static_cast<double>(telemetry_hz_);
-
-    counts_per_meter_ = (counts_per_rev * gearhead_ratio * pulley_ratio) / circumference;
-    last_cmd_time_ = now();
-    last_stall_eval_time_ = now();
-
-    if (baud_rate_ <= 0)
-    {
-      RCLCPP_WARN(get_logger(), "Invalid baud_rate=%d. Falling back to %d", baud_rate_,
-                  DEFAULT_SERIAL_BAUD_RATE);
-      baud_rate_ = DEFAULT_SERIAL_BAUD_RATE;
-    }
-
-    if (debug_log_period_ms_ <= 0) debug_log_period_ms_ = 200;
-
-    RCLCPP_INFO(get_logger(), "Motor direction signs: m1=%d m2=%d", m1_direction_sign_,
-                m2_direction_sign_);
   }
 
-  int normalizeDirectionSign(int value)
+  /// running_ が false になるまで connect_retry_sec_ 待機する
+  void serialSleep()
   {
-    if (value >= 0) return 1;
-    return -1;
+    std::unique_lock<std::mutex> lk(cmd_mutex_);
+    cmd_cv_.wait_for(lk, std::chrono::duration<double>(connect_retry_sec_),
+                     [this] { return !running_.load(std::memory_order_relaxed); });
   }
 
-  void tryConnect()
+  void serialHandleFailure(const char *reason)
   {
-    if (hw_connected_) return;
-
-    const std::string port = get_parameter("serial_port").as_string();
-    if (!roboclaw_.connect(port, baud_rate_))
+    RCLCPP_ERROR(get_logger(),
+                 "Roboclaw comm failure (%s). Disconnecting and scheduling reconnect.", reason);
+    hw_connected_.store(false, std::memory_order_release);
     {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
-                           "Failed to connect to Roboclaw on %s @ %d bps. Retrying...",
-                           port.c_str(), baud_rate_);
-      return;
+      std::lock_guard<std::mutex> lk(telemetry_mutex_);
+      shared_telemetry_.valid = false;
     }
-
-    if (debug_io_)
-    {
-      RCLCPP_INFO(get_logger(), "[debug_io] Roboclaw link established: port=%s baud=%d",
-                  port.c_str(), baud_rate_);
-    }
-
-    if (!initHardware())
-    {
-      RCLCPP_ERROR(get_logger(), "Hardware initialization failed. Retrying connection...");
-      roboclaw_.disconnect();
-      return;
-    }
-
-    hw_connected_ = true;
-    has_connected_once_ = true;
-    connect_timer_->cancel();
-    last_cmd_time_ = now();
-    RCLCPP_INFO(get_logger(), "Connected to Roboclaw on %s @ %d bps", port.c_str(), baud_rate_);
+    m1_stall_scale_.store(1.0, std::memory_order_relaxed);
+    m2_stall_scale_.store(1.0, std::memory_order_relaxed);
+    roboclaw_.disconnect();
   }
 
-  bool initHardware()
+  bool serialInitHardware(bool has_connected_once)
   {
     bool ok = true;
-    ok &= roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
-    ok &= roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
+    ok &= roboclaw_.setMixedSpeed(0, 0);
     ok &= roboclaw_.setPIDConstants(CMD_SET_M1_PID, m1_kp_, m1_ki_, m1_kd_, m1_qpps_);
     ok &= roboclaw_.setPIDConstants(CMD_SET_M2_PID, m2_kp_, m2_ki_, m2_kd_, m2_qpps_);
+    if (ok)
+    {
+      RCLCPP_INFO(get_logger(),
+                  "PID: M1(Kp=%.4f Ki=%.4f Kd=%.4f qpps=%d) M2(Kp=%.4f Ki=%.4f Kd=%.4f qpps=%d)",
+                  m1_kp_, m1_ki_, m1_kd_, m1_qpps_, m2_kp_, m2_ki_, m2_kd_, m2_qpps_);
+    }
 
-    const bool should_reset_encoders =
-        reset_encoders_on_connect_ && (!has_connected_once_ || reset_encoders_on_reconnect_);
-    if (should_reset_encoders)
+    const bool should_reset =
+        reset_encoders_on_connect_ && (!has_connected_once || reset_encoders_on_reconnect_);
+    if (should_reset)
     {
       ok &= roboclaw_.resetEncoders();
       RCLCPP_INFO(get_logger(), "Encoders reset (%s)",
-                  has_connected_once_ ? "reconnect" : "startup");
+                  has_connected_once ? "reconnect" : "startup");
     }
 
-    // ハードウェア電流制限 (0 はスキップ)
-    const float m1_max_ma = static_cast<float>(get_parameter("m1_max_current_ma").as_double());
-    const float m2_max_ma = static_cast<float>(get_parameter("m2_max_current_ma").as_double());
-    const int serial_timeout_ds = get_parameter("serial_timeout_ds").as_int();
-
-    if (serial_timeout_ds >= 0 && serial_timeout_ds <= 255)
+    if (serial_timeout_ds_ >= 0 && serial_timeout_ds_ <= 255)
     {
-      const bool timeout_ok = roboclaw_.setSerialTimeoutDs(static_cast<uint8_t>(serial_timeout_ds));
-      if (timeout_ok)
+      if (roboclaw_.setSerialTimeoutDs(static_cast<uint8_t>(serial_timeout_ds_)))
       {
-        RCLCPP_INFO(get_logger(), "Roboclaw serial timeout set to %d ds (%d ms)", serial_timeout_ds,
-                    serial_timeout_ds * 100);
+        RCLCPP_INFO(get_logger(), "Roboclaw serial timeout: %d ds (%d ms)", serial_timeout_ds_,
+                    serial_timeout_ds_ * 100);
       }
       else
       {
@@ -597,96 +716,26 @@ class CrawlerDriver : public rclcpp::Node
         ok = false;
       }
     }
-    else
-    {
-      RCLCPP_WARN(get_logger(), "Invalid serial_timeout_ds=%d. Skipping Roboclaw timeout setup.",
-                  serial_timeout_ds);
-    }
 
-    if (m1_max_ma > 0.0f)
+    if (m1_max_current_ma_ > 0.0f)
     {
-      ok &= roboclaw_.setMaxCurrent(CMD_SET_M1_MAX_CURRENT, m1_max_ma);
-      RCLCPP_INFO(get_logger(), "M1 max current set to %.0f mA", m1_max_ma);
+      ok &= roboclaw_.setMaxCurrent(CMD_SET_M1_MAX_CURRENT, m1_max_current_ma_);
+      RCLCPP_INFO(get_logger(), "M1 max current: %.0f mA", m1_max_current_ma_);
     }
-    if (m2_max_ma > 0.0f)
+    if (m2_max_current_ma_ > 0.0f)
     {
-      ok &= roboclaw_.setMaxCurrent(CMD_SET_M2_MAX_CURRENT, m2_max_ma);
-      RCLCPP_INFO(get_logger(), "M2 max current set to %.0f mA", m2_max_ma);
+      ok &= roboclaw_.setMaxCurrent(CMD_SET_M2_MAX_CURRENT, m2_max_current_ma_);
+      RCLCPP_INFO(get_logger(), "M2 max current: %.0f mA", m2_max_current_ma_);
     }
 
     if (ok) RCLCPP_INFO(get_logger(), "Hardware initialized");
     return ok;
   }
 
-  void initPublishers()
+  /// スタール検出。telemetry_hz_ ごとに呼ぶこと (dt = telemetry_dt_sec_ で固定)
+  void updateStall(StallState &state, int32_t cmd_qpps, int32_t actual_qpps)
   {
-    const std::string prefix = "~/diagnostics/";
-    pub_m1_current_ = create_publisher<std_msgs::msg::Float64>(prefix + "m1_current_ma", 10);
-    pub_m2_current_ = create_publisher<std_msgs::msg::Float64>(prefix + "m2_current_ma", 10);
-    pub_m1_speed_actual_ = create_publisher<std_msgs::msg::Float64>(prefix + "m1_speed_actual", 10);
-    pub_m2_speed_actual_ = create_publisher<std_msgs::msg::Float64>(prefix + "m2_speed_actual", 10);
-    pub_temperature_ = create_publisher<std_msgs::msg::Float64>(prefix + "temperature_c", 10);
-    pub_battery_voltage_ = create_publisher<std_msgs::msg::Float64>(prefix + "battery_volts", 10);
-    pub_status_flags_ = create_publisher<std_msgs::msg::UInt32>(prefix + "status_flags", 10);
-    pub_m1_stall_scale_ = create_publisher<std_msgs::msg::Float64>(prefix + "m1_stall_scale", 10);
-    pub_m2_stall_scale_ = create_publisher<std_msgs::msg::Float64>(prefix + "m2_stall_scale", 10);
-  }
-
-  // ── テレメトリ取得 + publish + 警告ログ ──────────────────────────────────
-  void telemetry_callback()
-  {
-    if (!hw_connected_) return;
-
-    telemetry_ = roboclaw_.readTelemetry();
-    if (!telemetry_.valid) return;
-
-    auto pub_f64 = [](auto &pub, double val)
-    {
-      std_msgs::msg::Float64 msg;
-      msg.data = val;
-      pub->publish(msg);
-    };
-
-    pub_f64(pub_m1_current_, telemetry_.m1_current_ma);
-    pub_f64(pub_m2_current_, telemetry_.m2_current_ma);
-    pub_f64(pub_m1_speed_actual_, static_cast<double>(telemetry_.m1_speed_qpps));
-    pub_f64(pub_m2_speed_actual_, static_cast<double>(telemetry_.m2_speed_qpps));
-    pub_f64(pub_temperature_, telemetry_.temperature_c);
-    pub_f64(pub_battery_voltage_, telemetry_.battery_volts);
-
-    {
-      std_msgs::msg::UInt32 msg;
-      msg.data = telemetry_.status_flags;
-      pub_status_flags_->publish(msg);
-    }
-
-    // ステータスフラグ警告ログ
-    const auto &sf = telemetry_.status_flags;
-    if (sf & STATUS_TEMP_ERROR)
-      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000,
-                            "🌡️  Roboclaw temperature error (%.1f°C)", telemetry_.temperature_c);
-    else if (sf & STATUS_TEMP_WARNING)
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
-                           "🌡️  Roboclaw temperature warning (%.1f°C)", telemetry_.temperature_c);
-    if (sf & STATUS_M1_OVERCURRENT)
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000, "⚡ M1 overcurrent (%.0f mA)",
-                           telemetry_.m1_current_ma);
-    if (sf & STATUS_M2_OVERCURRENT)
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000, "⚡ M2 overcurrent (%.0f mA)",
-                           telemetry_.m2_current_ma);
-    if (sf & STATUS_MAIN_BATT_LOW)
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000, "🔋 Main battery low (%.1f V)",
-                           telemetry_.battery_volts);
-    if (sf & STATUS_M1_FAULT)
-      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "💥 M1 driver fault");
-    if (sf & STATUS_M2_FAULT)
-      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "💥 M2 driver fault");
-  }
-
-  // ── スタック検出: 速度誤差スコアで出力スケールを更新 ──────────────────────
-  // 実速度は telemetry_ から読む (telemetry_callback が別タイマーで更新)
-  void updateStall(StallState &state, int32_t cmd_qpps, int32_t actual_qpps, double dt)
-  {
+    const double dt = telemetry_dt_sec_;
     const bool cmd_significant = std::abs(cmd_qpps) > stall_cmd_threshold_qpps_;
     const bool stalling = cmd_significant && (std::abs(cmd_qpps - actual_qpps) >
                                               std::abs(cmd_qpps) * stall_error_ratio_);
@@ -694,7 +743,7 @@ class CrawlerDriver : public rclcpp::Node
     if (stalling)
       state.score = std::min(state.score + dt, stall_window_sec_);
     else
-      state.score = std::max(state.score - dt * 2.0, 0.0);  // 回復は2倍速
+      state.score = std::max(state.score - dt * 2.0, 0.0);  // 回復は 2 倍速
 
     const double ratio = state.score / stall_window_sec_;
     state.scale = 1.0 - ratio * stall_max_reduction_;
@@ -704,134 +753,208 @@ class CrawlerDriver : public rclcpp::Node
                            state.scale);
   }
 
-  void stopMotors()
+  // ════════════════════════════════════════════════════════════════════════════
+  // ROS スレッド コールバック
+  // ════════════════════════════════════════════════════════════════════════════
+
+  static constexpr double kZeroVelThresh = 1e-4;  // [m/s] 停止扱いとするしきい値
+
+  /// コマンドをスロットに書き込んで serial スレッドを起こす。
+  /// zero は「一度だけ送る」ロジックを ROS スレッド側で処理してから呼ぶこと。
+  void pushCommand(int32_t m1, int32_t m2)
   {
-    if (!hw_connected_) return;
-    const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
-    const bool ok2 = roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
-    if (!ok1 || !ok2)
     {
-      handleCommFailure("failed to send zero-velocity stop command");
+      std::lock_guard<std::mutex> lk(cmd_mutex_);
+      pending_cmd_ = {m1, m2};
+      pending_valid_ = true;
     }
+    cmd_cv_.notify_one();
   }
 
-  void sendMotorCommands(double m1_vel, double m2_vel)
+  /// m/s → qpps 変換 (方向符号適用済み) してスロットを更新する共通ロジック
+  void handleVelocity(double m1_vel, double m2_vel)
   {
-    if (!hw_connected_) return;
+    const int32_t m1_qpps = static_cast<int32_t>(m1_vel * counts_per_meter_) * m1_direction_sign_;
+    const int32_t m2_qpps = static_cast<int32_t>(m2_vel * counts_per_meter_) * m2_direction_sign_;
 
-    m1_cmd_qpps_ = static_cast<int32_t>(m1_vel * counts_per_meter_) * m1_direction_sign_;
-    m2_cmd_qpps_ = static_cast<int32_t>(m2_vel * counts_per_meter_) * m2_direction_sign_;
-
-    const int32_t m1_actual_qpps = telemetry_.m1_speed_qpps * m1_direction_sign_;
-    const int32_t m2_actual_qpps = telemetry_.m2_speed_qpps * m2_direction_sign_;
-
-    // スタック検出 (テレメトリが有効な場合のみ)
-    const auto now_time = now();
-    double dt = (now_time - last_stall_eval_time_).seconds();
-    if (dt <= 0.0 || dt > 1.0) dt = telemetry_dt_sec_;
-    last_stall_eval_time_ = now_time;
-    if (telemetry_.valid)
+    if (std::abs(m1_vel) < kZeroVelThresh && std::abs(m2_vel) < kZeroVelThresh)
     {
-      updateStall(m1_stall_, m1_cmd_qpps_, m1_actual_qpps, dt);
-      updateStall(m2_stall_, m2_cmd_qpps_, m2_actual_qpps, dt);
+      // 停止遷移時のみ一度だけプッシュ。以降は無言 (serial_timeout_ds が最終保証)。
+      if (!cmd_vel_is_zero_)
+      {
+        cmd_vel_is_zero_ = true;
+        pushCommand(0, 0);
+      }
+      return;
     }
-
-    // stall scale を publish
-    {
-      std_msgs::msg::Float64 msg;
-      msg.data = m1_stall_.scale;
-      pub_m1_stall_scale_->publish(msg);
-      msg.data = m2_stall_.scale;
-      pub_m2_stall_scale_->publish(msg);
-    }
-
-    const auto m1 = static_cast<int32_t>(m1_cmd_qpps_ * m1_stall_.scale);
-    const auto m2 = static_cast<int32_t>(m2_cmd_qpps_ * m2_stall_.scale);
-
-    if (debug_io_)
-    {
-      RCLCPP_INFO_THROTTLE(
-          get_logger(), *get_clock(), debug_log_period_ms_,
-          "[debug_io] cmd_vel=(%.3f, %.3f) qpps_raw=(%d, %d) qpps_out=(%d, %d) actual=(%d, %d)"
-          " stall=(%.2f, %.2f)",
-          m1_vel, m2_vel, m1_cmd_qpps_, m2_cmd_qpps_, m1, m2, m1_actual_qpps, m2_actual_qpps,
-          m1_stall_.scale, m2_stall_.scale);
-    }
-
-    //const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
-    const bool ok2 = roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, m2);
-    const bool ok1 = roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, m1);
-    if (!ok1) RCLCPP_ERROR(get_logger(), "Failed to send M1 command");
-    if (!ok2) RCLCPP_ERROR(get_logger(), "Failed to send M2 command");
-    if (!ok1 || !ok2)
-    {
-      handleCommFailure("motor command write failure");
-    }
+    cmd_vel_is_zero_ = false;
+    pushCommand(m1_qpps, m2_qpps);
   }
 
   void driver_callback(const custom_interfaces::msg::CrawlerVelocity &msg)
   {
     if (estop_active_) return;
     last_cmd_time_ = now();
-    sendMotorCommands(msg.m1_vel, msg.m2_vel);
+    handleVelocity(msg.m1_vel, msg.m2_vel);
   }
 
   void cmd_vel_callback(const geometry_msgs::msg::Twist &msg)
   {
     if (estop_active_) return;
     last_cmd_time_ = now();
+
     const double half_track = track_width_ / 2.0;
-    sendMotorCommands(msg.linear.x - msg.angular.z * half_track,
-                      msg.linear.x + msg.angular.z * half_track);
+    handleVelocity(msg.linear.x - msg.angular.z * half_track,
+                   msg.linear.x + msg.angular.z * half_track);
   }
 
   void watchdog_callback()
   {
-    if (!hw_connected_) return;
+    if (!hw_connected_.load(std::memory_order_acquire)) return;
 
     const double elapsed = (now() - last_cmd_time_).seconds() * 1000.0;
-    if (elapsed > watchdog_timeout_ms_)
+    if (elapsed > static_cast<double>(watchdog_timeout_ms_))
     {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000,
                            "Watchdog: no command for %.0f ms, stopping motors", elapsed);
-      stopMotors();
+      force_stop_.store(true, std::memory_order_release);
+      cmd_cv_.notify_one();
     }
   }
 
-  void handleCommFailure(const char *reason)
+  // テレメトリ publish のみ (serial I/O なし)
+  void telemetry_publish_callback()
   {
-    if (!hw_connected_) return;
-
-    const int32_t last_m1_cmd_qpps = m1_cmd_qpps_;
-    const int32_t last_m2_cmd_qpps = m2_cmd_qpps_;
-    const int32_t last_m1_actual_qpps = telemetry_.m1_speed_qpps;
-    const int32_t last_m2_actual_qpps = telemetry_.m2_speed_qpps;
-
-    // 片側だけ指令が通っているケースを減らすため、切断前にベストエフォート停止。
-    (void)roboclaw_.setMotorVelocity(CMD_M1_VELOCITY, 0);
-    (void)roboclaw_.setMotorVelocity(CMD_M2_VELOCITY, 0);
-
-    hw_connected_ = false;
-    telemetry_.valid = false;
-    m1_cmd_qpps_ = 0;
-    m2_cmd_qpps_ = 0;
-    m1_stall_ = StallState{};
-    m2_stall_ = StallState{};
-
-    roboclaw_.disconnect();
-    if (connect_timer_) connect_timer_->reset();
-
-    RCLCPP_ERROR(
-        get_logger(),
-        "Communication with Roboclaw lost (%s). Entering fail-safe and retrying reconnect.",
-        reason);
-
-    if (debug_io_)
+    RoboclawTelemetry t;
     {
-      RCLCPP_ERROR(get_logger(),
-                   "[debug_io] link dropped: last_cmd_qpps=(%d, %d) last_actual_qpps=(%d, %d)",
-                   last_m1_cmd_qpps, last_m2_cmd_qpps, last_m1_actual_qpps, last_m2_actual_qpps);
+      std::lock_guard<std::mutex> lk(telemetry_mutex_);
+      t = shared_telemetry_;
     }
+    if (!t.valid) return;
+
+    auto pub_f64 = [](auto &pub, double val)
+    {
+      std_msgs::msg::Float64 msg;
+      msg.data = val;
+      pub->publish(msg);
+    };
+
+    pub_f64(pub_m1_current_, t.m1_current_ma);
+    pub_f64(pub_m2_current_, t.m2_current_ma);
+    pub_f64(pub_m1_speed_actual_, static_cast<double>(t.m1_speed_qpps));
+    pub_f64(pub_m2_speed_actual_, static_cast<double>(t.m2_speed_qpps));
+    pub_f64(pub_temperature_, t.temperature_c);
+    pub_f64(pub_battery_voltage_, t.battery_volts);
+    pub_f64(pub_m1_stall_scale_, m1_stall_scale_.load(std::memory_order_relaxed));
+    pub_f64(pub_m2_stall_scale_, m2_stall_scale_.load(std::memory_order_relaxed));
+
+    {
+      std_msgs::msg::UInt32 msg;
+      msg.data = t.status_flags;
+      pub_status_flags_->publish(msg);
+    }
+
+    const auto &sf = t.status_flags;
+    if (sf & STATUS_TEMP_ERROR)
+      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000,
+                            "🌡️  Roboclaw temperature error (%.1f°C)", t.temperature_c);
+    else if (sf & STATUS_TEMP_WARNING)
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000,
+                           "🌡️  Roboclaw temperature warning (%.1f°C)", t.temperature_c);
+    if (sf & STATUS_M1_OVERCURRENT)
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000, "⚡ M1 overcurrent (%.0f mA)",
+                           t.m1_current_ma);
+    if (sf & STATUS_M2_OVERCURRENT)
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000, "⚡ M2 overcurrent (%.0f mA)",
+                           t.m2_current_ma);
+    if (sf & STATUS_MAIN_BATT_LOW)
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000, "🔋 Main battery low (%.1f V)",
+                           t.battery_volts);
+    if (sf & STATUS_M1_FAULT)
+      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "💥 M1 driver fault");
+    if (sf & STATUS_M2_FAULT)
+      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "💥 M2 driver fault");
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 初期化ヘルパ
+  // ════════════════════════════════════════════════════════════════════════════
+
+  void initParams()
+  {
+    serial_port_ = get_parameter("serial_port").as_string();
+    baud_rate_ = get_parameter("baud_rate").as_int();
+    debug_io_ = get_parameter("debug_io").as_bool();
+    debug_log_period_ms_ = get_parameter("debug_log_period_ms").as_int();
+    if (debug_log_period_ms_ <= 0) debug_log_period_ms_ = 200;
+    track_width_ = get_parameter("track_width").as_double();
+    watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
+    connect_retry_sec_ = get_parameter("connect_retry_sec").as_double();
+
+    const double circumference = get_parameter("crawler_circumference").as_double();
+    const int counts_per_rev = get_parameter("counts_per_rev").as_int();
+    const int gearhead = get_parameter("gearhead_ratio").as_int();
+    const int pulley = get_parameter("pulley_ratio").as_int();
+    counts_per_meter_ = (counts_per_rev * gearhead * pulley) / circumference;
+
+    m1_kp_ = get_parameter("m1_kp").as_double();
+    m1_ki_ = get_parameter("m1_ki").as_double();
+    m1_kd_ = get_parameter("m1_kd").as_double();
+    m1_qpps_ = get_parameter("m1_qpps").as_int();
+    m2_kp_ = get_parameter("m2_kp").as_double();
+    m2_ki_ = get_parameter("m2_ki").as_double();
+    m2_kd_ = get_parameter("m2_kd").as_double();
+    m2_qpps_ = get_parameter("m2_qpps").as_int();
+
+    m1_direction_sign_ = (get_parameter("m1_direction_sign").as_int() >= 0) ? 1 : -1;
+    m2_direction_sign_ = (get_parameter("m2_direction_sign").as_int() >= 0) ? 1 : -1;
+
+    reset_encoders_on_connect_ = get_parameter("reset_encoders_on_connect").as_bool();
+    reset_encoders_on_reconnect_ = get_parameter("reset_encoders_on_reconnect").as_bool();
+
+    stall_error_ratio_ = get_parameter("stall_error_ratio").as_double();
+    stall_cmd_threshold_qpps_ = get_parameter("stall_cmd_threshold_qpps").as_int();
+    stall_window_sec_ = get_parameter("stall_window_sec").as_double();
+    stall_max_reduction_ = get_parameter("stall_max_reduction").as_double();
+
+    m1_max_current_ma_ = static_cast<float>(get_parameter("m1_max_current_ma").as_double());
+    m2_max_current_ma_ = static_cast<float>(get_parameter("m2_max_current_ma").as_double());
+
+    telemetry_hz_ = get_parameter("telemetry_hz").as_int();
+    if (telemetry_hz_ <= 0)
+    {
+      RCLCPP_WARN(get_logger(), "Invalid telemetry_hz=%d, using 10 Hz", telemetry_hz_);
+      telemetry_hz_ = 10;
+    }
+    telemetry_dt_sec_ = 1.0 / static_cast<double>(telemetry_hz_);
+
+    serial_timeout_ds_ = get_parameter("serial_timeout_ds").as_int();
+
+    if (baud_rate_ <= 0)
+    {
+      RCLCPP_WARN(get_logger(), "Invalid baud_rate=%d, using %d", baud_rate_,
+                  DEFAULT_SERIAL_BAUD_RATE);
+      baud_rate_ = DEFAULT_SERIAL_BAUD_RATE;
+    }
+
+    RCLCPP_INFO(get_logger(), "Motor direction signs: m1=%d m2=%d", m1_direction_sign_,
+                m2_direction_sign_);
+
+    last_cmd_time_ = now();
+  }
+
+  void initPublishers()
+  {
+    const std::string p = "~/diagnostics/";
+    pub_m1_current_ = create_publisher<std_msgs::msg::Float64>(p + "m1_current_ma", 10);
+    pub_m2_current_ = create_publisher<std_msgs::msg::Float64>(p + "m2_current_ma", 10);
+    pub_m1_speed_actual_ = create_publisher<std_msgs::msg::Float64>(p + "m1_speed_actual", 10);
+    pub_m2_speed_actual_ = create_publisher<std_msgs::msg::Float64>(p + "m2_speed_actual", 10);
+    pub_temperature_ = create_publisher<std_msgs::msg::Float64>(p + "temperature_c", 10);
+    pub_battery_voltage_ = create_publisher<std_msgs::msg::Float64>(p + "battery_volts", 10);
+    pub_status_flags_ = create_publisher<std_msgs::msg::UInt32>(p + "status_flags", 10);
+    pub_m1_stall_scale_ = create_publisher<std_msgs::msg::Float64>(p + "m1_stall_scale", 10);
+    pub_m2_stall_scale_ = create_publisher<std_msgs::msg::Float64>(p + "m2_stall_scale", 10);
   }
 };
 

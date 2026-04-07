@@ -81,6 +81,22 @@ def generate_launch_description():
 
         default_use_nav2 = _b(cfg.get("use_nav2", False))
         default_use_audio = _b(cfg.get("use_audio", True))
+
+        # Nav2 + SLAM 整合チェック: use_nav2=true かつ use_lidar=false は起動失敗の原因
+        _nav2_on = cfg.get("use_nav2", False)
+        _lidar_on = cfg.get("use_lidar", True)
+        _nav2_slam_warn = (
+            LogInfo(
+                msg=(
+                    "[ERROR][system.launch] use_nav2=true だが use_lidar=false です。"
+                    " Nav2 の global_costmap は map フレームを必要とし、"
+                    " map フレームは SLAM (use_lidar=true) が提供します。"
+                    " global_costmap が起動失敗します。"
+                )
+            )
+            if _nav2_on and not _lidar_on
+            else None
+        )
         default_use_lidar = _b(cfg.get("use_lidar", True))
         default_use_velodyne = _b(cfg.get("use_velodyne", cfg.get("use_lidar", True)))
         default_use_camera = _b(cfg.get("use_camera", True))
@@ -88,6 +104,8 @@ def generate_launch_description():
         default_use_arm = _b(cfg.get("use_arm", True))
         default_use_flipper = _b(cfg.get("use_flipper", True))
         default_use_imu = _b(cfg.get("use_imu", True))
+        default_use_t265_odom = _b(cfg.get("use_t265_odom", False))
+        default_use_depth_guard = _b(cfg.get("use_depth_guard", False))
 
         arg_use_nav2 = DeclareLaunchArgument("use_nav2", default_value=default_use_nav2)
         arg_use_audio = DeclareLaunchArgument("use_audio", default_value=default_use_audio)
@@ -98,6 +116,12 @@ def generate_launch_description():
         arg_use_arm = DeclareLaunchArgument("use_arm", default_value=default_use_arm)
         arg_use_flipper = DeclareLaunchArgument("use_flipper", default_value=default_use_flipper)
         arg_use_imu = DeclareLaunchArgument("use_imu", default_value=default_use_imu)
+        arg_use_t265_odom = DeclareLaunchArgument(
+            "use_t265_odom", default_value=default_use_t265_odom
+        )
+        arg_use_depth_guard = DeclareLaunchArgument(
+            "use_depth_guard", default_value=default_use_depth_guard
+        )
 
         use_nav2 = LaunchConfiguration("use_nav2")
         use_audio = LaunchConfiguration("use_audio")
@@ -108,6 +132,8 @@ def generate_launch_description():
         use_arm = LaunchConfiguration("use_arm")
         use_flipper = LaunchConfiguration("use_flipper")
         use_imu = LaunchConfiguration("use_imu")
+        use_t265_odom = LaunchConfiguration("use_t265_odom")
+        use_depth_guard = LaunchConfiguration("use_depth_guard")
         # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
         urdf_file = os.path.join(bringup_dir, "urdf", "robot.urdf.xacro")
         robot_state_publisher_actions = []
@@ -190,6 +216,7 @@ def generate_launch_description():
 
         actions = [
             LogInfo(msg="[system.launch] starting with fail-safe guards"),
+            *([_nav2_slam_warn] if _nav2_slam_warn else []),
             arg_use_nav2,
             arg_use_audio,
             arg_use_lidar,
@@ -199,6 +226,8 @@ def generate_launch_description():
             arg_use_arm,
             arg_use_flipper,
             arg_use_imu,
+            arg_use_t265_odom,
+            arg_use_depth_guard,
             # ==========================================
             # Zenoh / RMW 設定 (すべてのノードより前に実行)
             # ==========================================
@@ -232,13 +261,17 @@ def generate_launch_description():
                     "use_velodyne": use_velodyne,
                     "use_scan": use_lidar,
                     "use_rviz": "false",
+                    "use_t265_odom": use_t265_odom,
                 },
             ),
             # カメラの起動 (qr_detector が /camera/image_raw を必要とする)
             _safe_include(
                 camera_launch,
                 label="camera.launch.py",
-                launch_arguments={"use_camera": use_camera},
+                launch_arguments={
+                    "use_camera": use_camera,
+                    "use_depth_guard": use_depth_guard,
+                },
             ),
             # 制御系の起動
             _safe_include(

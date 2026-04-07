@@ -101,6 +101,11 @@ def generate_launch_description() -> LaunchDescription:
     use_lidar = DeclareLaunchArgument(
         "use_lidar", default_value="true", description="LiDAR + FAST-LIO パイプラインを有効にする"
     )
+    use_t265_odom = DeclareLaunchArgument(
+        "use_t265_odom",
+        default_value="false",
+        description="T265 ビジュアルオドメトリを /odom の第3 fallback として使用する",
+    )
     use_slam = DeclareLaunchArgument("use_slam", default_value="true")
     slam_params = DeclareLaunchArgument(
         "slam_params",
@@ -161,6 +166,27 @@ def generate_launch_description() -> LaunchDescription:
         respawn_delay=3.0,
     )
 
+    # odom_selector は LiDAR が有効 OR T265 odom が有効な場合に起動する
+    odom_selector_active = PythonExpression(
+        [
+            "'",
+            LaunchConfiguration("use_lidar"),
+            "' == 'true' or '",
+            LaunchConfiguration("use_t265_odom"),
+            "' == 'true'",
+        ]
+    )
+    # static fallback TF は LiDAR も T265 も無効な場合のみ
+    odom_static_fallback_active = PythonExpression(
+        [
+            "'",
+            LaunchConfiguration("use_lidar"),
+            "' != 'true' and '",
+            LaunchConfiguration("use_t265_odom"),
+            "' != 'true'",
+        ]
+    )
+
     odom_selector_node = Node(
         package="bringup",
         executable="odom_selector.py",
@@ -173,14 +199,16 @@ def generate_launch_description() -> LaunchDescription:
                 # use_imu=false 時は IMU health が届かないため、タイムアウトで自動 KISS-ICP へ
                 "health_timeout_s": 5.0,
                 "allow_kiss_fallback": kiss_icp_available,
+                "use_lidar": LaunchConfiguration("use_lidar"),
+                "use_t265_odom": LaunchConfiguration("use_t265_odom"),
             }
         ],
-        condition=IfCondition(LaunchConfiguration("use_lidar")),
+        condition=IfCondition(odom_selector_active),
         respawn=True,
         respawn_delay=2.0,
     )
 
-    # LiDAR なし時のフォールバック: odom→base_link を単位変換で配信
+    # LiDAR も T265 も無効な場合のフォールバック: odom→base_link を単位変換で配信
     # ロボットの TF ツリーが途切れないよう最低限の TF を保証する
     odom_base_static_tf = Node(
         package="tf2_ros",
@@ -205,7 +233,7 @@ def generate_launch_description() -> LaunchDescription:
             LaunchConfiguration("base_frame"),
         ],
         output="screen",
-        condition=UnlessCondition(LaunchConfiguration("use_lidar")),
+        condition=IfCondition(odom_static_fallback_active),
     )
 
     velodyne_driver_node = Node(
@@ -310,6 +338,7 @@ def generate_launch_description() -> LaunchDescription:
                 else []
             ),
             use_lidar,
+            use_t265_odom,
             config_path,
             lidar_topic_raw,
             lidar_topic,

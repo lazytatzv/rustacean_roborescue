@@ -121,6 +121,8 @@ class FlipperDriver : public rclcpp::Node
         RCLCPP_WARN(get_logger(), "Failed to set wheel mode for ID %ld. Retrying...", id);
         return;
       }
+      // クラッシュ再起動後にモーターが回り続けないよう、wheel mode 設定直後に停止コマンドを送る
+      dxl_wb_.goalVelocity(id, 0);
       // if (!dxl_wb_.itemWrite(id, "Velocity_Limit", velocity_limit_))
       //{
       //   RCLCPP_WARN(get_logger(), "Failed to set velocity limit for ID %ld. Retrying...", id);

@@ -287,15 +287,10 @@ def generate_launch_description() -> LaunchDescription:
             )
         ),
     )
-    robot_state_publisher_node = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        parameters=[{"robot_description": robot_description}],
-        output="screen",
-        respawn=True,
-        respawn_delay=3.0,
-        condition=IfCondition(use_ros2_control),
-    )
+    # robot_state_publisher はここでは起動しない。
+    # system.launch.py が robot.urdf.xacro で RSP を起動済み。
+    # controller_manager は上記 parameters=["robot_description": robot_description] で
+    # sekirei.urdf (ros2_control タグ付き) を直接パラメータとして受け取るため RSP 不要。
 
     # コントローラのスポーン (spawner は controller_manager の起動を自動で待つ)
     spawn_joint_state_broadcaster = Node(
@@ -372,7 +367,6 @@ def generate_launch_description() -> LaunchDescription:
             arm_driver_direct,
             # ros2_control モード
             controller_manager_node,
-            robot_state_publisher_node,
             spawn_joint_state_broadcaster,
             spawn_forward_position_controller,
             spawn_joint_trajectory_controller,

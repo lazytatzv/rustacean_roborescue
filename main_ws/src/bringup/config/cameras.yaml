@@ -26,12 +26,18 @@
 #   bitrate     : エンコードビットレート [bps] (デフォルト: 4000000)
 #
 # realsense 固有:
-#   serial      : シリアル番号 (空文字 = 自動検出)
-#   enable_color: カラーストリーム有効 (デフォルト: true)
-#   enable_depth: 深度ストリーム有効 (デフォルト: false)
-#   enable_pose : T265 オドメトリ有効 (デフォルト: false)
+#   serial           : シリアル番号 (空文字 = 自動検出)
+#   enable_color     : カラーストリーム有効 (デフォルト: true)
+#   enable_depth     : 深度ストリーム有効 (デフォルト: false)
+#   enable_pose      : T265 ビジュアルオドメトリ有効 (デフォルト: false)
+#   enable_accel     : IMU 加速度計有効 (D435i 等、デフォルト: false)
+#   enable_gyro      : IMU ジャイロ有効 (D435i 等、デフォルト: false)
+#   enable_pointcloud: 点群生成有効 (デフォルト: false、高負荷注意)
 #   color_width/color_height/color_fps: カラー解像度
 #   depth_width/depth_height/depth_fps: 深度解像度
+#
+# 注意: serial が空文字の場合、接続された最初のデバイスを使用する。
+#       複数の RealSense を同時使用する場合は必ずシリアル番号を指定すること。
 
 cameras:
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
@@ -118,13 +124,19 @@ cameras:
     encoder: libx264
     bitrate: 2000000
 
-  # ── RealSense ─────────────────────────────────────────────────────────────
-  - name: realsense_arm
+  # ── RealSense D435i (RGB-D + IMU) ─────────────────────────────────────────
+  # アーム先端またはフロントに搭載。深度+カラー+IMU(400Hz)。
+  # depth_guard ノードと組み合わせて近接障害物検出に使用する。
+  # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
+  - name: d435i
     driver: realsense
     enabled: false
     serial: ""
     enable_color: true
     enable_depth: true
+    enable_accel: true
+    enable_gyro: true
+    enable_pointcloud: false  # 高負荷。必要時のみ true にする
     color_width: 640
     color_height: 480
     color_fps: 30
@@ -134,3 +146,17 @@ cameras:
     use_qr: false
     encoder: libx264
     bitrate: 1000000
+
+  # ── RealSense T265 (トラッキングカメラ / Visual-Inertial Odometry) ─────────
+  # 6DOF ビジュアルオドメトリを /camera_t265/odom/sample に publish する。
+  # odom_selector の第3 fallback として利用するには launch_config.yaml の
+  # use_t265_odom: true も必要。
+  # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
+  - name: t265
+    driver: realsense
+    enabled: false
+    serial: ""
+    enable_color: false   # フィッシュアイ映像。通常不要
+    enable_depth: false
+    enable_pose: true
+    use_qr: false

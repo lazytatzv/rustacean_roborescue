@@ -183,6 +183,95 @@
     <origin xyz="0 0 0"/>
   </joint>
 
+  <!-- ======================== RealSense Cameras ======================== -->
+  <!--
+    FIXME: 以下の xyz / rpy は仮値。実機でノギス等を使って計測し調整すること。
+    realsense2_camera が publish する base_frame_id はこれらのリンク名と一致させている。
+    シリアル番号は `rs-enumerate-devices` で確認し cameras.yaml に設定すること。
+  -->
+
+  <!-- RealSense T265 (トラッキングカメラ)
+       マウント位置: arm_base_link の右側面 (-y 方向)、ロボット後方向き
+       rpy = "0 -pi/2 0" により T265 の +z (光軸) が base_link の -x (後方) を向く -->
+  <link name="camera_t265_link">
+    <visual>
+      <geometry><mesh filename="package://bringup/meshes/t265.STL" scale="${mesh_scale}"/></geometry>
+      <material name="silver"/>
+    </visual>
+    <xacro:dummy_inertial/>
+  </link>
+  <joint name="camera_t265_joint" type="fixed">
+    <parent link="arm_base_link"/>
+    <child link="camera_t265_link"/>
+    <!-- xyz: arm_base_link から右 5cm・上 2cm。rpy: 後方向き (-90° pitch) -->
+    <origin xyz="0.0 -0.05 0.02" rpy="0 ${-pi/2} 0"/>
+  </joint>
+
+  <!-- RealSense D435i (RGB-D カメラ)
+       マウント位置: arm6_link (エンドエフェクタ) の左側面 (+y 方向)、グリッパと同方向
+       arm6_link の向きはアーム姿勢依存なので rpy は 0 0 0 で出発し実機で確認すること -->
+  <link name="camera_d435i_link">
+    <visual>
+      <geometry><mesh filename="package://bringup/meshes/d435.STL" scale="${mesh_scale}"/></geometry>
+      <material name="silver"/>
+    </visual>
+    <xacro:dummy_inertial/>
+  </link>
+  <joint name="camera_d435i_joint" type="fixed">
+    <parent link="arm6_link"/>
+    <child link="camera_d435i_link"/>
+    <!-- xyz: arm6_link から左 4cm。グリッパと同じ方向を向く -->
+    <origin xyz="0.0 0.04 0.0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ======================== v4l2 カメラ TF リンク ======================== -->
+  <!--
+    FIXME: 以下の xyz / rpy は仮値。実機でノギス等を使って計測し調整すること。
+    TF ツリーに接続されていないと Foxglove の 3D 表示・QR 検出位置マッピングが壊れる。
+  -->
+
+  <!-- フロントカメラ: 前面中央、前向き -->
+  <link name="front_camera_link"><xacro:dummy_inertial/></link>
+  <joint name="front_camera_joint" type="fixed">
+    <parent link="base_link"/><child link="front_camera_link"/>
+    <origin xyz="${base_length/2} 0 ${base_height/2 + 0.02}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- バックカメラ: 後面中央、後向き -->
+  <link name="back_camera_link"><xacro:dummy_inertial/></link>
+  <joint name="back_camera_joint" type="fixed">
+    <parent link="base_link"/><child link="back_camera_link"/>
+    <origin xyz="${-base_length/2} 0 ${base_height/2 + 0.02}" rpy="0 0 ${pi}"/>
+  </joint>
+
+  <!-- 左カメラ: 左側面、左向き -->
+  <link name="left_camera_link"><xacro:dummy_inertial/></link>
+  <joint name="left_camera_joint" type="fixed">
+    <parent link="base_link"/><child link="left_camera_link"/>
+    <origin xyz="0 ${base_width/2} ${base_height/2 + 0.02}" rpy="0 0 ${pi/2}"/>
+  </joint>
+
+  <!-- 右カメラ: 右側面、右向き -->
+  <link name="right_camera_link"><xacro:dummy_inertial/></link>
+  <joint name="right_camera_joint" type="fixed">
+    <parent link="base_link"/><child link="right_camera_link"/>
+    <origin xyz="0 ${-base_width/2} ${base_height/2 + 0.02}" rpy="0 0 ${-pi/2}"/>
+  </joint>
+
+  <!-- アームカメラ: arm_base_link 前方の汎用 USB カメラ -->
+  <link name="arm_camera_link"><xacro:dummy_inertial/></link>
+  <joint name="arm_camera_joint" type="fixed">
+    <parent link="arm_base_link"/><child link="arm_camera_link"/>
+    <origin xyz="0.05 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- THETA S: 天板中央、360° カメラ -->
+  <link name="theta_camera_link"><xacro:dummy_inertial/></link>
+  <joint name="theta_camera_joint" type="fixed">
+    <parent link="base_link"/><child link="theta_camera_link"/>
+    <origin xyz="0 0 ${base_height/2 + 0.10}" rpy="0 0 0"/>
+  </joint>
+
   <!-- ======================== Gazebo Plugins ======================== -->
   <!-- DiffDrive: /cmd_vel → 走行、/odom → オドメトリ出力 -->
   <gazebo>

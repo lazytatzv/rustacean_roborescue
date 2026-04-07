@@ -5,7 +5,7 @@ from ament_index_python.packages import PackageNotFoundError, get_package_share_
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 
@@ -113,9 +113,15 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
     """RealSense ドライバのコンポーザブルノードリストを返す。"""
     params = {
         "serial_no": cam.get("serial", ""),
+        # URDF のリンク名 (camera_<name>_link) と一致させる。
+        # これにより realsense2_camera が publish する TF が robot TF ツリーに繋がる。
+        "base_frame_id": f"{ns}_link",
         "enable_color": cam.get("enable_color", True),
         "enable_depth": cam.get("enable_depth", False),
         "enable_pose": cam.get("enable_pose", False),
+        "enable_accel": cam.get("enable_accel", False),
+        "enable_gyro": cam.get("enable_gyro", False),
+        "enable_pointcloud": cam.get("enable_pointcloud", False),
         "color_width": cam.get("color_width", 640),
         "color_height": cam.get("color_height", 480),
         "color_fps": cam.get("color_fps", 30),
@@ -153,7 +159,12 @@ def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> Composa
     )
 
 
-def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfiguration) -> list:
+def _make_camera_group(
+    cam: dict,
+    qr_model_dir: str,
+    use_camera_cfg: LaunchConfiguration,
+    use_depth_guard_cfg: LaunchConfiguration,
+) -> list:
     name = cam["name"]
     ns = f"camera_{name}"
     driver = cam.get("driver", "v4l2")
@@ -232,6 +243,65 @@ def _make_camera_group(cam: dict, qr_model_dir: str, use_camera_cfg: LaunchConfi
                 )
             )
 
+    # depthimage_to_laserscan: 深度画像 → LaserScan → nav2 costmap に直接接続
+    # depth_guard とは役割が異なる: これは nav2 の障害物回避に使う標準パイプライン
+    if driver == "realsense" and cam.get("enable_depth", False):
+        actions.append(
+            Node(
+                package="depthimage_to_laserscan",
+                executable="depthimage_to_laserscan_node",
+                name=f"depth_to_scan_{name}",
+                remappings=[
+                    ("image", f"/{ns}/depth/image_rect_raw"),
+                    ("camera_info", f"/{ns}/depth/camera_info"),
+                    ("scan", "/scan_depth"),
+                ],
+                parameters=[
+                    {
+                        "scan_height": 5,
+                        "scan_time": 0.033,
+                        "range_min": 0.1,
+                        "range_max": 3.0,
+                    }
+                ],
+                condition=IfCondition(use_camera_cfg),
+                respawn=True,
+                respawn_delay=5.0,
+            )
+        )
+
+    # depth_guard: D435i 等の深度カメラに対する近接障害物検出ノード
+    # realsense + enable_depth が有効なカメラにのみ追加する
+    # ※ nav2 統合は depthimage_to_laserscan が担う。depth_guard はオペレーター向け警告表示用。
+    if driver == "realsense" and cam.get("enable_depth", False):
+        actions.append(
+            Node(
+                package="depth_guard",
+                executable="depth_guard",
+                name=f"depth_guard_{name}",
+                output="screen",
+                parameters=[
+                    {
+                        "enabled": True,
+                        "depth_topic": f"/{ns}/depth/image_rect_raw",
+                    }
+                ],
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            use_camera_cfg,
+                            "' == 'true' and '",
+                            use_depth_guard_cfg,
+                            "' == 'true'",
+                        ]
+                    )
+                ),
+                respawn=True,
+                respawn_delay=5.0,
+            )
+        )
+
     return actions
 
 
@@ -243,13 +313,19 @@ def generate_launch_description():
     arg_use_camera = DeclareLaunchArgument(
         "use_camera", default_value="true", description="カメラ + QR 検出を有効にする"
     )
+    arg_use_depth_guard = DeclareLaunchArgument(
+        "use_depth_guard",
+        default_value="false",
+        description="D435i 深度近接検出ノード (depth_guard) を有効にする",
+    )
     use_camera_cfg = LaunchConfiguration("use_camera")
+    use_depth_guard_cfg = LaunchConfiguration("use_depth_guard")
 
     cameras = _load_cameras(bringup_share)
     if not cameras:
         print("[camera.launch] WARNING: no cameras defined in cameras.yaml")
 
-    actions = [arg_use_camera]
+    actions = [arg_use_camera, arg_use_depth_guard]
     seen_v4l2_phys = set()
     for cam in cameras:
         available, reason = _camera_available(cam)
@@ -274,6 +350,6 @@ def generate_launch_description():
                     continue
                 seen_v4l2_phys.add(key)
 
-        actions.extend(_make_camera_group(cam, qr_model_dir, use_camera_cfg))
+        actions.extend(_make_camera_group(cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg))
 
     return LaunchDescription(actions)

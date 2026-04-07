@@ -15,9 +15,12 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(custom_interfaces REQUIRED)
+find_package(Threads REQUIRED)
 
 add_executable(crawler_driver_node src/crawler_driver.cpp)
+target_compile_features(crawler_driver_node PUBLIC cxx_std_17)
 ament_target_dependencies(crawler_driver_node rclcpp geometry_msgs std_msgs custom_interfaces)
+target_link_libraries(crawler_driver_node Threads::Threads)
 
 install(TARGETS crawler_driver_node
 	DESTINATION lib/${PROJECT_NAME})

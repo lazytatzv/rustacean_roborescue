@@ -28,3 +28,12 @@ use_audio: false
 # CAUTION: use_lidarを必ずtrueにすること！
 # odom精度の為にuse_imuもtrueのほうが望ましい
 use_nav2: false
+
+# T265 トラッキングカメラを /odom の第3 fallback として使用する
+# spark_fast_lio → KISS-ICP → T265 の優先順位でフォールバック
+# cameras.yaml の t265 エントリも enabled: true にすること
+use_t265_odom: false
+
+# D435i 深度カメラを使った近接障害物検出 (depth_guard ノード) を有効にする
+# cameras.yaml の d435i エントリも enabled: true にすること
+use_depth_guard: false

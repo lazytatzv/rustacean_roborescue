@@ -10,13 +10,16 @@ crawler_driver:
     serial_timeout_ds: 5  # Roboclaw hardware-side command timeout [100ms units]
     track_width: 0.4  # クローラ間距離 [m] (Nav2 cmd_vel → 差動駆動用)
     # Roboclaw PID tuning (要実測チューニング)
+    # Kd を 0 から 0.008 に変更: 微分減衰を追加し停止時の振動を抑制する。
+    # 動き始め / 停止時の振動が残る場合: Kd を 0.005〜0.015 の範囲で調整。
+    # 動きが遅くなる場合: Kp を少し上げるか Kd を下げる。
     m1_kp: 0.464
     m1_ki: 0.021
-    m1_kd: 0.0
+    m1_kd: 0.008
     m1_qpps: 53250   # M1 max quadrature pulses/sec
     m2_kp: 0.438
     m2_ki: 0.020
-    m2_kd: 0.0
+    m2_kd: 0.008
     m2_qpps: 50062   # M2 max quadrature pulses/sec
     # モーター向き補正: 実機配線や取り付け向き差を吸収 (+1 or -1)
     # ログ上で cmd と actual の符号が逆なら -1 を設定
