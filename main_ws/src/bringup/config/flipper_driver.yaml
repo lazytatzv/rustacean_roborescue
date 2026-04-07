@@ -1,6 +1,7 @@
 flipper_driver:
   ros__parameters:
-    port_name: "/dev/ttyUSB0"  # udev: deploy/99-robot.rules の dynamixel_flipper symlink
+    port_name: "/dev/dynamixel_flipper"  # udev: deploy/99-robot.rules の dynamixel_flipper symlink
     baud_rate: 115200 # 通信速度。要check
-    dynamixel_ids: [2, 4, 3, 1]
+    dynamixel_ids: [1, 3, 4, 2]
+    servo_inverted: [true, true, true, true]  # dynamixel_ids と同順。true にすると速度指令の正負を反転
     watchdog_timeout_ms: 500

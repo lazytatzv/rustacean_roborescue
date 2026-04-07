@@ -21,6 +21,7 @@ class FlipperDriver : public rclcpp::Node
     declare_parameter("watchdog_timeout_ms", 500);
     declare_parameter("velocity_limit", 1023);
     declare_parameter("init_retry_sec", 3.0);
+    declare_parameter("servo_inverted", std::vector<bool>({}));
 
     initParams();
 
@@ -48,6 +49,7 @@ class FlipperDriver : public rclcpp::Node
   std::vector<long int> dynamixel_ids_;
   int watchdog_timeout_ms_;
   int velocity_limit_;
+  std::vector<bool> servo_inverted_;
   bool initialized_ = false;
 
   rclcpp::Subscription<custom_interfaces::msg::FlipperVelocity>::SharedPtr subscription_;
@@ -64,6 +66,9 @@ class FlipperDriver : public rclcpp::Node
     dynamixel_ids_ = get_parameter("dynamixel_ids").as_integer_array();
     watchdog_timeout_ms_ = get_parameter("watchdog_timeout_ms").as_int();
     velocity_limit_ = get_parameter("velocity_limit").as_int();
+    servo_inverted_ = get_parameter("servo_inverted").as_bool_array();
+    // パラメータ未指定またはサイズ不足の場合はすべて非反転で埋める
+    servo_inverted_.resize(dynamixel_ids_.size(), false);
   }
 
   // 初期化成功後に一度だけ呼び出す
@@ -159,7 +164,8 @@ class FlipperDriver : public rclcpp::Node
 
     for (size_t i = 0; i < dynamixel_ids_.size(); ++i)
     {
-      if (!dxl_wb_.goalVelocity(dynamixel_ids_[i], msg.flipper_vel[i]))
+      const int32_t vel = servo_inverted_[i] ? -msg.flipper_vel[i] : msg.flipper_vel[i];
+      if (!dxl_wb_.goalVelocity(dynamixel_ids_[i], vel))
         RCLCPP_ERROR(get_logger(), "Failed to set goal velocity for ID %ld", dynamixel_ids_[i]);
     }
   }

@@ -197,9 +197,9 @@ class JoyController : public rclcpp::Node
     auto flipper_msg = custom_interfaces::msg::FlipperVelocity();
     if (mode_ == Mode::DRIVE)
     {
-      float m1 = std::clamp(apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
+      float m1 = std::clamp(apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_,
                             -max_speed_, max_speed_);
-      float m2 = std::clamp(apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_,
+      float m2 = std::clamp(apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
                             -max_speed_, max_speed_);
       crawler_msg.m1_vel = m1;
       crawler_msg.m2_vel = m2;
@@ -213,8 +213,8 @@ class JoyController : public rclcpp::Node
     }
     else
     {
-      const bool wants_drive = std::abs(axis(msg, AXIS_LEFT_Y)) > deadzone_ ||
-                               std::abs(axis(msg, AXIS_RIGHT_Y)) > deadzone_;
+      const bool wants_drive = std::abs(axis(msg, AXIS_RIGHT_Y)) > deadzone_ ||
+                               std::abs(axis(msg, AXIS_LEFT_Y)) > deadzone_;
       if (wants_drive)
       {
         RCLCPP_WARN_THROTTLE(

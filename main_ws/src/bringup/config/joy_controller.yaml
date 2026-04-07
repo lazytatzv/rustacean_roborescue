@@ -1,7 +1,7 @@
 joy_controller:
   ros__parameters:
-    max_speed: 0.7           # クローラ最大速度 [m/s]
+    max_speed: 0.3           # クローラ最大速度 [m/s]
     deadzone: 0.1            # スティックデッドゾーン閾値
     flipper_speed: 1000      # フリッパ速度 [Dynamixel units]
-    arm_linear_scale: 0.3    # アーム手先移動速度スケール [m/s]
+    arm_linear_scale: 0.6  # アーム手先移動速度スケール [m/s]
     arm_angular_scale: 0.5   # アーム手先回転速度スケール [rad/s]

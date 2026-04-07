@@ -1,6 +1,6 @@
 crawler_driver:
   ros__parameters:
-    serial_port: "/dev/ttyACM0" # ここはudevで名前を縛る必要がある
+    serial_port: "/dev/roboclaw" # ここはudevで名前を縛る必要がある
     baud_rate: 38400 # Roboclaw本体設定に合わせる
     crawler_circumference: 0.39
     counts_per_rev: 256
@@ -16,11 +16,11 @@ crawler_driver:
     m1_kp: 0.464
     m1_ki: 0.021
     m1_kd: 0.008
-    m1_qpps: 53250   # M1 max quadrature pulses/sec
+    m1_qpps: 61000   # M1 max quadrature pulses/sec (0.7m/s approx)
     m2_kp: 0.438
     m2_ki: 0.020
     m2_kd: 0.008
-    m2_qpps: 50062   # M2 max quadrature pulses/sec
+    m2_qpps: 61000   # M2 max quadrature pulses/sec (0.7m/s approx)
     # モーター向き補正: 実機配線や取り付け向き差を吸収 (+1 or -1)
     # ログ上で cmd と actual の符号が逆なら -1 を設定
     m1_direction_sign: -1
@@ -38,13 +38,13 @@ crawler_driver:
 
     # ── スタック保護 ──────────────────────────────────────────────────────────
     # 指令速度に対して実速度がこの割合以上ずれていたらスタック判定
-    stall_error_ratio: 0.5
+    stall_error_ratio: 0.8
     # この qpps 以下の指令は判定しない (停止指令での誤検知防止)
     stall_cmd_threshold_qpps: 500
     # スタックスコアがこの秒数分たまると最大絞りに達する
     stall_window_sec: 2.0
-    # スタック時の最大出力削減率 (0.5 = 最大50%削減)
-    stall_max_reduction: 0.5
+    # スタック時の最大出力削減率 (0.7 = 最大30%削減)
+    stall_max_reduction: 0.7
 
     # ── テレメトリ読み取り周期 ──────────────────────────────────────────────
     telemetry_hz: 10

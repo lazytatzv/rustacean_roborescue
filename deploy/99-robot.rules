@@ -16,8 +16,10 @@
 # デバイスファイルは実行権限関係ない
 # とりあえず0666で基本的にフル権限にしている
 
+# 完全に整合性が取れているのは
+# cralwer, flipper, arm
+
 # Roboclaw モータコントローラ (BasicMicro)
-# lsusbで整合性をとれていることを確認済み
 # roboclawは絶対に一つなのでこれは弄る必要はない
 SUBSYSTEM=="tty", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2404", SYMLINK+="roboclaw", MODE="0666"
 
@@ -29,9 +31,10 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="s
 # アームとフリッパは同一 VID/PID のため、iSerial(ID_SERIAL_SHORT) で区別する。
 # lsusbでFTDI(0403:6014)が2本見えていても、ここ未設定だと名前固定はできない。
 # U2D2を変えた場合iserialも変わることに注意する!!!!!!
-# flipperのdynamixelのIDは1,2,3,4
 
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="FT5WINPD", SYMLINK+="dynamixel_flipper", MODE="0666"
+# flipperのdynamixelのIDは1,2,3,4
+# yamlでid-mapを変えることができる
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERIAL_SHORT}=="FT763H1F", SYMLINK+="dynamixel_flipper", MODE="0666"
 
 # ── Dynamixel U2D2 — アーム + グリッパ共用バス ──────────────────────────────
 # アームジョイント (ID 21-26) とグリッパ (ID 10) は同一 RS485 バス上。
