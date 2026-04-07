@@ -38,10 +38,11 @@ struct HardwareThreadParams {
     baud_rate: u32,
     profile_velocity: u32,
     arm_ids: Vec<u8>,
-    gripper_id: u8,
+    gripper_ids: Vec<u8>,
+    gripper_directions: Vec<f64>,
     gripper_max_current: u16,
     arm_offsets: Vec<f64>,
-    gripper_offset: f64,
+    gripper_offsets: Vec<f64>,
     rx_cmd: Receiver<HwCommand>,
     joint_state_pub: Publisher<JointState>,
     gripper_status_pub: Publisher<GripperStatus>,
@@ -55,9 +56,10 @@ fn hardware_thread(params: HardwareThreadParams) {
         &params.port_name,
         params.baud_rate,
         params.arm_ids.clone(),
-        params.gripper_id,
+        params.gripper_ids.clone(),
+        params.gripper_directions.clone(),
         params.arm_offsets.clone(),
-        params.gripper_offset,
+        params.gripper_offsets.clone(),
     ) {
         Ok(d) => d,
         Err(e) => {
@@ -207,11 +209,18 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let arm_ids: Vec<u8> = arm_ids_arr.iter().copied().map(|id| id as u8).collect();
-    let gripper_id: i64 = node
-        .declare_parameter("gripper_id")
-        .default(10_i64)
+    let gripper_ids_arr: Arc<[i64]> = node
+        .declare_parameter("gripper_ids")
+        .default(Arc::from(vec![27_i64, 28_i64].into_boxed_slice()))
         .mandatory()?
         .get();
+    let gripper_ids: Vec<u8> = gripper_ids_arr.iter().copied().map(|id| id as u8).collect();
+    let gripper_directions_arr: Arc<[f64]> = node
+        .declare_parameter("gripper_directions")
+        .default(Arc::from(vec![1.0_f64, -1.0_f64].into_boxed_slice()))
+        .mandatory()?
+        .get();
+    let gripper_directions: Vec<f64> = gripper_directions_arr.to_vec();
     let gripper_max_current: i64 = node
         .declare_parameter("gripper_max_current")
         .default(500_i64)
@@ -231,11 +240,12 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let arm_offsets: Vec<f64> = arm_offsets_arr.to_vec();
-    let gripper_offset: f64 = node
-        .declare_parameter("gripper_offset")
-        .default(0.0_f64)
+    let gripper_offsets_arr: Arc<[f64]> = node
+        .declare_parameter("gripper_offsets")
+        .default(Arc::from(vec![0.0_f64; 2].into_boxed_slice()))
         .mandatory()?
         .get();
+    let gripper_offsets: Vec<f64> = gripper_offsets_arr.to_vec();
 
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
@@ -295,10 +305,11 @@ fn run() -> Result<()> {
             baud_rate: baud_rate as u32,
             profile_velocity: profile_velocity as u32,
             arm_ids,
-            gripper_id: gripper_id as u8,
+            gripper_ids,
+            gripper_directions,
             gripper_max_current: gripper_max_current as u16,
             arm_offsets,
-            gripper_offset,
+            gripper_offsets,
             rx_cmd,
             joint_state_pub,
             gripper_status_pub,

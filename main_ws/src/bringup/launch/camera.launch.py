@@ -173,7 +173,7 @@ def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> Composa
             {
                 "model_dir": qr_model_dir,
                 "publish_compressed": False,
-                "detection_interval": 1,
+                "detection_interval": 30,
             }
         ],
         extra_arguments=[{"use_intra_process_comms": True}],
@@ -195,22 +195,13 @@ def _make_camera_group(
     default_image_topic = "color/image_raw" if driver == "realsense" else "image_raw"
     image_topic = cam.get("image_topic", default_image_topic)
 
-    # コンポーザブルノード (ドライバのみ)
+    # コンポーザブルノード (ドライバのみ、QR は別コンテナに分離)
     if driver == "realsense":
         composable_nodes = _realsense_nodes(cam, ns)
     elif driver == "theta_s":
         composable_nodes = _theta_s_nodes(cam, ns)
     else:
         composable_nodes = _v4l2_nodes(cam, ns)
-
-    if use_qr:
-        if qr_model_dir:
-            composable_nodes.append(_qr_node(cam, qr_model_dir, ns, image_topic))
-        else:
-            print(
-                f"[camera.launch] WARNING: use_qr=true for {name} "
-                "but qr_detector package not found, skipping QR"
-            )
 
     has_color = driver != "realsense" or cam.get("enable_color", True)
 
@@ -227,6 +218,28 @@ def _make_camera_group(
     )
 
     actions = [container]
+
+    # QR 検出は別コンテナ (別プロセス) で起動: カメラドライバへの干渉を防ぐ
+    if use_qr:
+        if qr_model_dir:
+            actions.append(
+                ComposableNodeContainer(
+                    name=f"camera_{name}_qr_container",
+                    namespace="",
+                    package="rclcpp_components",
+                    executable="component_container_mt",
+                    composable_node_descriptions=[_qr_node(cam, qr_model_dir, ns, image_topic)],
+                    output="screen",
+                    condition=IfCondition(use_camera_cfg),
+                    respawn=True,
+                    respawn_delay=3.0,
+                )
+            )
+        else:
+            print(
+                f"[camera.launch] WARNING: use_qr=true for {name} "
+                "but qr_detector package not found, skipping QR"
+            )
 
     # image_transport republish (standalone): compressed トピックを配信する。
     # composable plugin が nix 環境で未登録のためコンテナ外で起動する。

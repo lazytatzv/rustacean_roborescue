@@ -9,9 +9,10 @@ arm_gripper_driver:
     arm_ids: [21, 22, 23, 24, 25, 26]
     profile_velocity: 100
 
-    # グリッパー設定
+    # グリッパー設定 (2サーボ: ミラー構成)
     gripper_joint: "gripper_joint"
-    gripper_id: 10
+    gripper_ids: [27, 28]
+    gripper_directions: [1.0, -1.0]  # 28番は逆向き
     gripper_max_current: 500 # 握力制限 [mA]
 
     # ──────────────────────────────────────────────────────────────
@@ -26,5 +27,5 @@ arm_gripper_driver:
     # Dynamixel Wizard で Homing Offset レジスタ (addr 20) を設定済みの場合は
     # すべて 0.0 のままで問題ない。
     # ──────────────────────────────────────────────────────────────
-    arm_offsets: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # [j1, j2, j3, j4, j5, j6]
-    gripper_offset: 0.0
+    arm_offsets: [0.0, 0.0, -2.4222, 0.0, 0.0, 0.0]  # [j1, j2, j3, j4, j5, j6]
+    gripper_offsets: [0.0, 0.0]  # [gripper_id[0], gripper_id[1]]

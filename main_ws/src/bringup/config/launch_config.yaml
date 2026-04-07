@@ -7,7 +7,7 @@
 use_crawler: false
 use_flipper: false
 
-use_arm: false
+use_arm: true
 
 # stm32のimuからデータをブリッジする
 # imuを使わない場合はfalse
@@ -20,7 +20,7 @@ use_lidar: false
 
 # カメラ制御全て
 # これがfalseだと遠隔操縦は不可能
-use_camera: true
+use_camera: false
 
 use_audio: false
 

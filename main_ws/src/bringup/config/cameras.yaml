@@ -14,14 +14,14 @@
 #   width/height : 解像度
 #   fps          : フレームレート
 #   frame_id     : TF フレーム名
-#   jpeg_quality : JPEG圧縮品質 1-100 (デフォルト: 80)
+#   jpeg_quality : JPEG圧縮品質 1-100 (デフォルト: 65)
 #
 # theta_s 固有 (RICOH THETA S、USB UVC/MJPEGモード):
 #   device       : v4l2 デバイスパス
 #   width/height : 解像度 (デフォルト: 1280x720)
 #   fps          : フレームレート (デフォルト: 15)
 #   frame_id     : TF フレーム名
-#   jpeg_quality : JPEG圧縮品質 1-100 (デフォルト: 80)
+#   jpeg_quality : JPEG圧縮品質 1-100 (デフォルト: 65)
 #
 # realsense 固有:
 #   serial           : シリアル番号 (空文字 = 自動検出)
@@ -50,14 +50,14 @@ cameras:
     driver: v4l2
     enabled: true
     device: /dev/camera_arm # udev bind
-    width: 640
-    height: 480
+    width: 352
+    height: 288
     output_encoding: yuv422_yuy2
     fps: 30
     pixel_format: YUYV
     frame_id: arm_camera_link
     use_qr: true
-    jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)
+    jpeg_quality: 60
 
     # Genius WideCam F100 (usb-0000:00:14.0-3.3)
     # ロボットのバッテリーがある側をFRONTとする
@@ -68,12 +68,12 @@ cameras:
     device: /dev/camera_front
     width: 640
     height: 480
-    fps: 15
+    fps: 10
     pixel_format: YUYV
     output_encoding: yuv422_yuy2
     frame_id: front_camera_link
     use_qr: false
-    jpeg_quality: 80
+    jpeg_quality: 65
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   - name: theta
