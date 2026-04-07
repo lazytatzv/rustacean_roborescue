@@ -10,20 +10,18 @@
 #                 v4l2/theta_s → image_raw / realsense → color/image_raw
 #
 # v4l2 固有:
-#   device      : v4l2 デバイスパス
-#   width/height: 解像度
-#   fps         : フレームレート
-#   frame_id    : TF フレーム名
-#   encoder     : ffmpeg エンコーダ (libx264 / h264_v4l2m2m など)
-#   bitrate     : エンコードビットレート [bps]
+#   device       : v4l2 デバイスパス
+#   width/height : 解像度
+#   fps          : フレームレート
+#   frame_id     : TF フレーム名
+#   jpeg_quality : JPEG圧縮品質 1-100 (デフォルト: 80)
 #
 # theta_s 固有 (RICOH THETA S、USB UVC/MJPEGモード):
-#   device      : v4l2 デバイスパス
-#   width/height: 解像度 (デフォルト: 1280x720)
-#   fps         : フレームレート (デフォルト: 15)
-#   frame_id    : TF フレーム名
-#   encoder     : ffmpeg エンコーダ
-#   bitrate     : エンコードビットレート [bps] (デフォルト: 4000000)
+#   device       : v4l2 デバイスパス
+#   width/height : 解像度 (デフォルト: 1280x720)
+#   fps          : フレームレート (デフォルト: 15)
+#   frame_id     : TF フレーム名
+#   jpeg_quality : JPEG圧縮品質 1-100 (デフォルト: 80)
 #
 # realsense 固有:
 #   serial           : シリアル番号 (空文字 = 自動検出)
@@ -53,8 +51,7 @@ cameras:
     pixel_format: YUYV
     frame_id: front_camera_link
     use_qr: true
-    encoder: libx264
-    bitrate: 1000000
+    jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)
 
   # バックカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.1)
   - name: back
@@ -67,8 +64,6 @@ cameras:
     pixel_format: YUYV
     frame_id: back_camera_link
     use_qr: false
-    encoder: libx264
-    bitrate: 800000
 
   # アームカメラ: Genius WideCam F100 (usb-0000:00:14.0-3.4)
   - name: arm
@@ -81,8 +76,6 @@ cameras:
     pixel_format: YUYV
     frame_id: arm_camera_link
     use_qr: true
-    encoder: libx264
-    bitrate: 800000
 
   - name: left
     driver: v4l2
@@ -94,8 +87,6 @@ cameras:
     pixel_format: MJPG
     frame_id: left_camera_link
     use_qr: false
-    encoder: libx264
-    bitrate: 1200000
 
   - name: right
     driver: v4l2
@@ -107,8 +98,6 @@ cameras:
     pixel_format: MJPG
     frame_id: right_camera_link
     use_qr: false
-    encoder: libx264
-    bitrate: 1200000
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   - name: theta
@@ -121,8 +110,7 @@ cameras:
     pixel_format: MJPG
     frame_id: theta_camera_link
     use_qr: false
-    encoder: libx264
-    bitrate: 2000000
+    jpeg_quality: 85  # THETA S は解像度が大きいため少し高めに
 
   # ── RealSense D435i (RGB-D + IMU) ─────────────────────────────────────────
   # アーム先端またはフロントに搭載。深度+カラー+IMU(400Hz)。
@@ -144,8 +132,7 @@ cameras:
     depth_height: 480
     depth_fps: 30
     use_qr: false
-    encoder: libx264
-    bitrate: 1000000
+    jpeg_quality: 80
 
   # ── RealSense T265 (トラッキングカメラ / Visual-Inertial Odometry) ─────────
   # 6DOF ビジュアルオドメトリを /camera_t265/odom/sample に publish する。

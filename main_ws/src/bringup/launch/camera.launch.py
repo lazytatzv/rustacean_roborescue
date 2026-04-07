@@ -54,12 +54,36 @@ def _video_device_realpath_key(dev_path: str) -> str:
         return ""
 
 
+def _jpeg_republish_node(ns: str, in_topic: str, jpeg_quality: int) -> ComposableNode:
+    """image_raw → image_raw/compressed (JPEG) を同コンテナ内で変換するノード。
+    intra-process で受け取り外部に sensor_msgs/CompressedImage として配信する。
+    Foxglove Studio の Image パネルが直接購読できる。
+    """
+    return ComposableNode(
+        package="image_transport",
+        plugin="image_transport::RepublishNode",
+        name="republish_compressed",
+        namespace=ns,
+        remappings=[
+            ("in", in_topic),
+            ("out", in_topic),
+        ],
+        parameters=[
+            {
+                "in_transport": "raw",
+                "out_transport": "compressed",
+                "compressed.format": "jpeg",
+                "compressed.jpeg_quality": jpeg_quality,
+            }
+        ],
+        extra_arguments=[{"use_intra_process_comms": True}],
+    )
+
+
 def _v4l2_nodes(cam: dict, ns: str) -> list:
-    """v4l2 ドライバのコンポーザブルノードリストを返す。"""
-    # gop_size: キーフレーム間隔。小さいほど再接続/途中購読からの復旧が速い。
-    # repeat_headers=1 により SPS/PPS を毎 IDR フレームに付加するので途中参加にも対応。
-    gop_size = cam.get("gop_size", 5)
-    composable = [
+    """v4l2 ドライバ + JPEG 圧縮再配信のコンポーザブルノードリストを返す。"""
+    jpeg_quality = cam.get("jpeg_quality", 80)
+    return [
         ComposableNode(
             package="v4l2_camera",
             plugin="v4l2_camera::V4L2Camera",
@@ -72,22 +96,20 @@ def _v4l2_nodes(cam: dict, ns: str) -> list:
                     "image_size": [cam.get("width", 640), cam.get("height", 480)],
                     "time_per_frame": [1, cam.get("fps", 30)],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
-                    "image_raw.ffmpeg.encoder": cam.get("encoder", "libx264"),
-                    "image_raw.ffmpeg.bit_rate": cam.get("bitrate", 2000000),
-                    "image_raw.ffmpeg.gop_size": gop_size,
-                    "image_raw.ffmpeg.av_options": "profile:baseline,preset:ultrafast,x264-params:repeat_headers=1",
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
-        )
+        ),
+        _jpeg_republish_node(ns, "image_raw", jpeg_quality),
     ]
-    return composable
 
 
 def _theta_s_nodes(cam: dict, ns: str) -> list:
     """RICOH THETA S (UVC live streaming) のコンポーザブルノードリストを返す。
     THETA S は USB接続時にMJPEGのUVCデバイスとして認識される。
+    MJPG → JPEG 再圧縮はほぼロスレスなので品質劣化は軽微。
     """
+    jpeg_quality = cam.get("jpeg_quality", 80)
     return [
         ComposableNode(
             package="v4l2_camera",
@@ -101,19 +123,17 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
                     "image_size": [cam.get("width", 1280), cam.get("height", 720)],
                     "time_per_frame": [1, cam.get("fps", 15)],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
-                    "image_raw.ffmpeg.encoder": cam.get("encoder", "libx264"),
-                    "image_raw.ffmpeg.bit_rate": cam.get("bitrate", 4000000),
-                    "image_raw.ffmpeg.gop_size": cam.get("gop_size", 5),
-                    "image_raw.ffmpeg.av_options": "profile:baseline,preset:ultrafast,x264-params:repeat_headers=1",
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
-        )
+        ),
+        _jpeg_republish_node(ns, "image_raw", jpeg_quality),
     ]
 
 
 def _realsense_nodes(cam: dict, ns: str) -> list:
     """RealSense ドライバのコンポーザブルノードリストを返す。"""
+    jpeg_quality = cam.get("jpeg_quality", 80)
     params = {
         "serial_no": cam.get("serial", ""),
         # URDF のリンク名 (camera_<name>_link) と一致させる。
@@ -132,7 +152,7 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
         "depth_height": cam.get("depth_height", 480),
         "depth_fps": cam.get("depth_fps", 30),
     }
-    return [
+    nodes = [
         ComposableNode(
             package="realsense2_camera",
             plugin="realsense2_camera::RealSenseNodeFactory",
@@ -142,6 +162,9 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
             extra_arguments=[{"use_intra_process_comms": True}],
         )
     ]
+    if cam.get("enable_color", True):
+        nodes.append(_jpeg_republish_node(ns, "color/image_raw", jpeg_quality))
+    return nodes
 
 
 def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> ComposableNode:
@@ -173,11 +196,11 @@ def _make_camera_group(
     driver = cam.get("driver", "v4l2")
     use_qr = cam.get("use_qr", False)
 
-    # ドライバごとのデフォルトimage_topic
+    # ドライバごとのデフォルト raw image トピック (QR検出用)
     default_image_topic = "color/image_raw" if driver == "realsense" else "image_raw"
     image_topic = cam.get("image_topic", default_image_topic)
 
-    # コンポーザブルノード
+    # コンポーザブルノード (ドライバ + JPEG再配信)
     if driver == "realsense":
         composable_nodes = _realsense_nodes(cam, ns)
     elif driver == "theta_s":
@@ -190,7 +213,8 @@ def _make_camera_group(
             composable_nodes.append(_qr_node(cam, qr_model_dir, ns, image_topic))
         else:
             print(
-                f"[camera.launch] WARNING: use_qr=true for {name} but qr_detector package not found, skipping QR"
+                f"[camera.launch] WARNING: use_qr=true for {name} "
+                "but qr_detector package not found, skipping QR"
             )
 
     container = ComposableNodeContainer(
@@ -205,51 +229,7 @@ def _make_camera_group(
         respawn_delay=3.0,
     )
 
-    # ffmpeg ブリッジ: カラー画像があるカメラのみ
-    has_color = driver == "v4l2" or cam.get("enable_color", True)
     actions = [container]
-    if has_color:
-        ffmpeg_in = f"/{ns}/{image_topic}/ffmpeg"
-        ffmpeg_out = f"/{ns}/compressed_video"
-        actions.append(
-            Node(
-                package="bringup",
-                executable="ffmpeg_to_foxglove_video.py",
-                name=f"ffmpeg_to_foxglove_{name}",
-                parameters=[
-                    {
-                        "use_sim_time": False,
-                        "input_topic": ffmpeg_in,
-                        "output_topic": ffmpeg_out,
-                    }
-                ],
-                condition=IfCondition(use_camera_cfg),
-                respawn=True,
-                respawn_delay=3.0,
-            )
-        )
-
-        # Backward-compatible single-topic output for operator dashboards.
-        # Keep per-camera topics, and additionally expose front camera to a
-        # stable global topic that Foxglove layouts can subscribe to.
-        if name == "front":
-            actions.append(
-                Node(
-                    package="bringup",
-                    executable="ffmpeg_to_foxglove_video.py",
-                    name="ffmpeg_to_foxglove_front_compat",
-                    parameters=[
-                        {
-                            "use_sim_time": False,
-                            "input_topic": ffmpeg_in,
-                            "output_topic": "/camera/image_raw/foxglove_video",
-                        }
-                    ],
-                    condition=IfCondition(use_camera_cfg),
-                    respawn=True,
-                    respawn_delay=3.0,
-                )
-            )
 
     # depthimage_to_laserscan: 深度画像 → LaserScan → nav2 costmap に直接接続
     # depth_guard とは役割が異なる: これは nav2 の障害物回避に使う標準パイプライン
