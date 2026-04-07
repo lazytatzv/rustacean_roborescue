@@ -66,6 +66,7 @@ def _v4l2_nodes(cam: dict, ns: str) -> list:
                 {
                     "video_device": cam.get("device", "/dev/video0"),
                     "pixel_format": cam.get("pixel_format", "MJPG"),
+                    "output_encoding": cam.get("output_encoding", "rgb8"),
                     "image_size": [cam.get("width", 640), cam.get("height", 480)],
                     "time_per_frame": [1, cam.get("fps", 30)],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
@@ -88,6 +89,7 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
                 {
                     "video_device": cam.get("device", "/dev/video4"),
                     "pixel_format": "MJPG",
+                    "output_encoding": cam.get("output_encoding", "rgb8"),
                     "image_size": [cam.get("width", 1280), cam.get("height", 720)],
                     "time_per_frame": [1, cam.get("fps", 15)],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
