@@ -183,6 +183,7 @@ def _make_camera_group(
     qr_model_dir: str,
     use_camera_cfg: LaunchConfiguration,
     use_depth_guard_cfg: LaunchConfiguration,
+    use_jpeg_republish_cfg: LaunchConfiguration,
 ) -> list:
     name = cam["name"]
     ns = f"camera_{name}"
@@ -224,11 +225,39 @@ def _make_camera_group(
 
     actions = [container]
 
-    # JPEG 常時配信: カラー画像があるカメラのみ
-    # realsense で enable_color=false (T265 等) は除く
+    # JPEG 常時配信 (use_jpeg_republish:=true のときのみ起動)
+    # デフォルトは image_transport の compressed transport に任せる。
+    # compressed_image_transport が未インストール等で image_raw/compressed が
+    # 流れない場合に use_jpeg_republish:=true で切り替える。
     has_color = driver != "realsense" or cam.get("enable_color", True)
     if has_color:
-        actions.append(_jpeg_node(cam, name, ns, image_topic, use_camera_cfg))
+        actions.append(
+            Node(
+                package="bringup",
+                executable="jpeg_republish.py",
+                name=f"jpeg_republish_{name}",
+                parameters=[
+                    {
+                        "in_topic": f"/{ns}/{image_topic}",
+                        "out_topic": f"/{ns}/{image_topic}/compressed",
+                        "jpeg_quality": cam.get("jpeg_quality", 80),
+                    }
+                ],
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            use_camera_cfg,
+                            "' == 'true' and '",
+                            use_jpeg_republish_cfg,
+                            "' == 'true'",
+                        ]
+                    )
+                ),
+                respawn=True,
+                respawn_delay=3.0,
+            )
+        )
 
     # depthimage_to_laserscan: 深度画像 → LaserScan → nav2 costmap
     if driver == "realsense" and cam.get("enable_depth", False):
@@ -306,14 +335,25 @@ def generate_launch_description():
         default_value="false",
         description="D435i 深度近接検出ノード (depth_guard) を有効にする",
     )
+    arg_use_jpeg_republish = DeclareLaunchArgument(
+        "use_jpeg_republish",
+        default_value="false",
+        description=(
+            "jpeg_republish.py による常時 JPEG 配信を有効にする。"
+            " デフォルトは image_transport の compressed transport を使用。"
+            " compressed_image_transport が未インストールなど image_raw/compressed が"
+            " 流れない場合に true にする。"
+        ),
+    )
     use_camera_cfg = LaunchConfiguration("use_camera")
     use_depth_guard_cfg = LaunchConfiguration("use_depth_guard")
+    use_jpeg_republish_cfg = LaunchConfiguration("use_jpeg_republish")
 
     cameras = _load_cameras(bringup_share)
     if not cameras:
         print("[camera.launch] WARNING: no cameras defined in cameras.yaml")
 
-    actions = [arg_use_camera, arg_use_depth_guard]
+    actions = [arg_use_camera, arg_use_depth_guard, arg_use_jpeg_republish]
     seen_v4l2_phys = set()
     for cam in cameras:
         available, reason = _camera_available(cam)
@@ -338,6 +378,10 @@ def generate_launch_description():
                     continue
                 seen_v4l2_phys.add(key)
 
-        actions.extend(_make_camera_group(cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg))
+        actions.extend(
+            _make_camera_group(
+                cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg, use_jpeg_republish_cfg
+            )
+        )
 
     return LaunchDescription(actions)

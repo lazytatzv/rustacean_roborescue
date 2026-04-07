@@ -106,6 +106,7 @@ def generate_launch_description():
         default_use_imu = _b(cfg.get("use_imu", True))
         default_use_t265_odom = _b(cfg.get("use_t265_odom", False))
         default_use_depth_guard = _b(cfg.get("use_depth_guard", False))
+        default_use_jpeg_republish = _b(cfg.get("use_jpeg_republish", False))
 
         arg_use_nav2 = DeclareLaunchArgument("use_nav2", default_value=default_use_nav2)
         arg_use_audio = DeclareLaunchArgument("use_audio", default_value=default_use_audio)
@@ -122,6 +123,9 @@ def generate_launch_description():
         arg_use_depth_guard = DeclareLaunchArgument(
             "use_depth_guard", default_value=default_use_depth_guard
         )
+        arg_use_jpeg_republish = DeclareLaunchArgument(
+            "use_jpeg_republish", default_value=default_use_jpeg_republish
+        )
 
         use_nav2 = LaunchConfiguration("use_nav2")
         use_audio = LaunchConfiguration("use_audio")
@@ -134,6 +138,7 @@ def generate_launch_description():
         use_imu = LaunchConfiguration("use_imu")
         use_t265_odom = LaunchConfiguration("use_t265_odom")
         use_depth_guard = LaunchConfiguration("use_depth_guard")
+        use_jpeg_republish = LaunchConfiguration("use_jpeg_republish")
         # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
         urdf_file = os.path.join(bringup_dir, "urdf", "robot.urdf.xacro")
         robot_state_publisher_actions = []
@@ -228,6 +233,7 @@ def generate_launch_description():
             arg_use_imu,
             arg_use_t265_odom,
             arg_use_depth_guard,
+            arg_use_jpeg_republish,
             # ==========================================
             # Zenoh / RMW 設定 (すべてのノードより前に実行)
             # ==========================================
@@ -271,6 +277,7 @@ def generate_launch_description():
                 launch_arguments={
                     "use_camera": use_camera,
                     "use_depth_guard": use_depth_guard,
+                    "use_jpeg_republish": use_jpeg_republish,
                 },
             ),
             # 制御系の起動

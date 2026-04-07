@@ -37,3 +37,8 @@ use_t265_odom: false
 # D435i 深度カメラを使った近接障害物検出 (depth_guard ノード) を有効にする
 # cameras.yaml の d435i エントリも enabled: true にすること
 use_depth_guard: false
+
+# jpeg_republish.py による常時 JPEG 配信を有効にする
+# デフォルト (false) は image_transport の compressed transport を使用する。
+# ros2 topic list で /camera_XXX/image_raw/compressed が見えない場合に true にする。
+use_jpeg_republish: false
