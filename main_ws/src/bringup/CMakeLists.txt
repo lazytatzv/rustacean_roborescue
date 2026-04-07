@@ -28,6 +28,7 @@ install(PROGRAMS
   scripts/arm_cmd_bridge.py
   scripts/arm_mock_driver.py
   scripts/ffmpeg_to_foxglove_video.py
+  scripts/jpeg_republish.py
   scripts/odom_selector.py
   DESTINATION lib/${PROJECT_NAME}
 )

@@ -54,35 +54,8 @@ def _video_device_realpath_key(dev_path: str) -> str:
         return ""
 
 
-def _jpeg_republish_node(ns: str, in_topic: str, jpeg_quality: int) -> ComposableNode:
-    """image_raw → image_raw/compressed (JPEG) を同コンテナ内で変換するノード。
-    intra-process で受け取り外部に sensor_msgs/CompressedImage として配信する。
-    Foxglove Studio の Image パネルが直接購読できる。
-    """
-    return ComposableNode(
-        package="image_transport",
-        plugin="image_transport::RepublishNode",
-        name="republish_compressed",
-        namespace=ns,
-        remappings=[
-            ("in", in_topic),
-            ("out", in_topic),
-        ],
-        parameters=[
-            {
-                "in_transport": "raw",
-                "out_transport": "compressed",
-                "compressed.format": "jpeg",
-                "compressed.jpeg_quality": jpeg_quality,
-            }
-        ],
-        extra_arguments=[{"use_intra_process_comms": True}],
-    )
-
-
 def _v4l2_nodes(cam: dict, ns: str) -> list:
-    """v4l2 ドライバ + JPEG 圧縮再配信のコンポーザブルノードリストを返す。"""
-    jpeg_quality = cam.get("jpeg_quality", 80)
+    """v4l2 ドライバのコンポーザブルノードを返す。JPEG 配信は別 Node で行う。"""
     return [
         ComposableNode(
             package="v4l2_camera",
@@ -99,17 +72,12 @@ def _v4l2_nodes(cam: dict, ns: str) -> list:
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
-        ),
-        _jpeg_republish_node(ns, "image_raw", jpeg_quality),
+        )
     ]
 
 
 def _theta_s_nodes(cam: dict, ns: str) -> list:
-    """RICOH THETA S (UVC live streaming) のコンポーザブルノードリストを返す。
-    THETA S は USB接続時にMJPEGのUVCデバイスとして認識される。
-    MJPG → JPEG 再圧縮はほぼロスレスなので品質劣化は軽微。
-    """
-    jpeg_quality = cam.get("jpeg_quality", 80)
+    """RICOH THETA S (UVC live streaming) のコンポーザブルノードを返す。"""
     return [
         ComposableNode(
             package="v4l2_camera",
@@ -126,18 +94,14 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
-        ),
-        _jpeg_republish_node(ns, "image_raw", jpeg_quality),
+        )
     ]
 
 
 def _realsense_nodes(cam: dict, ns: str) -> list:
-    """RealSense ドライバのコンポーザブルノードリストを返す。"""
-    jpeg_quality = cam.get("jpeg_quality", 80)
+    """RealSense ドライバのコンポーザブルノードを返す。"""
     params = {
         "serial_no": cam.get("serial", ""),
-        # URDF のリンク名 (camera_<name>_link) と一致させる。
-        # これにより realsense2_camera が publish する TF が robot TF ツリーに繋がる。
         "base_frame_id": f"{ns}_link",
         "enable_color": cam.get("enable_color", True),
         "enable_depth": cam.get("enable_depth", False),
@@ -152,7 +116,7 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
         "depth_height": cam.get("depth_height", 480),
         "depth_fps": cam.get("depth_fps", 30),
     }
-    nodes = [
+    return [
         ComposableNode(
             package="realsense2_camera",
             plugin="realsense2_camera::RealSenseNodeFactory",
@@ -162,9 +126,6 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
             extra_arguments=[{"use_intra_process_comms": True}],
         )
     ]
-    if cam.get("enable_color", True):
-        nodes.append(_jpeg_republish_node(ns, "color/image_raw", jpeg_quality))
-    return nodes
 
 
 def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> ComposableNode:
@@ -185,6 +146,38 @@ def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> Composa
     )
 
 
+def _jpeg_node(
+    cam: dict,
+    name: str,
+    ns: str,
+    image_topic: str,
+    use_camera_cfg: LaunchConfiguration,
+) -> Node:
+    """subscriber 数に関わらず常時 JPEG を配信するノード。
+
+    image_transport::RepublishNode は lazy publishing のため subscriber が
+    いないと圧縮が止まる。このノードはその問題を回避する。
+    Foxglove の購読先: /{ns}/{image_topic}/compressed
+    """
+    in_topic = f"/{ns}/{image_topic}"
+    out_topic = f"/{ns}/{image_topic}/compressed"
+    return Node(
+        package="bringup",
+        executable="jpeg_republish.py",
+        name=f"jpeg_republish_{name}",
+        parameters=[
+            {
+                "in_topic": in_topic,
+                "out_topic": out_topic,
+                "jpeg_quality": cam.get("jpeg_quality", 80),
+            }
+        ],
+        condition=IfCondition(use_camera_cfg),
+        respawn=True,
+        respawn_delay=3.0,
+    )
+
+
 def _make_camera_group(
     cam: dict,
     qr_model_dir: str,
@@ -196,11 +189,11 @@ def _make_camera_group(
     driver = cam.get("driver", "v4l2")
     use_qr = cam.get("use_qr", False)
 
-    # ドライバごとのデフォルト raw image トピック (QR検出用)
+    # ドライバごとのデフォルト raw image トピック
     default_image_topic = "color/image_raw" if driver == "realsense" else "image_raw"
     image_topic = cam.get("image_topic", default_image_topic)
 
-    # コンポーザブルノード (ドライバ + JPEG再配信)
+    # コンポーザブルノード (ドライバのみ)
     if driver == "realsense":
         composable_nodes = _realsense_nodes(cam, ns)
     elif driver == "theta_s":
@@ -231,8 +224,13 @@ def _make_camera_group(
 
     actions = [container]
 
-    # depthimage_to_laserscan: 深度画像 → LaserScan → nav2 costmap に直接接続
-    # depth_guard とは役割が異なる: これは nav2 の障害物回避に使う標準パイプライン
+    # JPEG 常時配信: カラー画像があるカメラのみ
+    # realsense で enable_color=false (T265 等) は除く
+    has_color = driver != "realsense" or cam.get("enable_color", True)
+    if has_color:
+        actions.append(_jpeg_node(cam, name, ns, image_topic, use_camera_cfg))
+
+    # depthimage_to_laserscan: 深度画像 → LaserScan → nav2 costmap
     if driver == "realsense" and cam.get("enable_depth", False):
         actions.append(
             Node(
@@ -258,9 +256,7 @@ def _make_camera_group(
             )
         )
 
-    # depth_guard: D435i 等の深度カメラに対する近接障害物検出ノード
-    # realsense + enable_depth が有効なカメラにのみ追加する
-    # ※ nav2 統合は depthimage_to_laserscan が担う。depth_guard はオペレーター向け警告表示用。
+    # depth_guard: オペレーター向け近接障害物警告
     if driver == "realsense" and cam.get("enable_depth", False):
         actions.append(
             Node(
