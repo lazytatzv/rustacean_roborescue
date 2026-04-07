@@ -130,6 +130,38 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
     ]
 
 
+def _compressed_republish_node(
+    cam: dict, ns: str, image_topic: str, condition=None
+) -> Node:
+    """image_transport republish で compressed を配信するスタンドアロンノード。
+
+    image_transport::RepublishNode composable plugin が nix 環境で未登録のため
+    standalone Node として起動する。subscriber がいないときも常時動作するが、
+    compressed transport 自体が lazy なので帯域消費は限定的。
+    """
+    return Node(
+        package="image_transport",
+        executable="republish",
+        name="republish_compressed",
+        namespace=ns,
+        arguments=["raw"],
+        remappings=[
+            ("in", image_topic),
+            ("out", image_topic),
+        ],
+        parameters=[
+            {
+                "in_transport": "raw",
+                "out_transport": "compressed",
+                "compressed.jpeg_quality": cam.get("jpeg_quality", 80),
+            }
+        ],
+        condition=condition,
+        respawn=True,
+        respawn_delay=3.0,
+    )
+
+
 def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> ComposableNode:
     return ComposableNode(
         package="qr_detector_cpp",
@@ -148,44 +180,11 @@ def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> Composa
     )
 
 
-def _jpeg_node(
-    cam: dict,
-    name: str,
-    ns: str,
-    image_topic: str,
-    use_camera_cfg: LaunchConfiguration,
-) -> Node:
-    """subscriber 数に関わらず常時 JPEG を配信するノード。
-
-    image_transport::RepublishNode は lazy publishing のため subscriber が
-    いないと圧縮が止まる。このノードはその問題を回避する。
-    Foxglove の購読先: /{ns}/{image_topic}/compressed
-    """
-    in_topic = f"/{ns}/{image_topic}"
-    out_topic = f"/{ns}/{image_topic}/compressed"
-    return Node(
-        package="bringup",
-        executable="jpeg_republish.py",
-        name=f"jpeg_republish_{name}",
-        parameters=[
-            {
-                "in_topic": in_topic,
-                "out_topic": out_topic,
-                "jpeg_quality": cam.get("jpeg_quality", 80),
-            }
-        ],
-        condition=IfCondition(use_camera_cfg),
-        respawn=True,
-        respawn_delay=3.0,
-    )
-
-
 def _make_camera_group(
     cam: dict,
     qr_model_dir: str,
     use_camera_cfg: LaunchConfiguration,
     use_depth_guard_cfg: LaunchConfiguration,
-    use_jpeg_republish_cfg: LaunchConfiguration,
 ) -> list:
     name = cam["name"]
     ns = f"camera_{name}"
@@ -213,6 +212,8 @@ def _make_camera_group(
                 "but qr_detector package not found, skipping QR"
             )
 
+    has_color = driver != "realsense" or cam.get("enable_color", True)
+
     container = ComposableNodeContainer(
         name=f"camera_{name}_container",
         namespace="",
@@ -227,65 +228,47 @@ def _make_camera_group(
 
     actions = [container]
 
-    # JPEG 常時配信 (use_jpeg_republish:=true のときのみ起動)
-    # デフォルトは image_transport の compressed transport に任せる。
-    # compressed_image_transport が未インストール等で image_raw/compressed が
-    # 流れない場合に use_jpeg_republish:=true で切り替える。
-    has_color = driver != "realsense" or cam.get("enable_color", True)
+    # image_transport republish (standalone): compressed トピックを配信する。
+    # composable plugin が nix 環境で未登録のためコンテナ外で起動する。
     if has_color:
         actions.append(
-            Node(
-                package="bringup",
-                executable="jpeg_republish.py",
-                name=f"jpeg_republish_{name}",
-                parameters=[
-                    {
-                        "in_topic": f"/{ns}/{image_topic}",
-                        "out_topic": f"/{ns}/{image_topic}/compressed",
-                        "jpeg_quality": cam.get("jpeg_quality", 80),
-                    }
-                ],
-                condition=IfCondition(
-                    PythonExpression(
-                        [
-                            "'",
-                            use_camera_cfg,
-                            "' == 'true' and '",
-                            use_jpeg_republish_cfg,
-                            "' == 'true'",
-                        ]
-                    )
-                ),
-                respawn=True,
-                respawn_delay=3.0,
+            _compressed_republish_node(
+                cam, ns, image_topic, condition=IfCondition(use_camera_cfg)
             )
         )
 
     # depthimage_to_laserscan: 深度画像 → LaserScan → nav2 costmap
     if driver == "realsense" and cam.get("enable_depth", False):
-        actions.append(
-            Node(
-                package="depthimage_to_laserscan",
-                executable="depthimage_to_laserscan_node",
-                name=f"depth_to_scan_{name}",
-                remappings=[
-                    ("image", f"/{ns}/depth/image_rect_raw"),
-                    ("camera_info", f"/{ns}/depth/camera_info"),
-                    ("scan", "/scan_depth"),
-                ],
-                parameters=[
-                    {
-                        "scan_height": 5,
-                        "scan_time": 0.033,
-                        "range_min": 0.1,
-                        "range_max": 3.0,
-                    }
-                ],
-                condition=IfCondition(use_camera_cfg),
-                respawn=True,
-                respawn_delay=5.0,
+        try:
+            get_package_share_directory("depthimage_to_laserscan")
+            actions.append(
+                Node(
+                    package="depthimage_to_laserscan",
+                    executable="depthimage_to_laserscan_node",
+                    name=f"depth_to_scan_{name}",
+                    remappings=[
+                        ("image", f"/{ns}/depth/image_rect_raw"),
+                        ("camera_info", f"/{ns}/depth/camera_info"),
+                        ("scan", "/scan_depth"),
+                    ],
+                    parameters=[
+                        {
+                            "scan_height": 5,
+                            "scan_time": 0.033,
+                            "range_min": 0.1,
+                            "range_max": 3.0,
+                        }
+                    ],
+                    condition=IfCondition(use_camera_cfg),
+                    respawn=True,
+                    respawn_delay=5.0,
+                )
             )
-        )
+        except PackageNotFoundError:
+            print(
+                f"[camera.launch] WARNING: depthimage_to_laserscan not found, "
+                f"skipping depth→laserscan for {name}"
+            )
 
     # depth_guard: オペレーター向け近接障害物警告
     if driver == "realsense" and cam.get("enable_depth", False):
@@ -337,25 +320,14 @@ def generate_launch_description():
         default_value="false",
         description="D435i 深度近接検出ノード (depth_guard) を有効にする",
     )
-    arg_use_jpeg_republish = DeclareLaunchArgument(
-        "use_jpeg_republish",
-        default_value="false",
-        description=(
-            "jpeg_republish.py による常時 JPEG 配信を有効にする。"
-            " デフォルトは image_transport の compressed transport を使用。"
-            " compressed_image_transport が未インストールなど image_raw/compressed が"
-            " 流れない場合に true にする。"
-        ),
-    )
     use_camera_cfg = LaunchConfiguration("use_camera")
     use_depth_guard_cfg = LaunchConfiguration("use_depth_guard")
-    use_jpeg_republish_cfg = LaunchConfiguration("use_jpeg_republish")
 
     cameras = _load_cameras(bringup_share)
     if not cameras:
         print("[camera.launch] WARNING: no cameras defined in cameras.yaml")
 
-    actions = [arg_use_camera, arg_use_depth_guard, arg_use_jpeg_republish]
+    actions = [arg_use_camera, arg_use_depth_guard]
     seen_v4l2_phys = set()
     for cam in cameras:
         available, reason = _camera_available(cam)
@@ -381,9 +353,7 @@ def generate_launch_description():
                 seen_v4l2_phys.add(key)
 
         actions.extend(
-            _make_camera_group(
-                cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg, use_jpeg_republish_cfg
-            )
+            _make_camera_group(cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg)
         )
 
     return LaunchDescription(actions)

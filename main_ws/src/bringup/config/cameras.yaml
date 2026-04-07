@@ -36,22 +36,25 @@
 #
 # 注意: serial が空文字の場合、接続された最初のデバイスを使用する。
 #       複数の RealSense を同時使用する場合は必ずシリアル番号を指定すること。
+#
+#
+#   v4l2-ctl --list-formats-ext -d /dev/camera_front
 
 cameras:
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
 
   # アームの先端中のカメラ
   # Genius WideCam F100 (usb-0000:00:14.0-3.4)
+  # BUFFALO INC. (formerly MelCo., Inc.) USB 2.0 Camera
   - name: arm
     driver: v4l2
     enabled: true
     device: /dev/camera_arm # udev bind
     width: 640
     height: 480
-    output_encoding: rgb8
+    output_encoding: yuv422_yuy2
     fps: 30
     pixel_format: YUYV
-    # とりあえずYUYVだとうまくいった
     frame_id: arm_camera_link
     use_qr: true
     jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)
@@ -59,17 +62,18 @@ cameras:
     # Genius WideCam F100 (usb-0000:00:14.0-3.3)
     # ロボットのバッテリーがある側をFRONTとする
     # これはFRONT側のバッテリー上に付いているカメラ
-    # CAUTION: まだ動作確認できていない
   - name: front
     driver: v4l2
-    enabled: false
-    device: /dev/video4
-    width: 320
-    height: 240
-    fps: 5
+    enabled: true
+    device: /dev/camera_front
+    width: 640
+    height: 480
+    fps: 15
     pixel_format: YUYV
+    output_encoding: yuv422_yuy2
     frame_id: front_camera_link
     use_qr: false
+    jpeg_quality: 80
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   - name: theta
@@ -90,7 +94,7 @@ cameras:
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
   - name: d435i
     driver: realsense
-    enabled: true
+    enabled: false
     serial: ""
     enable_color: true
     enable_depth: true

@@ -168,6 +168,7 @@
           ros.velodyne-driver
           ros.velodyne-pointcloud
           ros.pointcloud-to-laserscan # 3D → 2D LaserScan
+          ros.depthimage-to-laserscan # 深度画像 → 2D LaserScan (D435i)
           ros.slam-toolbox            # 2D SLAM
           ros.pcl-ros
           ros.pcl-conversions
@@ -181,6 +182,9 @@
           ros.v4l2-camera                  # Optimized camera driver
           ros.camera-info-manager
           ros.rclcpp-components
+          ros.realsense2-camera            # Intel RealSense D435i / T265 ドライバ
+          ros.realsense2-camera-msgs       # RealSense カスタムメッセージ型
+          ros.realsense2-description       # RealSense URDF
 
 
           #ros.pcl

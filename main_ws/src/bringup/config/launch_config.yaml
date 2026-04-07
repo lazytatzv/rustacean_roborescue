@@ -4,8 +4,8 @@
 # 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
 # 足回り
-use_crawler: true
-use_flipper: true
+use_crawler: false
+use_flipper: false
 
 use_arm: false
 
@@ -20,7 +20,7 @@ use_lidar: false
 
 # カメラ制御全て
 # これがfalseだと遠隔操縦は不可能
-use_camera: false
+use_camera: true
 
 use_audio: false
 
@@ -38,7 +38,3 @@ use_t265_odom: false
 # cameras.yaml の d435i エントリも enabled: true にすること
 use_depth_guard: false
 
-# jpeg_republish.py による常時 JPEG 配信を有効にする
-# デフォルト (false) は image_transport の compressed transport を使用する。
-# ros2 topic list で /camera_XXX/image_raw/compressed が見えない場合に true にする。
-use_jpeg_republish: false
