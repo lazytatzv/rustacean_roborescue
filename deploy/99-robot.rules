@@ -49,4 +49,4 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_SERI
 #
 #
 # アームの先端中のカメラ(たぶん)
-SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0411", ATTRS{idProduct}=="02da", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_front", MODE="0666"
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0411", ATTRS{idProduct}=="02da", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_arm", MODE="0666"
