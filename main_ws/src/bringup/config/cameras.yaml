@@ -49,8 +49,9 @@ cameras:
     device: /dev/camera_front # udev bind
     width: 640
     height: 480
+    output_encoding: rgb8
     fps: 30
-    pixel_format: MJPG
+    pixel_format: YUYV
     frame_id: front_camera_link
     use_qr: false
     jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)

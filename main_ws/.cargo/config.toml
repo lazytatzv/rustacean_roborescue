@@ -1,6 +1,9 @@
 [patch.crates-io.test_msgs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/test_msgs/rust"
 
+[patch.crates-io.arm_driver]
+path = "/home/yano/rustacean_roborescue/main_ws/install/share/arm_driver/rust"
+
 [patch.crates-io.type_description_interfaces]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/type_description_interfaces/rust"
 
@@ -22,17 +25,23 @@ path = "/home/yano/rustacean_roborescue/main_ws/install/share/sensor_msgs/rust"
 [patch.crates-io.trajectory_msgs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/trajectory_msgs/rust"
 
+[patch.crates-io.sensor_gateway]
+path = "/home/yano/rustacean_roborescue/main_ws/install/share/sensor_gateway/rust"
+
 [patch.crates-io.visualization_msgs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/visualization_msgs/rust"
 
 [patch.crates-io.service_msgs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/service_msgs/rust"
 
-[patch.crates-io.geometry_msgs]
-path = "/home/yano/rustacean_roborescue/main_ws/install/share/geometry_msgs/rust"
+[patch.crates-io.depth_guard]
+path = "/home/yano/rustacean_roborescue/main_ws/install/share/depth_guard/rust"
 
 [patch.crates-io.custom_interfaces]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/custom_interfaces/rust"
+
+[patch.crates-io.geometry_msgs]
+path = "/home/yano/rustacean_roborescue/main_ws/install/share/geometry_msgs/rust"
 
 [patch.crates-io.shape_msgs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/shape_msgs/rust"
@@ -57,6 +66,9 @@ path = "/home/yano/rustacean_roborescue/main_ws/install/share/unique_identifier_
 
 [patch.crates-io.lifecycle_msgs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/lifecycle_msgs/rust"
+
+[patch.crates-io.arm_controller]
+path = "/home/yano/rustacean_roborescue/main_ws/install/share/arm_controller/rust"
 
 [patch.crates-io.rclrs]
 path = "/home/yano/rustacean_roborescue/main_ws/install/share/rclrs/rust"

@@ -285,6 +285,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "depth_guard"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "builtin_interfaces",
+ "rclrs",
+ "sensor_msgs",
+ "std_msgs",
+]
+
+[[package]]
 name = "dynamixel2"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1513,8 +1524,20 @@ name = "actionlib_msgs"
 version = "5.3.6"
 
 [[patch.unused]]
+name = "arm_controller"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "arm_driver"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "composition_interfaces"
 version = "2.0.3"
+
+[[patch.unused]]
+name = "depth_guard"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "diagnostic_msgs"
@@ -1535,6 +1558,10 @@ version = "2.0.3"
 [[patch.unused]]
 name = "rosgraph_msgs"
 version = "2.0.3"
+
+[[patch.unused]]
+name = "sensor_gateway"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "shape_msgs"
