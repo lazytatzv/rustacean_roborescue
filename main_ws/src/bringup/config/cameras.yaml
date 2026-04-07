@@ -47,10 +47,10 @@ cameras:
     driver: v4l2
     enabled: true
     device: /dev/camera_front # udev bind
-    width: 320
-    height: 240
-    fps: 5
-    pixel_format: MJPG  # カメラのネイティブフォーマット (YUYVはstream start失敗)
+    width: 640
+    height: 480
+    fps: 30
+    pixel_format: MJPG
     frame_id: front_camera_link
     use_qr: false
     jpeg_quality: 80  # JPEG圧縮品質 (1-100, デフォルト: 80)
