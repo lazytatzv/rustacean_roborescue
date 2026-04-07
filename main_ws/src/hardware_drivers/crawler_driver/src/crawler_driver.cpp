@@ -230,14 +230,39 @@ class RoboclawDriver
 
     const size_t total = data_bytes + 2;
     size_t n = boost::asio::read(serial_, boost::asio::buffer(out, total), ec);
-    if (ec || n != total) return false;
+    if (ec || n != total)
+    {
+      RCLCPP_ERROR(rclcpp::get_logger("RoboclawDriver"),
+                   "readCommand(cmd=%u): read failed ec='%s' n=%zu expected=%zu",
+                   cmd, ec.message().c_str(), n, total);
+      return false;
+    }
 
     // CRC 検証: [addr][cmd][data...] の crc16
     Packet crc_pkt(ROBOCLAW_ADDRESS, cmd);
     for (size_t i = 0; i < data_bytes; ++i) crc_pkt.push(out[i]);
     const uint16_t expected = crc_pkt.crc16();
     const uint16_t received = (static_cast<uint16_t>(out[data_bytes]) << 8) | out[data_bytes + 1];
-    return expected == received;
+    if (expected != received)
+    {
+      RCLCPP_ERROR(rclcpp::get_logger("RoboclawDriver"),
+                   "readCommand(cmd=%u): CRC mismatch expected=0x%04X received=0x%04X bytes=[%s]",
+                   cmd, expected, received,
+                   [&]()
+                   {
+                     std::string s;
+                     for (size_t i = 0; i < total; ++i)
+                     {
+                       char buf[4];
+                       snprintf(buf, sizeof(buf), "%02X ", out[i]);
+                       s += buf;
+                     }
+                     return s;
+                   }()
+                       .c_str());
+      return false;
+    }
+    return true;
   }
 
   bool readMotorCurrents(float &m1_ma, float &m2_ma)
@@ -679,6 +704,7 @@ class CrawlerDriver : public rclcpp::Node
     m1_stall_scale_.store(1.0, std::memory_order_relaxed);
     m2_stall_scale_.store(1.0, std::memory_order_relaxed);
     roboclaw_.disconnect();
+    serialSleep();
   }
 
   bool serialInitHardware(bool has_connected_once)

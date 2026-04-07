@@ -169,10 +169,22 @@ def _build_network_actions(context):
                 os.makedirs(src_quic_dir, exist_ok=True)
                 dst_crt = os.path.join(src_quic_dir, "server.crt")
                 dst_key = os.path.join(src_quic_dir, "server.key")
-                if not os.path.isfile(dst_crt) or not os.path.samefile(ca_cert, dst_crt):
-                    shutil.copy2(ca_cert, dst_crt)
-                if not os.path.isfile(dst_key) or not os.path.samefile(key, dst_key):
-                    shutil.copy2(key, dst_key)
+                # server.crt が symlink で cert と同一物理ファイルを指す場合はコピーしない
+                # (symlink-install 環境で server.crt を ca.crt で上書きするのを防ぐ)
+                try:
+                    cert_is_dst = os.path.isfile(dst_crt) and os.path.samefile(cert, dst_crt)
+                except (FileNotFoundError, OSError):
+                    cert_is_dst = False
+                if not cert_is_dst:
+                    if not os.path.isfile(dst_crt) or not os.path.samefile(ca_cert, dst_crt):
+                        shutil.copy2(ca_cert, dst_crt)
+                try:
+                    key_is_dst = os.path.isfile(dst_key) and os.path.samefile(key, dst_key)
+                except (FileNotFoundError, OSError):
+                    key_is_dst = False
+                if not key_is_dst:
+                    if not os.path.isfile(dst_key) or not os.path.samefile(key, dst_key):
+                        shutil.copy2(key, dst_key)
                 actions.append(
                     LogInfo(msg=f"[network.launch] synced CA cert to {src_quic_dir} for operator")
                 )
