@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>depth_guard</name>
+  <version>0.1.0</version>
+  <description>D435i 深度画像から ROI 別最短距離を検出して publish する近接障害物検出ノード</description>
+  <maintainer email="yano.tatsuki439@mail.kyutech.jp">lazytatzv</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cargo</buildtool_depend>
+
+  <depend>rclrs</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+
+  <export>
+    <build_type>ament_cargo</build_type>
+  </export>
+</package>
