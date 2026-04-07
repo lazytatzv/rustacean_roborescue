@@ -44,7 +44,7 @@ cameras:
   - name: front
     driver: v4l2
     enabled: true
-    device: /dev/video0
+    device: /dev/camera_front
     width: 320
     height: 240
     fps: 5
