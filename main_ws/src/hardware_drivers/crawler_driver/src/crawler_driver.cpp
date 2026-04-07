@@ -29,8 +29,8 @@ constexpr uint8_t CMD_READ_M1_SPEED = 30;
 constexpr uint8_t CMD_READ_M2_SPEED = 31;
 constexpr uint8_t CMD_READ_CURRENTS = 49;
 constexpr uint8_t CMD_READ_TEMPERATURE = 47;
-constexpr uint8_t CMD_READ_MAIN_VOLTAGE = 90;
-constexpr uint8_t CMD_READ_STATUS = 24;
+constexpr uint8_t CMD_READ_MAIN_VOLTAGE = 24;
+constexpr uint8_t CMD_READ_STATUS = 90;
 constexpr uint8_t CMD_SET_M1_MAX_CURRENT = 133;
 constexpr uint8_t CMD_SET_M2_MAX_CURRENT = 134;
 constexpr uint8_t CMD_SET_SERIAL_TIMEOUT = 14;
@@ -238,7 +238,7 @@ class RoboclawDriver
       return false;
     }
 
-    // CRC 検証: [addr][cmd][data...] の crc16
+    // CRC 検証: [addr][cmd][data...] の crc16 (データシート準拠)
     Packet crc_pkt(ROBOCLAW_ADDRESS, cmd);
     for (size_t i = 0; i < data_bytes; ++i) crc_pkt.push(out[i]);
     const uint16_t expected = crc_pkt.crc16();
