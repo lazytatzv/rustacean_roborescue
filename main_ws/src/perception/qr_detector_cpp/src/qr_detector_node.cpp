@@ -119,11 +119,33 @@ void QrDetectorNode::image_callback(const sensor_msgs::msg::Image::ConstSharedPt
   std::vector<cv::Mat> points;
   std::vector<std::string> results;
 
+  bool use_zbar = !detector_;
+
   if (detector_)
   {
-    results = detector_->detectAndDecode(frame, points);
+    try
+    {
+      results = detector_->detectAndDecode(frame, points);
+    }
+    catch (const cv::Exception &e)
+    {
+      RCLCPP_WARN(this->get_logger(), "WeChatQRCode failed, falling back to zbar: %s", e.what());
+      use_zbar = true;
+    }
+    catch (const std::exception &e)
+    {
+      RCLCPP_WARN(this->get_logger(), "WeChatQRCode failed, falling back to zbar: %s", e.what());
+      use_zbar = true;
+    }
+    catch (...)
+    {
+      RCLCPP_WARN(this->get_logger(),
+                  "WeChatQRCode failed with unknown error, falling back to zbar");
+      use_zbar = true;
+    }
   }
-  else
+
+  if (use_zbar)
   {
     // zbar フォールバック (MONO8 で直接変換)
     cv_bridge::CvImagePtr gray_ptr;
