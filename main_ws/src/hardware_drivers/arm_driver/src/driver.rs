@@ -16,7 +16,7 @@ const ADDR_GOAL_POSITION: u16 = 116; // 4 bytes
 const ADDR_PRESENT_CURRENT: u16 = 126; // 2 bytes (signed)
 const ADDR_PRESENT_VELOCITY: u16 = 128; // 4 bytes (signed)
 const ADDR_PRESENT_POSITION: u16 = 132; // 4 bytes
-const ADDR_CURRENT_LIMIT: u16 = 38;        // 2 bytes (EEPROM)
+const ADDR_CURRENT_LIMIT: u16 = 38; // 2 bytes (EEPROM)
 const ADDR_PRESENT_TEMPERATURE: u16 = 146; // 1 byte
 
 /// Position Control Mode
@@ -64,9 +64,12 @@ pub struct ArmDynamixelDriver {
     bus: Bus<Vec<u8>, Vec<u8>>,
     arm_ids: Vec<u8>,
     gripper_ids: Vec<u8>,
+    /// arm_directions[i]: +1.0 or -1.0. physical_rad = (urdf_rad + offset) * direction
+    /// ウォームギア等でURDF関節方向とサーボ回転方向が逆の場合は -1.0 を設定する。
+    arm_directions: Vec<f64>,
     /// gripper_directions[i]: +1.0 or -1.0. physical_rad = (urdf_rad + offset) * direction
     gripper_directions: Vec<f64>,
-    /// per-joint offset [rad]: physical_rad = urdf_rad + offset
+    /// per-joint offset [rad]: physical_rad = (urdf_rad + offset) * direction
     /// URDF 0 rad が Dynamixel tick 2048 と一致しない場合に設定する。
     /// 正値: URDF ゼロ時にモーターが正方向にずれている
     arm_offsets: Vec<f64>,
@@ -88,6 +91,7 @@ impl ArmDynamixelDriver {
         baud_rate: u32,
         arm_ids: Vec<u8>,
         gripper_ids: Vec<u8>,
+        arm_directions: Vec<f64>,
         gripper_directions: Vec<f64>,
         arm_offsets: Vec<f64>,
         gripper_offsets: Vec<f64>,
@@ -98,12 +102,15 @@ impl ArmDynamixelDriver {
         arm_off.resize(arm_ids.len(), 0.0);
         let mut g_off = gripper_offsets;
         g_off.resize(gripper_ids.len(), 0.0);
+        let mut a_dir = arm_directions;
+        a_dir.resize(arm_ids.len(), 1.0);
         let mut g_dir = gripper_directions;
         g_dir.resize(gripper_ids.len(), 1.0);
         Ok(Self {
             bus,
             arm_ids,
             gripper_ids,
+            arm_directions: a_dir,
             gripper_directions: g_dir,
             arm_offsets: arm_off,
             gripper_offsets: g_off,
@@ -130,7 +137,11 @@ impl ArmDynamixelDriver {
         for &id in &self.arm_ids {
             self.bus
                 .write_u8(id, ADDR_OPERATING_MODE, MODE_POSITION_CONTROL)
-                .map_err(|e| anyhow::anyhow!("ID {id} set operating_mode={MODE_POSITION_CONTROL} failed: {e:?}"))?;
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "ID {id} set operating_mode={MODE_POSITION_CONTROL} failed: {e:?}"
+                    )
+                })?;
         }
         for &id in &self.gripper_ids {
             self.bus
@@ -142,7 +153,9 @@ impl ArmDynamixelDriver {
         for &id in &self.arm_ids {
             self.bus
                 .write_u32(id, ADDR_PROFILE_VELOCITY, profile_velocity)
-                .map_err(|e| anyhow::anyhow!("ID {id} set profile_velocity={profile_velocity} failed: {e:?}"))?;
+                .map_err(|e| {
+                    anyhow::anyhow!("ID {id} set profile_velocity={profile_velocity} failed: {e:?}")
+                })?;
         }
         for &id in &self.gripper_ids {
             // Current Limit (EEPROM) を読んでクランプ: Dynamixel Wizard で下げている場合にも対応
@@ -165,7 +178,11 @@ impl ArmDynamixelDriver {
             };
             self.bus
                 .write_u16(id, ADDR_GOAL_CURRENT, effective_current)
-                .map_err(|e| anyhow::anyhow!("gripper ID {id} set goal_current={effective_current} failed: {e:?}"))?;
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "gripper ID {id} set goal_current={effective_current} failed: {e:?}"
+                    )
+                })?;
         }
 
         // トルクON前に現在位置をゴールとして書き込む。
@@ -182,11 +199,13 @@ impl ArmDynamixelDriver {
 
         // Torque ON
         for &id in &self.arm_ids {
-            self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 1)
+            self.bus
+                .write_u8(id, ADDR_TORQUE_ENABLE, 1)
                 .map_err(|e| anyhow::anyhow!("ID {id} torque enable failed: {e:?}"))?;
         }
         for &id in &self.gripper_ids {
-            self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 1)
+            self.bus
+                .write_u8(id, ADDR_TORQUE_ENABLE, 1)
                 .map_err(|e| anyhow::anyhow!("gripper ID {id} torque enable failed: {e:?}"))?;
         }
 
@@ -194,15 +213,16 @@ impl ArmDynamixelDriver {
     }
 
     pub fn write_arm_positions(&mut self, positions_rad: &[f64]) -> Result<()> {
-        // URDF 角度 → 物理角度 (offset 加算) → ticks
+        // URDF 角度 → 物理角度 (offset 加算 → direction 乗算) → ticks
         let commands: Vec<SyncWriteData<u32>> = self
             .arm_ids
             .iter()
             .zip(positions_rad.iter())
             .zip(self.arm_offsets.iter())
-            .map(|((&id, &rad), &offset)| SyncWriteData {
+            .zip(self.arm_directions.iter())
+            .map(|(((&id, &rad), &offset), &dir)| SyncWriteData {
                 motor_id: id,
-                data: rad_to_ticks(rad + offset),
+                data: rad_to_ticks((rad + offset) * dir),
             })
             .collect();
         self.bus
@@ -226,17 +246,21 @@ impl ArmDynamixelDriver {
             .bus
             .sync_read_u32(&self.arm_ids, ADDR_PRESENT_POSITION)
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-        // ticks → 物理角度 → URDF 角度 (offset 減算)
+        // ticks → 物理角度 → URDF 角度 (direction 除算 → offset 減算)
         Ok(resp
             .iter()
             .zip(self.arm_offsets.iter())
-            .map(|(r, &offset)| ticks_to_rad(r.data) - offset)
+            .zip(self.arm_directions.iter())
+            .map(|((r, &offset), &dir)| ticks_to_rad(r.data) / dir - offset)
             .collect())
     }
 
     /// 最初のグリッパーサーボのステータスを返す (代表値)
     pub fn read_gripper_status(&mut self) -> Result<MotorStatus> {
-        let id = *self.gripper_ids.first().ok_or_else(|| anyhow::anyhow!("no gripper ids"))?;
+        let id = *self
+            .gripper_ids
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("no gripper ids"))?;
         let dir = self.gripper_directions.first().copied().unwrap_or(1.0);
         let offset = self.gripper_offsets.first().copied().unwrap_or(0.0);
         let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION)?;

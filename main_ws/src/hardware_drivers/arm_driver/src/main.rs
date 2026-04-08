@@ -39,6 +39,7 @@ struct HardwareThreadParams {
     profile_velocity: u32,
     arm_ids: Vec<u8>,
     gripper_ids: Vec<u8>,
+    arm_directions: Vec<f64>,
     gripper_directions: Vec<f64>,
     gripper_max_current: u16,
     arm_offsets: Vec<f64>,
@@ -57,6 +58,7 @@ fn hardware_thread(params: HardwareThreadParams) {
         params.baud_rate,
         params.arm_ids.clone(),
         params.gripper_ids.clone(),
+        params.arm_directions.clone(),
         params.gripper_directions.clone(),
         params.arm_offsets.clone(),
         params.gripper_offsets.clone(),
@@ -215,6 +217,12 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let gripper_ids: Vec<u8> = gripper_ids_arr.iter().copied().map(|id| id as u8).collect();
+    let arm_directions_arr: Arc<[f64]> = node
+        .declare_parameter("arm_directions")
+        .default(Arc::from(vec![1.0_f64; 6].into_boxed_slice()))
+        .mandatory()?
+        .get();
+    let arm_directions: Vec<f64> = arm_directions_arr.to_vec();
     let gripper_directions_arr: Arc<[f64]> = node
         .declare_parameter("gripper_directions")
         .default(Arc::from(vec![1.0_f64, -1.0_f64].into_boxed_slice()))
@@ -306,6 +314,7 @@ fn run() -> Result<()> {
             profile_velocity: profile_velocity as u32,
             arm_ids,
             gripper_ids,
+            arm_directions,
             gripper_directions,
             gripper_max_current: gripper_max_current as u16,
             arm_offsets,

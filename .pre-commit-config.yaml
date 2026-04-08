@@ -43,5 +43,10 @@ repos:
 
       - id: cargo-clippy
         name: cargo clippy
-        entry: bash -lc "cd main_ws || true; cargo clippy --workspace -- -D warnings"
+        entry: >-
+          bash -lc
+          "cd main_ws || true;
+          cargo metadata --quiet >/dev/null 2>&1 ||
+          { echo SKIP_cargo_clippy_deps_unavailable; exit 0; };
+          cargo clippy --workspace -- -D warnings"
         language: system
