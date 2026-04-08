@@ -17,6 +17,23 @@ sync:
   # 新しい環境で作業する場合はsyncしてsubmoduleの内容物を取ってくる
   git submodule update --init --recursive
 
+# QUIC用TLS証明書を生成してコミット対象ファイルに配置する
+# IPアドレスが変わった場合や初回セットアップ時に実行する
+# 実行後: git add + commit → operator側は git pull するだけでscp不要
+gen-cert:
+  #!/usr/bin/env bash
+  set -e
+  mkdir -p main_ws/src/bringup/config/quic operator_ws/quic
+  openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 3650 \
+    -keyout main_ws/src/bringup/config/quic/server.key \
+    -out main_ws/src/bringup/config/quic/server.crt \
+    -subj "/CN=zenoh-robot" \
+    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.42.0.1,IP:100.114.200.30"
+  cp main_ws/src/bringup/config/quic/server.crt operator_ws/quic/server.crt
+  echo ""
+  echo "証明書を生成しました。以下をコミットしてください:"
+  echo "  git add main_ws/src/bringup/config/quic/server.crt operator_ws/quic/server.crt"
+
 nix-status:
   systemctl status nix-daemon
 

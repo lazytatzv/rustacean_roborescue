@@ -34,9 +34,9 @@ __pycache__/
 *.png
 
 # --- Security / Certificates (Zenoh QUIC) ---
-# Runtime generated certificates and keys should not be committed
-**/*.crt
+# 秘密鍵・中間ファイルはコミットしない
 **/*.key
 **/*.csr
 **/*.srl
-quic/
+# server.crt (公開側) は just gen-cert で生成後コミットする → scp不要
+# **/*.crt はignoreしない

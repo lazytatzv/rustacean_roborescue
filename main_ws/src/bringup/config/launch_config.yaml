@@ -38,3 +38,7 @@ use_t265_odom: false
 # cameras.yaml の d435i エントリも enabled: true にすること
 use_depth_guard: false
 
+# QUICのTLS証明書を強制再生成する
+# 通常は just gen-cert でコミット済みのcertを使うためfalseのまま
+# IPアドレスが変わった場合は true にして一度起動後、false に戻してコミット
+quic_regenerate_cert: false

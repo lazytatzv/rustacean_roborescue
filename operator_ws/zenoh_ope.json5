@@ -1,12 +1,9 @@
 {
-  // README 推奨の client モード
   mode: "client",
   connect: {
     endpoints: [
-      // Tailscale 経由 (安定性が高い)
       "quic/100.114.200.30:7447",
       "tcp/100.114.200.30:7447",
-      // 直接接続 (10.42.0.1)
       "quic/10.42.0.1:7447",
       "tcp/10.42.0.1:7447"
     ]
@@ -16,8 +13,7 @@
     shared_memory: { enabled: true },
     link: {
       tls: {
-        // operator.launch.py 経由で起動する場合は、自動的に絶対パスに上書きされます
-        // 手動で起動する場合は operator_ws をカレントディレクトリにしてください
+        // 初回のみ: scp robot@ROBOT_IP:.../bringup/config/quic/server.crt ./quic/server.crt
         root_ca_certificate: "quic/server.crt"
       }
     }

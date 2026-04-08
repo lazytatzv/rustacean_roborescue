@@ -29,32 +29,27 @@ def _b(val: bool) -> str:
 def _build_operator_actions(context):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(this_dir)
+    cert = os.path.join(repo_root, "quic", "server.crt")
 
-    # TLS 証明書: robot の network.launch.py が生成して operator_ws/quic/ にコピーする
-    project_cert = os.path.join(repo_root, "quic", "server.crt")
+    if os.path.isfile(cert):
+        tls_block = f'    link: {{\n      tls: {{\n        root_ca_certificate: "{cert}"\n      }}\n    }}\n'
+        endpoints = '"quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/100.114.200.30:7447", "tcp/100.114.200.30:7447"'
+    else:
+        tls_block = ""
+        endpoints = '"tcp/10.42.0.1:7447", "tcp/100.114.200.30:7447"'
 
-    ope_cfg_content = f"""
-    {{
-      mode: "client",
-      connect: {{
-        endpoints: [
-          "quic/10.42.0.1:7447",
-          "tcp/10.42.0.1:7447",
-          "quic/100.114.200.30:7447",
-          "tcp/100.114.200.30:7447"
-        ]
-      }},
-      scouting: {{ multicast: {{ enabled: false }} }},
-      transport: {{
-        shared_memory: {{ enabled: true }},
-        link: {{
-          tls: {{
-            root_ca_certificate: "{project_cert}"
-          }}
-        }}
-      }}
-    }}
-    """
+    ope_cfg_content = f"""\
+{{
+  mode: "client",
+  connect: {{
+    endpoints: [{endpoints}]
+  }},
+  scouting: {{ multicast: {{ enabled: false }} }},
+  transport: {{
+    shared_memory: {{ enabled: true }},
+{tls_block}  }}
+}}
+"""
     fd, dynamic_ope_cfg = tempfile.mkstemp(prefix="zenoh_ope_dynamic_", suffix=".json5")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(ope_cfg_content)
