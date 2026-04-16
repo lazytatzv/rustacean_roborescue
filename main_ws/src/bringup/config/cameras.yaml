@@ -56,7 +56,7 @@ cameras:
     fps: 30
     pixel_format: YUYV
     frame_id: arm_camera_link
-    use_qr: true
+    use_qr: false
     jpeg_quality: 60
 
     # Genius WideCam F100 (usb-0000:00:14.0-3.3)
@@ -78,8 +78,8 @@ cameras:
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   - name: theta
     driver: theta_s
-    enabled: false
-    device: /dev/video1
+    enabled: true
+    device: /dev/richo_camera
     width: 1280
     height: 720
     fps: 15
@@ -94,7 +94,7 @@ cameras:
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
   - name: d435i
     driver: realsense
-    enabled: false
+    enabled: true
     serial: ""
     enable_color: true
     enable_depth: true
@@ -107,7 +107,7 @@ cameras:
     depth_width: 640
     depth_height: 480
     depth_fps: 30
-    use_qr: true
+    use_qr: false
     jpeg_quality: 80
 
   # ── RealSense T265 (トラッキングカメラ / Visual-Inertial Odometry) ─────────

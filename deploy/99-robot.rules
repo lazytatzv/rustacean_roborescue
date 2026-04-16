@@ -56,3 +56,7 @@ SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0411", ATTRS{idProduct}=="02da", ENV
 # 深度データは librealsense 経由でアクセスすること
 # アーム先端の横
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b3a", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_realsense", MODE="0666"
+
+# 360 degree camera richo
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0366", ATTRS{idProduct}=="05ca", SYMLINK+="richo_camera", MODE="0666"
+
