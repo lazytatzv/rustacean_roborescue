@@ -78,7 +78,17 @@ def _v4l2_nodes(cam: dict, ns: str) -> list:
 
 
 def _theta_s_nodes(cam: dict, ns: str) -> list:
-    """RICOH THETA S (UVC live streaming) のコンポーザブルノードを返す。"""
+    """RICOH THETA S (UVC live streaming) のコンポーザブルノードを返す。
+
+    RICOH THETA S は MJPG フォーマットで 1280x720 @ 2997/200fps (≒14.985fps) を出力する。
+    v4l2_camera は time_per_frame を [numerator, denominator] で指定するため、
+    正確なフレームレートを使用する。
+    """
+    # RICOH THETA S の実際のフレームレート: 2997/200 fps
+    # YAMLで上書き可能にするため fps_numerator/fps_denominator も参照
+    fps_num = cam.get("fps_numerator", 200)
+    fps_den = cam.get("fps_denominator", 2997)
+
     return [
         ComposableNode(
             package="v4l2_camera",
@@ -91,7 +101,7 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
                     "pixel_format": "MJPG",
                     "output_encoding": cam.get("output_encoding", "rgb8"),
                     "image_size": [cam.get("width", 1280), cam.get("height", 720)],
-                    "time_per_frame": [1, cam.get("fps", 15)],
+                    "time_per_frame": [fps_num, fps_den],
                     "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
                 }
             ],
