@@ -79,19 +79,18 @@ cameras:
     jpeg_quality: 65
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
-  # THETA S は 1280x720 @ 2997/200fps (≒14.985fps) で動作する。
-  # v4l2_camera は厳密なフレームレートが必要なため、fps_numerator/fps_denominator で指定可能。
-  # デフォルトは 200/2997 (THETA S の実測値) を使用。
+  # THETA S は MJPEG のみ出力するため v4l2_camera 非対応。gscam (GStreamer) を使用。
+  # GStreamer pipeline: v4l2src ! image/jpeg ! jpegdec ! videoconvert ! video/x-raw,format=RGB
+  # fps_numerator/fps_denominator は time_per_frame (1/fps) の分子/分母。
+  # GStreamer framerate caps では逆数 (fps_denominator/fps_numerator = 2997/200) を使用。
   - name: theta
     driver: theta_s
     enabled: true
     device: /dev/camera_ricoh
     width: 1280
     height: 720
-    # fps: 15  # 参考値。実際は fps_numerator/fps_denominator を使用
-    fps_numerator: 200    # time_per_frame numerator (1/fps の分子)
-    fps_denominator: 2997 # time_per_frame denominator (1/fps の分母)
-    pixel_format: MJPG
+    fps_numerator: 200    # time_per_frame 分子 (GStreamer framerate = fps_denominator/fps_numerator)
+    fps_denominator: 2997 # time_per_frame 分母
     output_encoding: rgb8
     frame_id: theta_camera_link
     use_qr: false

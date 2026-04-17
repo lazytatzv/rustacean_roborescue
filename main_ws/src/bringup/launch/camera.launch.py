@@ -80,29 +80,45 @@ def _v4l2_nodes(cam: dict, ns: str) -> list:
 def _theta_s_nodes(cam: dict, ns: str) -> list:
     """RICOH THETA S (UVC live streaming) のコンポーザブルノードを返す。
 
-    RICOH THETA S は MJPG フォーマットで 1280x720 @ 2997/200fps (≒14.985fps) を出力する。
-    v4l2_camera は time_per_frame を [numerator, denominator] で指定するため、
-    正確なフレームレートを使用する。
+    RICOH THETA S は MJPEG のみ出力する。v4l2_camera は MJPEG 非対応のため
+    GStreamer ベースの gscam を使用する。jpegdec で確実にデコードする。
+
+    GStreamer framerate caps は fps (= fps_denominator/fps_numerator) で指定する。
+    cameras.yaml の fps_numerator/fps_denominator は time_per_frame (1/fps の分子/分母) なので
+    GStreamer 向けには逆数 (fps_denominator/fps_numerator) を使う。
     """
-    # RICOH THETA S の実際のフレームレート: 2997/200 fps
-    # YAMLで上書き可能にするため fps_numerator/fps_denominator も参照
-    fps_num = cam.get("fps_numerator", 200)
-    fps_den = cam.get("fps_denominator", 2997)
+    fps_num = cam.get("fps_numerator", 200)     # time_per_frame 分子 (= 1/fps の分子)
+    fps_den = cam.get("fps_denominator", 2997)  # time_per_frame 分母
+    device = cam.get("device", "/dev/video4")
+    width = cam.get("width", 1280)
+    height = cam.get("height", 720)
+
+    # framerate = fps = fps_den/fps_num = 2997/200 ≒ 14.985 fps
+    pipeline = (
+        f"v4l2src device={device} ! "
+        f"image/jpeg,width={width},height={height},framerate={fps_den}/{fps_num} ! "
+        f"jpegdec ! videoconvert ! video/x-raw,format=RGB"
+    )
 
     return [
         ComposableNode(
-            package="v4l2_camera",
-            plugin="v4l2_camera::V4L2Camera",
-            name="v4l2_camera",
+            package="gscam",
+            plugin="gscam::GSCam",
+            name="gscam",
             namespace=ns,
+            remappings=[
+                # gscam は camera/image_raw に配信するが、
+                # 他ノード (QR検出・republish) は image_raw を期待するため合わせる
+                ("camera/image_raw", "image_raw"),
+                ("camera/camera_info", "camera_info"),
+            ],
             parameters=[
                 {
-                    "video_device": cam.get("device", "/dev/video4"),
-                    "pixel_format": "MJPG",
-                    "output_encoding": cam.get("output_encoding", "rgb8"),
-                    "image_size": [cam.get("width", 1280), cam.get("height", 720)],
-                    "time_per_frame": [fps_num, fps_den],
-                    "camera_frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
+                    "gscam_config": pipeline,
+                    "image_encoding": cam.get("output_encoding", "rgb8"),
+                    "camera_name": ns,
+                    "frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
+                    "sync_sink": False,
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],

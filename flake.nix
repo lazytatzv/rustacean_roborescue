@@ -180,6 +180,7 @@
           ros.ffmpeg-image-transport-msgs  # FFMPEGPacket メッセージ型
           ros.foxglove-msgs                # foxglove.CompressedVideo スキーマ (Foxglove Studio ネイティブH264)
           ros.v4l2-camera                  # Optimized camera driver
+          ros.gscam                        # GStreamer camera driver (RICOH THETA S MJPEG)
           ros.camera-info-manager
           ros.rclcpp-components
           ros.realsense2-camera            # Intel RealSense D435i / T265 ドライバ
@@ -318,7 +319,7 @@
           ros.orocos-kdl-vendor ros.eigen3-cmake-module ros.message-filters
           ros.cv-bridge ros.image-transport ros.compressed-image-transport
           ros.camera-info-manager ros.image-transport
-          ros.ffmpeg-image-transport ros.v4l2-camera
+          ros.ffmpeg-image-transport ros.v4l2-camera ros.gscam
           ros.joy ros.joy-linux
           ros.usb-cam
           ros.dynamixel-workbench-toolbox ros.dynamixel-sdk ros.dynamixel-interfaces
@@ -447,6 +448,11 @@
               alias rqt_graph="$_detected_nixgl rqt_graph"
             fi
             unset _detected_nixgl
+
+            # --- GStreamer プラグインパス (非-NixOS: Nix ストアのプラグインを明示) ---
+            # gscam (THETA S) の jpegdec は gst-plugins-good に存在する。
+            # 非-NixOS では GST_PLUGIN_PATH を設定しないと /usr/lib 配下のみ参照される。
+            export GST_PLUGIN_PATH="${pkgs.gst_all_1.gst-plugins-base}/lib/gstreamer-1.0:${pkgs.gst_all_1.gst-plugins-good}/lib/gstreamer-1.0''${GST_PLUGIN_PATH:+:$GST_PLUGIN_PATH}"
 
             # --- ライブラリパス ---
             # rmw_zenoh_cpp は symlinkJoin 経由だと .so 探索に失敗するケースがあるため
