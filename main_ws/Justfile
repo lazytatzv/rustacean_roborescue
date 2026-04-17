@@ -112,7 +112,7 @@ ready:
 
 # メモ
 sim:
-	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && export LIBGL_ALWAYS_SOFTWARE=1 && export MESA_GL_VERSION_OVERRIDE=3.3 && export MESA_GLSL_VERSION_OVERRIDE=330 && export QT_QPA_PLATFORM=xcb && export GZ_PARTITION=roborescue && export IGN_PARTITION=roborescue && export GZ_IP=127.0.0.1 && export IGN_IP=127.0.0.1 && ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=true use_gz_gui:=false use_rviz:=true use_sim_time:=true spawn_delay_sec:=5.0 nav2_delay_sec:=10.0
+	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && export LIBGL_ALWAYS_SOFTWARE=1 && export MESA_GL_VERSION_OVERRIDE=3.3 && export MESA_GLSL_VERSION_OVERRIDE=330 && export QT_QPA_PLATFORM=xcb && export GZ_PARTITION=roborescue && export IGN_PARTITION=roborescue && export GZ_IP=127.0.0.1 && export IGN_IP=127.0.0.1 && export ZENOH_SESSION_CONFIG_URI="" && ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=true use_gz_gui:=false use_rviz:=true use_sim_time:=true spawn_delay_sec:=10.0 nav2_delay_sec:=25.0
 
 # ── Zenoh Utils ──
 

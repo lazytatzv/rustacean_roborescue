@@ -70,6 +70,15 @@ def generate_launch_description():
     spawn_delay_sec = LaunchConfiguration("spawn_delay_sec")
     nav2_delay_sec = LaunchConfiguration("nav2_delay_sec")
 
+    # ── Zenoh Router ──────────────────────────────────────────────────────────
+    # シミュレーション時の安定したディスカバリのためにルーターを起動する
+    zenoh_router = Node(
+        package="rmw_zenoh_cpp",
+        executable="rmw_zenohd",
+        name="zenoh_router",
+        output="screen",
+    )
+
     # GPU有り: センサー付きワールド, GUI付き
     world_gpu = os.path.join(bringup_dir, "worlds", "rescue_field.sdf")
     # GPU無し: センサーなしワールド, サーバーのみ
@@ -291,6 +300,7 @@ def generate_launch_description():
             arg_nav2_delay,
             gz_partition,
             ign_partition,
+            zenoh_router,
             robot_state_publisher,
             gz_sim_gpu,
             gz_sim_gpu_server,
