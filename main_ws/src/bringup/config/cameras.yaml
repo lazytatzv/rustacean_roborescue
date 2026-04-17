@@ -102,12 +102,12 @@ cameras:
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
   - name: d435i
     driver: realsense
-    enabled: false
+    enabled: true
     serial: ""
     enable_color: true
-    enable_depth: true
-    enable_accel: true
-    enable_gyro: true
+    enable_depth: false
+    enable_accel: false
+    enable_gyro: false
     enable_pointcloud: false  # 高負荷。必要時のみ true にする
     color_width: 640
     color_height: 480
