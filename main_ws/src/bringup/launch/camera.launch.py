@@ -172,7 +172,29 @@ def _compressed_republish_node(
     )
 
 
-def _qr_node(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> ComposableNode:
+def _qr_node_standalone(cam: dict, qr_model_dir: str, ns: str, image_topic: str, condition=None) -> Node:
+    """QR検出をスタンドアロンNodeとして起動。クラッシュ時にカメラに影響しない。"""
+    return Node(
+        package="qr_detector_cpp",
+        executable="qr_detector_node",
+        name="qr_detector",
+        namespace=ns,
+        remappings=[("image_raw", image_topic)],
+        parameters=[
+            {
+                "model_dir": qr_model_dir,
+                "publish_compressed": False,
+                "detection_interval": 30,
+            }
+        ],
+        condition=condition,
+        respawn=True,
+        respawn_delay=3.0,
+    )
+
+
+def _qr_node_composable(cam: dict, qr_model_dir: str, ns: str, image_topic: str) -> ComposableNode:
+    """QR検出をComposableNodeとして返す。intra-process通信でパフォーマンス向上。"""
     return ComposableNode(
         package="qr_detector_cpp",
         plugin="qr_detector_cpp::QrDetectorNode",
@@ -229,22 +251,31 @@ def _make_camera_group(
 
     actions = [container]
 
-    # QR 検出は別コンテナ (別プロセス) で起動: カメラドライバへの干渉を防ぐ
+    # QR 検出ノード起動
+    # qr_use_component: true  → カメラと同一コンテナ (intra-process通信、高パフォーマンス)
+    # qr_use_component: false → 別プロセス (クラッシュ分離、デフォルト)
     if use_qr:
         if qr_model_dir:
-            actions.append(
-                ComposableNodeContainer(
-                    name=f"camera_{name}_qr_container",
+            qr_use_component = cam.get("qr_use_component", False)
+            if qr_use_component:
+                # カメラコンテナに追加（既に作成済みのcontainerには追加できないので再構築）
+                composable_nodes.append(_qr_node_composable(cam, qr_model_dir, ns, image_topic))
+                # containerを更新（actionsの最初の要素を置き換え）
+                actions[0] = ComposableNodeContainer(
+                    name=f"camera_{name}_container",
                     namespace="",
                     package="rclcpp_components",
                     executable="component_container_mt",
-                    composable_node_descriptions=[_qr_node(cam, qr_model_dir, ns, image_topic)],
+                    composable_node_descriptions=composable_nodes,
                     output="screen",
                     condition=IfCondition(use_camera_cfg),
                     respawn=True,
                     respawn_delay=3.0,
                 )
-            )
+            else:
+                actions.append(
+                    _qr_node_standalone(cam, qr_model_dir, ns, image_topic, condition=IfCondition(use_camera_cfg))
+                )
         else:
             print(
                 f"[camera.launch] WARNING: use_qr=true for {name} "
