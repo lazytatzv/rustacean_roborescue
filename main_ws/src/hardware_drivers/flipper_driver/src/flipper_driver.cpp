@@ -155,10 +155,14 @@ class FlipperDriver : public rclcpp::Node
     if (estop_active_) return;
     last_cmd_time_ = now();
 
+    // 不正なメッセージは無視（他ノードからの不正パブリッシュ対策）
+    if (msg.flipper_vel.empty()) return;
+
     if (msg.flipper_vel.size() < dynamixel_ids_.size())
     {
-      RCLCPP_ERROR(get_logger(), "flipper_vel size (%zu) < dynamixel_ids size (%zu)",
-                   msg.flipper_vel.size(), dynamixel_ids_.size());
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000,
+                           "flipper_vel size (%zu) < dynamixel_ids size (%zu)",
+                           msg.flipper_vel.size(), dynamixel_ids_.size());
       return;
     }
 

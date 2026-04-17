@@ -195,14 +195,18 @@ class JoyController : public rclcpp::Node
   {
     auto crawler_msg = custom_interfaces::msg::CrawlerVelocity();
     auto flipper_msg = custom_interfaces::msg::FlipperVelocity();
+
+    // 常に有効なサイズで初期化（デフォルト停止）
+    crawler_msg.m1_vel = 0.0f;
+    crawler_msg.m2_vel = 0.0f;
+    flipper_msg.flipper_vel = {0, 0, 0, 0};
+
     if (mode_ == Mode::DRIVE)
     {
-      float m1 = std::clamp(apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_,
-                            -max_speed_, max_speed_);
-      float m2 = std::clamp(apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
-                            -max_speed_, max_speed_);
-      crawler_msg.m1_vel = m1;
-      crawler_msg.m2_vel = m2;
+      crawler_msg.m1_vel = std::clamp(apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_,
+                                      -max_speed_, max_speed_);
+      crawler_msg.m2_vel = std::clamp(apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
+                                      -max_speed_, max_speed_);
       int f1 = (axis(msg, AXIS_DPAD_Y) < -0.5f) ? 1 : (axis(msg, AXIS_DPAD_Y) > 0.5f ? -1 : 0);
       int f2 = (button(msg, BUTTON_CROSS) == 1) ? 1 : (button(msg, BUTTON_SQUARE) == 1 ? -1 : 0);
       int f3 = (button(msg, BUTTON_L1) == 1) ? 1 : (axis(msg, AXIS_L2) < -0.9f ? -1 : 0);
@@ -219,7 +223,7 @@ class JoyController : public rclcpp::Node
       {
         RCLCPP_WARN_THROTTLE(
             this->get_logger(), *this->get_clock(), 2000,
-            "Drive input ignored in STOP mode. Press OPTIONS to enter DRIVE mode.");
+            "Drive input ignored in non-DRIVE mode. Press OPTIONS to enter DRIVE mode.");
       }
     }
     crawler_publisher_->publish(crawler_msg);
