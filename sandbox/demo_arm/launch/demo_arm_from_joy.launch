@@ -1,0 +1,9 @@
+<launch>
+    <arg name="rviz" default="true"/>
+    <include file="$(find demo_arm)\launch\demo_joy.launch"/>
+    <node pkg="demo_arm" type="demo_arm_operator" name="arm_operator"/>
+    <node pkg="demo_arm" type="demo_arm_ctl" name="arm_controller"/>
+    <include file="$(find demo_arm)\launch\display.launch">
+        <arg name="rviz" value="$(arg rviz)"/>
+    </include>
+</launch>

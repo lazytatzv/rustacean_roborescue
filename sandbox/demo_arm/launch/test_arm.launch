@@ -1,0 +1,22 @@
+<launch>
+    <rosparam command="load" file="$(find hardware_description)/config/serialport.yaml"/>
+
+    <arg name="model" default="$(find task_launch)/urdf/robot.urdf"/>
+    <param name="robot_description" command="$(find xacro)/xacro $(arg model)"/>
+
+    <group>
+        <node pkg="flipper" type="flip_ctl" name="flipper_controller"/>
+        <node pkg="maxon" type="demo_maxon_ctl.py" name="maxon_controller"/>
+        <node name="flip_state" pkg="flipper" type="flip_state"/>
+    </group>
+    <group>
+        <node pkg="demo_arm" type="demo_arm_ctl" name="arm_controller" output="screen"/>
+        <node name="arm_state" pkg="demo_arm" type="demo_arm_state" output="screen"/>
+    </group>
+
+    <node pkg="operator" type="operator" name="operator">
+        <param name="ps4" value="false"/>
+    </node>
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+</launch>

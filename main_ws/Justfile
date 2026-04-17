@@ -112,7 +112,7 @@ ready:
 
 # メモ
 sim:
-	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && export LIBGL_ALWAYS_SOFTWARE=1 && export MESA_GL_VERSION_OVERRIDE=3.3 && export MESA_GLSL_VERSION_OVERRIDE=330 && export QT_QPA_PLATFORM=xcb && export GZ_PARTITION=roborescue && export IGN_PARTITION=roborescue && export GZ_IP=127.0.0.1 && export IGN_IP=127.0.0.1 && ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=false use_gz_gui:=false use_rviz:=true use_sim_time:=true spawn_delay_sec:=15.0
+	ROOT=$(cd .. && pwd); cd "$ROOT/main_ws" && source install/setup.bash && export LIBGL_ALWAYS_SOFTWARE=1 && export MESA_GL_VERSION_OVERRIDE=3.3 && export MESA_GLSL_VERSION_OVERRIDE=330 && export QT_QPA_PLATFORM=xcb && export GZ_PARTITION=roborescue && export IGN_PARTITION=roborescue && export GZ_IP=127.0.0.1 && export IGN_IP=127.0.0.1 && ros2 launch bringup simulation.launch.py use_slam:=true use_nav2:=true use_gz_gui:=false use_rviz:=true use_sim_time:=true spawn_delay_sec:=5.0 nav2_delay_sec:=10.0
 
 # ── Zenoh Utils ──
 
@@ -127,3 +127,51 @@ topics:
 # 直接トピック情報を表示する (例: just topic-info /joy)
 topic-info topic:
 	export ZENOH_SESSION_CONFIG_URI="$(realpath install/share/bringup/config/zenoh_robot.json5)" && ros2 topic info -v {{topic}}
+
+# ── Map Utils ──
+
+# 2D/3Dマップを保存 (例: just save-maps mission_01)
+save-maps name="":
+	#!/bin/bash
+	set -e
+	if [[ -z "{{name}}" ]]; then
+		NAME="$(date +%Y%m%d_%H%M%S)"
+	else
+		NAME="{{name}}"
+	fi
+	MAP_DIR="$HOME/maps/$NAME"
+	if [[ -d "$MAP_DIR" ]]; then
+		echo "ERROR: $MAP_DIR already exists"
+		exit 1
+	fi
+	mkdir -p "$MAP_DIR"
+	echo "Saving maps to: $MAP_DIR"
+	source install/setup.bash
+
+	echo "[1/3] Saving 2D map..."
+	if ros2 run nav2_map_server map_saver_cli -f "$MAP_DIR/map_2d" --ros-args -p save_map_timeout:=10.0 2>/dev/null; then
+		echo "  -> map_2d.pgm, map_2d.yaml"
+	else
+		echo "  -> SKIP: map_saver failed (slam_toolbox not running?)"
+	fi
+
+	echo "[2/3] Serializing SLAM state..."
+	if ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph "{filename: '$MAP_DIR/slam_state'}" 2>/dev/null; then
+		echo "  -> slam_state.posegraph, slam_state.data"
+	else
+		echo "  -> SKIP: serialize failed (slam_toolbox not running?)"
+	fi
+
+	echo "[3/3] Saving 3D pointcloud..."
+	# kiss_icp (優先) または 生の velodyne_points から取得
+	if ros2 run bringup save_pointcloud.py --topic /kiss/local_map --output "$MAP_DIR/map_3d.pcd" --timeout 5.0 2>/dev/null; then
+		echo "  -> map_3d.pcd (from kiss_icp)"
+	elif ros2 run bringup save_pointcloud.py --topic /velodyne_points --output "$MAP_DIR/map_3d.pcd" --timeout 5.0 2>/dev/null; then
+		echo "  -> map_3d.pcd (from velodyne raw - single frame only)"
+	else
+		echo "  -> SKIP: no pointcloud available"
+	fi
+
+	echo ""
+	echo "Done: $MAP_DIR"
+	ls -la "$MAP_DIR"

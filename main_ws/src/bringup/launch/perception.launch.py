@@ -377,3 +377,4 @@ def generate_launch_description() -> LaunchDescription:
             rviz_node,
         ]
     )
+

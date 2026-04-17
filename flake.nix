@@ -334,6 +334,7 @@
           ros.joint-state-publisher
           ros.velodyne ros.velodyne-driver ros.velodyne-pointcloud
           ros.pointcloud-to-laserscan
+          ros.slam-toolbox
           ros.pcl-ros ros.pcl-conversions ros.pcl-msgs
           ros.laser-geometry ros.interactive-markers ros.resource-retriever
           ros.map-msgs ros.point-cloud-transport

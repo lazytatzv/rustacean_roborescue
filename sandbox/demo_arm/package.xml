@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>demo_arm</name>
+    <version>2.2.1</version>
+    <license>Apache 2.0</license>
+    <description>arm controll package</description>
+    <maintainer email="shun@todo.todo">shun</maintainer>
+    <buildtool_depend>catkin</buildtool_depend>
+    <depend>joy</depend>
+    <depend>xacro</depend>
+    <depend>roscpp</depend>
+    <depend>std_msgs</depend>
+    <depend>tf</depend>
+    <depend>dynamixel_sdk</depend>
+    <depend>dynamixel_workbench</depend>
+    <depend>dynamixel_workbench_toolbox</depend>
+    <depend>robot_state_publisher</depend>
+    <depend>rodep_msgs</depend>
+</package>

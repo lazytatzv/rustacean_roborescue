@@ -30,6 +30,7 @@ install(PROGRAMS
   scripts/ffmpeg_to_foxglove_video.py
   scripts/jpeg_republish.py
   scripts/odom_selector.py
+  scripts/save_pointcloud.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

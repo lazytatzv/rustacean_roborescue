@@ -1,0 +1,20 @@
+<launch>
+
+    <arg name="model" default="$(find demo_arm)/urdf/sekirei.urdf"/>
+    <arg name="gui" default="True"/>
+    <arg name="rvizconfig" default="$(find demo_arm)/rviz/arm.rviz"/>
+    <arg name="rviz" default="True"/>
+
+    <param name="robot_description" command="$(find xacro)/xacro $(arg model)"/>
+    <param name="use_gui" value="$(arg gui)"/>
+
+    <node name="arm_state" pkg="demo_arm" type="demo_arm_state" output="screen"/>
+
+    <!-- node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" / -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+    <group if="$(arg rviz)">
+        <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true"/>
+    </group>
+
+</launch>
