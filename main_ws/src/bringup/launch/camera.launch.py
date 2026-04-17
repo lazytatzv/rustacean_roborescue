@@ -3,7 +3,7 @@ import os
 import yaml
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.actions import DeclareLaunchArgument, LogInfo, TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import ComposableNodeContainer, Node
@@ -300,10 +300,18 @@ def _make_camera_group(
 
     # image_transport republish (standalone): compressed トピックを配信する。
     # composable plugin が nix 環境で未登録のためコンテナ外で起動する。
+    # realsense は RGB センサー初期化が遅いため、zenoh ピア間サブスクリプションが
+    # 確立される前に republish が起動してしまう。delay で待機させる。
     if has_color:
+        republish_delay = 5.0 if driver == "realsense" else 2.0
         actions.append(
-            _compressed_republish_node(
-                cam, ns, image_topic, condition=IfCondition(use_camera_cfg)
+            TimerAction(
+                period=republish_delay,
+                actions=[
+                    _compressed_republish_node(
+                        cam, ns, image_topic, condition=IfCondition(use_camera_cfg)
+                    )
+                ],
             )
         )
 
