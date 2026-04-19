@@ -170,7 +170,7 @@ def _compressed_republish_node(
         executable="republish",
         name="republish_compressed",
         namespace=ns,
-        arguments=["raw"],
+        arguments=["raw", "compressed"],
         remappings=[
             ("in", image_topic),
             ("out", image_topic),
