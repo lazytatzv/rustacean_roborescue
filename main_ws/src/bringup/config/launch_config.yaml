@@ -4,7 +4,7 @@
 # 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
 # 足回り
-use_crawler: true 
+use_crawler: true
 use_flipper: true
 
 use_arm: false
