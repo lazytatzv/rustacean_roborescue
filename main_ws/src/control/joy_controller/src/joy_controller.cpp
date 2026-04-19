@@ -203,10 +203,10 @@ class JoyController : public rclcpp::Node
 
     if (mode_ == Mode::DRIVE)
     {
-      crawler_msg.m1_vel = std::clamp(apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_,
-                                      -max_speed_, max_speed_);
-      crawler_msg.m2_vel = std::clamp(apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_,
-                                      -max_speed_, max_speed_);
+      crawler_msg.m1_vel = std::clamp(
+          apply_deadzone(axis(msg, AXIS_RIGHT_Y), deadzone_) * max_speed_, -max_speed_, max_speed_);
+      crawler_msg.m2_vel = std::clamp(
+          apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_, -max_speed_, max_speed_);
       int f1 = (axis(msg, AXIS_DPAD_Y) < -0.5f) ? 1 : (axis(msg, AXIS_DPAD_Y) > 0.5f ? -1 : 0);
       int f2 = (button(msg, BUTTON_CROSS) == 1) ? 1 : (button(msg, BUTTON_SQUARE) == 1 ? -1 : 0);
       int f3 = (button(msg, BUTTON_L1) == 1) ? 1 : (axis(msg, AXIS_L2) < -0.9f ? -1 : 0);
