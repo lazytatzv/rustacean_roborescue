@@ -159,27 +159,24 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
 def _compressed_republish_node(
     cam: dict, ns: str, image_topic: str, condition=None
 ) -> Node:
-    """image_transport republish で compressed を配信するスタンドアロンノード。
+    """JPEG を常時配信するスタンドアロンノード。
 
-    image_transport::RepublishNode composable plugin が nix 環境で未登録のため
-    standalone Node として起動する。subscriber がいないときも常時動作するが、
-    compressed transport 自体が lazy なので帯域消費は限定的。
+    image_transport republish は環境や QoS 組み合わせにより
+    "waiting for image msg" となることがあるため、BEST_EFFORT で受信できる
+    bringup/scripts/jpeg_republish.py を使って安定化する。
     """
+    in_topic = f"/{ns}/{image_topic}"
+    out_topic = f"/{ns}/{image_topic}/compressed"
     return Node(
-        package="image_transport",
-        executable="republish",
-        name="republish_compressed",
+        package="bringup",
+        executable="jpeg_republish.py",
+        name="jpeg_republish",
         namespace=ns,
-        arguments=["raw"],
-        remappings=[
-            ("in", image_topic),
-            ("out", image_topic),
-        ],
         parameters=[
             {
-                "in_transport": "raw",
-                "out_transport": "compressed",
-                "compressed.jpeg_quality": cam.get("jpeg_quality", 80),
+                "in_topic": in_topic,
+                "out_topic": out_topic,
+                "jpeg_quality": cam.get("jpeg_quality", 80),
             }
         ],
         condition=condition,

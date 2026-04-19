@@ -117,6 +117,7 @@ cameras:
     depth_fps: 30
     use_qr: false
     jpeg_quality: 80
+    image_topic: realsense2_camera/color/image_raw
 
   # ── RealSense T265 (トラッキングカメラ / Visual-Inertial Odometry) ─────────
   # 6DOF ビジュアルオドメトリを /camera_t265/odom/sample に publish する。
