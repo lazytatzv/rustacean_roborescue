@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """点群トピックを1回取得してPCDファイルに保存する"""
 import argparse
-import struct
 import sys
 
 import rclpy

@@ -87,7 +87,7 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
     cameras.yaml の fps_numerator/fps_denominator は time_per_frame (1/fps の分子/分母) なので
     GStreamer 向けには逆数 (fps_denominator/fps_numerator) を使う。
     """
-    fps_num = cam.get("fps_numerator", 200)     # time_per_frame 分子 (= 1/fps の分子)
+    fps_num = cam.get("fps_numerator", 200)  # time_per_frame 分子 (= 1/fps の分子)
     fps_den = cam.get("fps_denominator", 2997)  # time_per_frame 分母
     device = cam.get("device", "/dev/video4")
     width = cam.get("width", 1280)
@@ -156,30 +156,25 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
     ]
 
 
-def _compressed_republish_node(
-    cam: dict, ns: str, image_topic: str, condition=None
-) -> Node:
-    """image_transport republish で compressed を配信するスタンドアロンノード。
+def _compressed_republish_node(cam: dict, ns: str, image_topic: str, condition=None) -> Node:
+    """JPEG を常時配信するスタンドアロンノード。
 
-    image_transport::RepublishNode composable plugin が nix 環境で未登録のため
-    standalone Node として起動する。subscriber がいないときも常時動作するが、
-    compressed transport 自体が lazy なので帯域消費は限定的。
+    image_transport republish は環境や QoS 組み合わせにより
+    "waiting for image msg" となることがあるため、BEST_EFFORT で受信できる
+    bringup/scripts/jpeg_republish.py を使って安定化する。
     """
+    in_topic = f"/{ns}/{image_topic}"
+    out_topic = f"/{ns}/{image_topic}/compressed"
     return Node(
-        package="image_transport",
-        executable="republish",
-        name="republish_compressed",
+        package="bringup",
+        executable="jpeg_republish.py",
+        name="jpeg_republish",
         namespace=ns,
-        arguments=["raw"],
-        remappings=[
-            ("in", image_topic),
-            ("out", image_topic),
-        ],
         parameters=[
             {
-                "in_transport": "raw",
-                "out_transport": "compressed",
-                "compressed.jpeg_quality": cam.get("jpeg_quality", 80),
+                "in_topic": in_topic,
+                "out_topic": out_topic,
+                "jpeg_quality": cam.get("jpeg_quality", 80),
             }
         ],
         condition=condition,
@@ -188,7 +183,9 @@ def _compressed_republish_node(
     )
 
 
-def _qr_node_standalone(cam: dict, qr_model_dir: str, ns: str, image_topic: str, condition=None) -> Node:
+def _qr_node_standalone(
+    cam: dict, qr_model_dir: str, ns: str, image_topic: str, condition=None
+) -> Node:
     """QR検出をスタンドアロンNodeとして起動。クラッシュ時にカメラに影響しない。"""
     return Node(
         package="qr_detector_cpp",
@@ -290,7 +287,9 @@ def _make_camera_group(
                 )
             else:
                 actions.append(
-                    _qr_node_standalone(cam, qr_model_dir, ns, image_topic, condition=IfCondition(use_camera_cfg))
+                    _qr_node_standalone(
+                        cam, qr_model_dir, ns, image_topic, condition=IfCondition(use_camera_cfg)
+                    )
                 )
         else:
             print(
@@ -430,8 +429,6 @@ def generate_launch_description():
                     continue
                 seen_v4l2_phys.add(key)
 
-        actions.extend(
-            _make_camera_group(cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg)
-        )
+        actions.extend(_make_camera_group(cam, qr_model_dir, use_camera_cfg, use_depth_guard_cfg))
 
     return LaunchDescription(actions)
