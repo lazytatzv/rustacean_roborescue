@@ -1,114 +1,180 @@
 #include "hwt901b_imu/hwt901b_imu_node.hpp"
 #include <algorithm>
-#include <functional>
 #include <memory>
-#include <chrono>
-#include <fcntl.h>
+#include <thread>
+
+namespace
+{
+constexpr char kMagneticTopic[] = "/hwt901b/magnetic_field";
+constexpr int kPublisherQueueDepth = 10;
+constexpr double kMagStddevTesla = 0.15e-6;
+
+void set_magnetic_covariance(sensor_msgs::msg::MagneticField & msg)
+{
+  const double var = kMagStddevTesla * kMagStddevTesla;
+  msg.magnetic_field_covariance[0] = var;
+  msg.magnetic_field_covariance[4] = var;
+  msg.magnetic_field_covariance[8] = var;
+}
+}  // namespace
 
 /**
  * HWT901B AHRS IMU センサノード
- * 加速度、角速度、磁気、クォータニオンを取得し、ROS 2トピックとしてpublish
+ * 磁気センサー値のみ取得し、ROS 2トピックとしてpublish
  */
+
 HWT901BIMUNode::HWT901BIMUNode()
 : Node("hwt901b_imu_node"), serial_(io_context_)
 {
-  // parameter
-  port_name_ = this->declare_parameter<std::string>("port", "/dev/hwt901b");
-  baud_rate_ = this->declare_parameter<int>("baud_rate", 9600);
-  frame_id_ = this->declare_parameter<std::string>("frame_id", "hwt901b_link");
-  poll_interval_ms_ = this->declare_parameter<int>("poll_interval_ms", 5);
+  RCLCPP_INFO(this->get_logger(), "[startup] HWT901B magnetic node initialization begin");
 
-  // initialize publisher
-  imu_publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("/hwt901b/imu", 10);
-  mag_publisher_ = this->create_publisher<sensor_msgs::msg::MagneticField>("/hwt901b/magnetic_field", 10);
+  load_parameters();
 
-  init_messages();
-  open_serial();
-
-  // 一定間隔でシリアルポートをポーリングするタイマーを作成
-  poll_timer_ = this->create_wall_timer(
-    std::chrono::milliseconds(poll_interval_ms_),
-    std::bind(&HWT901BIMUNode::poll_serial, this));
-
-  RCLCPP_INFO(this->get_logger(), "HWT901B IMU node started: port=%s baud=%d", port_name_.c_str(), baud_rate_);
-}
-
-void HWT901BIMUNode::init_messages()
-{
-  // データシートからセンサーの精度は
-  // 加速度: 0.005 m/s^2
-  // 角速度: 0.05 deg/s
-  const double accel_stddev = 0.005 * G; // [m/s^2]
-  const double gyro_stddev = 0.05 * DEG_TO_RAD; // [deg/s] -> [rad/s]
-  const double orientation_stddev = 0.05 * DEG_TO_RAD; // [deg/s] -> [rad/s]
-  const double mag_stddev = 0.15e-6; // [uT] -> [T]
-
-  // 既定値はunknown(0)。対角成分のみ分散を設定する。
-  std::fill(imu_msg_.orientation_covariance.begin(), imu_msg_.orientation_covariance.end(), 0.0);
-  std::fill(imu_msg_.angular_velocity_covariance.begin(), imu_msg_.angular_velocity_covariance.end(), 0.0);
-  std::fill(imu_msg_.linear_acceleration_covariance.begin(), imu_msg_.linear_acceleration_covariance.end(), 0.0);
-  std::fill(mag_msg_.magnetic_field_covariance.begin(), mag_msg_.magnetic_field_covariance.end(), 0.0);
-
-  for(int i = 0; i < 9; i += 4){
-    imu_msg_.orientation_covariance[i] = orientation_stddev * orientation_stddev;
-    imu_msg_.angular_velocity_covariance[i] = gyro_stddev * gyro_stddev;
-    imu_msg_.linear_acceleration_covariance[i] = accel_stddev * accel_stddev;
-    mag_msg_.magnetic_field_covariance[i] = mag_stddev * mag_stddev;
+  if (baud_rate_ <= 9600) {
+    RCLCPP_WARN(this->get_logger(),
+      "baud_rate=%d. High-rate outputでは115200推奨です。", baud_rate_);
   }
+
+  // 磁気データのみ publish する。
+  mag_publisher_ = this->create_publisher<sensor_msgs::msg::MagneticField>(
+    kMagneticTopic, kPublisherQueueDepth);
+  RCLCPP_INFO(
+    this->get_logger(),
+    "[startup] publisher ready: topic=%s depth=%d",
+    kMagneticTopic, kPublisherQueueDepth);
+
+  // シリアル初期化に成功したときだけ非同期受信を開始する。
+  if (configure_serial()) {
+    start_async_read();
+    start_io_thread();
+  } else {
+    RCLCPP_ERROR(this->get_logger(), "[startup] serial initialization failed; async receive disabled");
+  }
+
+  RCLCPP_INFO(
+    this->get_logger(),
+    "[startup] HWT901B magnetic node started: port=%s baud=%d frame_id=%s scale=%.6f",
+    port_name_.c_str(), baud_rate_, frame_id_.c_str(), mag_scale_);
+  RCLCPP_INFO(this->get_logger(), "[startup] initialization end");
 }
 
-void HWT901BIMUNode::open_serial()
+HWT901BIMUNode::~HWT901BIMUNode()
 {
+  // readコールバックより先にI/Oループを停止して安全に終了する。
+  stop_io_thread();
+}
+
+void HWT901BIMUNode::load_parameters()
+{
+  // 宣言と取得を分離し、外部上書き後の最終値を読む。
+  this->declare_parameter<std::string>("port", "/dev/hwt901b");
+  this->declare_parameter<int>("baud_rate", 9600);
+  this->declare_parameter<std::string>("frame_id", "hwt901b_link");
+  this->declare_parameter<double>("mag_scale", 1.0);
+
+  this->get_parameter("port", port_name_);
+  this->get_parameter("baud_rate", baud_rate_);
+  this->get_parameter("frame_id", frame_id_);
+  this->get_parameter("mag_scale", mag_scale_);
+
+  RCLCPP_INFO(
+    this->get_logger(),
+    "[startup] parameters: port=%s baud_rate=%d frame_id=%s mag_scale=%.6f",
+    port_name_.c_str(), baud_rate_, frame_id_.c_str(), mag_scale_);
+}
+
+bool HWT901BIMUNode::configure_serial()
+{
+  RCLCPP_INFO(this->get_logger(), "[startup] opening serial: %s", port_name_.c_str());
+
   boost::system::error_code ec;
   serial_.open(port_name_, ec);
   if (ec) {
     RCLCPP_ERROR(this->get_logger(), "Failed to open %s: %s", port_name_.c_str(), ec.message().c_str());
-    return;
+    return false;
   }
 
-  // 通信設定: データシートに基づき、パリティなし、ストップビット1、フロー制御なしで固定します。 
+  // HWT901Bデータシート準拠の通信設定。
   serial_.set_option(boost::asio::serial_port_base::baud_rate(baud_rate_));
   serial_.set_option(boost::asio::serial_port_base::character_size(8));
-  serial_.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none)); // parityなし
-  serial_.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one)); // stop bitは1
-  serial_.set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none)); // flow制御なし
-  const int fd = serial_.native_handle();
-  const int flags = ::fcntl(fd, F_GETFL, 0);
-  if (flags == -1 || ::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-    RCLCPP_WARN(this->get_logger(), "Failed to set non-blocking mode on %s", port_name_.c_str());
-  }
+  serial_.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
+  serial_.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
+  serial_.set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
+
+  RCLCPP_INFO(
+    this->get_logger(),
+    "[startup] serial configured: baud=%d data_bits=8 parity=none stop_bits=1 flow_control=none",
+    baud_rate_);
+  return true;
 }
 
-void HWT901BIMUNode::poll_serial()
+void HWT901BIMUNode::start_io_thread()
+{
+  RCLCPP_INFO(this->get_logger(), "[startup] starting io_context thread");
+  io_thread_ = std::thread([this]() { io_context_.run(); });
+}
+
+void HWT901BIMUNode::stop_io_thread()
+{
+  RCLCPP_INFO(this->get_logger(), "[shutdown] stopping io_context and serial");
+  io_context_.stop();
+  if (serial_.is_open()) {
+    boost::system::error_code ec;
+    serial_.cancel(ec);
+    serial_.close(ec);
+  }
+  if (io_thread_.joinable()) {
+    io_thread_.join();
+  }
+  RCLCPP_INFO(this->get_logger(), "[shutdown] io_context thread stopped");
+}
+
+void HWT901BIMUNode::start_async_read()
 {
   if (!serial_.is_open()) {
-    RCLCPP_ERROR(this->get_logger(), "Serial port is not open");
+    RCLCPP_ERROR(this->get_logger(), "[startup] cannot arm async read: serial is not open");
     return;
   }
 
-  std::array<uint8_t, 256> buf{};
-  boost::system::error_code ec;
-  const auto n = serial_.read_some(boost::asio::buffer(buf), ec);
+  RCLCPP_INFO_ONCE(this->get_logger(), "[startup] async read armed");
 
-  if (ec == boost::asio::error::would_block || ec == boost::asio::error::try_again) return;
-  if (ec) {
-    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Serial read error: %s", ec.message().c_str());
-    return;
-  }
-  if (n == 0) return;
-
-  // 受信データをバッファに追加し、フレーム解析へ
-  rx_buffer_.insert(rx_buffer_.end(), buf.begin(), buf.begin() + static_cast<std::ptrdiff_t>(n));
-  parse_frames();
+  serial_.async_read_some(
+    boost::asio::buffer(read_buf_),
+    [this](const boost::system::error_code & ec, std::size_t n) { on_read(ec, n); });
 }
 
-// これを結合し、負の数を正しく扱えるよう int16_t (signed short) にキャストします
+void HWT901BIMUNode::on_read(const boost::system::error_code & ec, std::size_t n)
+{
+  if (ec == boost::asio::error::operation_aborted) return;
+
+  if (ec) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000,
+      "Serial read error: %s", ec.message().c_str());
+    start_async_read();
+    return;
+  }
+
+  if (n > 0) {
+    // 受信データをバッファに追加
+    rx_buffer_.insert(
+      rx_buffer_.end(),
+      read_buf_.begin(),
+      read_buf_.begin() + static_cast<std::ptrdiff_t>(n));
+
+    // 解析実行
+    parse_frames();
+  }
+
+  // 次の読み取りを予約
+  start_async_read();
+}
+
 int16_t HWT901BIMUNode::to_int16(uint8_t low, uint8_t high)
 {
   return static_cast<int16_t>((static_cast<uint16_t>(high) << 8U) | static_cast<uint16_t>(low));
 }
 
-// SUM check
 bool HWT901BIMUNode::valid_checksum(const std::array<uint8_t, FRAME_SIZE> & frame)
 {
   uint16_t sum = 0;
@@ -118,105 +184,53 @@ bool HWT901BIMUNode::valid_checksum(const std::array<uint8_t, FRAME_SIZE> & fram
   return static_cast<uint8_t>(sum & 0xFFU) == frame[FRAME_SIZE - 1];
 }
 
-/*
-  先頭削除を多用するため、受信バッファは std::deque を使う。
-*/
 void HWT901BIMUNode::parse_frames()
 {
   while (rx_buffer_.size() >= FRAME_SIZE) {
-    // ヘッダー(0x55)が出るまで先頭を捨てる
+    // ヘッダ同期が取れるまで1byteずつ捨てる。
     if (rx_buffer_.front() != IMU_HEADER) {
       rx_buffer_.pop_front();
       continue;
     }
 
-    // フレームをコピーしてチェックサム確認
     std::array<uint8_t, FRAME_SIZE> frame{};
     std::copy_n(rx_buffer_.begin(), FRAME_SIZE, frame.begin());
 
     if (!valid_checksum(frame)) {
-      // 不正なら先頭の 0x55 だけ捨てて次を探す
+      // ヘッダ候補が偽陽性のときは1byte進めて再同期する。
       rx_buffer_.pop_front();
       continue;
     }
 
-    // 正常ならデコードして、使用したフレーム分をまとめて削除
     decode_frame(frame);
-    for (size_t i = 0; i < FRAME_SIZE; ++i) {
-      rx_buffer_.pop_front();
-    }
+    consume_frame();
   }
 }
 
-void HWT901BIMUNode::stamp_headers()
+void HWT901BIMUNode::consume_frame()
 {
-  const auto now = this->get_clock()->now();
-  imu_msg_.header.stamp = now;
-  imu_msg_.header.frame_id = frame_id_;
-  mag_msg_.header.stamp = now;
-  mag_msg_.header.frame_id = frame_id_;
+  for (size_t i = 0; i < FRAME_SIZE; ++i) {
+    rx_buffer_.pop_front();
+  }
 }
 
-/**
- * フレームのデコードとパブリッシュ
- * センサーから別々に送られてくる各データを一時保持し、
- * 通信帯域の節約とデータの同時性を担保するため、特定のパケット受信をトリガーにまとめて配信します。
- */
 void HWT901BIMUNode::decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame)
 {
-  switch (frame[1]) {
-    case ACCELERATION: { // 0x51: 加速度
-      // 計算式: (結合データ / 32768) * 16g
-      imu_msg_.linear_acceleration.x = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 16.0 * G;
-      imu_msg_.linear_acceleration.y = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 16.0 * G;
-      imu_msg_.linear_acceleration.z = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 16.0 * G;
-      break;
-    }
-    case ANGULAR_VELOCITY: { // 0x52: 角速度
-      // 計算式: (結合データ / 32768) * 2000 degree/s
-      // ROS 2規格に合わせるため rad/s へ変換
-      imu_msg_.angular_velocity.x = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0 * 2000.0 * DEG_TO_RAD;
-      imu_msg_.angular_velocity.y = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0 * 2000.0 * DEG_TO_RAD;
-      imu_msg_.angular_velocity.z = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0 * 2000.0 * DEG_TO_RAD;
-      break;
-    }
-    case MAGNETIC_FIELD: { // 0x54: 磁気
-      // 磁気データは計測周期が異なる場合があるため、受信の度に配信
-      mag_msg_.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA;
-      mag_msg_.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA;
-      mag_msg_.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA;
+  if (frame[1] != MAGNETIC_FIELD) return;
 
-      mag_msg_.header.stamp = this->get_clock()->now();
-      mag_msg_.header.frame_id = frame_id_;
-      mag_publisher_->publish(mag_msg_);
-      mag_received_ = true;
-      break;
-    }
-    case QUATERNION_CMD: { // 0x59: Quaternion
-      // 計算式: 結合データ / 32768
-      imu_msg_.orientation.w = static_cast<double>(to_int16(frame[2], frame[3])) / 32768.0;
-      imu_msg_.orientation.x = static_cast<double>(to_int16(frame[4], frame[5])) / 32768.0;
-      imu_msg_.orientation.y = static_cast<double>(to_int16(frame[6], frame[7])) / 32768.0;
-      imu_msg_.orientation.z = static_cast<double>(to_int16(frame[8], frame[9])) / 32768.0;
-      
-      // パブリッシュ
-      // 0x59は出力シーケンスの最後の方に来るため、これをトリガーにして
-      // 「加速度・角速度・四元数」が揃った最新のIMUメッセージを一度にpublish
-      stamp_headers(); 
-      imu_publisher_->publish(imu_msg_);
-      imu_received_ = true;
-      break;
-    }
-    default:
-      break;
-  }
+  // コールバックローカルでメッセージを構築する。
+  sensor_msgs::msg::MagneticField msg;
+  set_magnetic_covariance(msg);
 
-  // デバッグ用: 両方のメッセージが受信できていることを一定間隔で表示
-  if (imu_received_ && mag_received_) {
-    RCLCPP_DEBUG_THROTTLE(
-      this->get_logger(), *this->get_clock(), 3000, "Receiving IMU feedback from %s",
-      port_name_.c_str());
-  }
+  // データ変換
+  msg.magnetic_field.x = static_cast<double>(to_int16(frame[2], frame[3])) * GAUSS_TO_TESLA * mag_scale_;
+  msg.magnetic_field.y = static_cast<double>(to_int16(frame[4], frame[5])) * GAUSS_TO_TESLA * mag_scale_;
+  msg.magnetic_field.z = static_cast<double>(to_int16(frame[6], frame[7])) * GAUSS_TO_TESLA * mag_scale_;
+
+  msg.header.stamp = this->get_clock()->now();
+  msg.header.frame_id = frame_id_;
+
+  mag_publisher_->publish(msg);
 }
 
 int main(int argc, char ** argv)
