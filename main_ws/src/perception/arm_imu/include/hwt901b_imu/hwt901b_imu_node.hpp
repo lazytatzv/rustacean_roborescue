@@ -2,23 +2,21 @@
 #define HWT901B_IMU__HWT901B_IMU_NODE_HPP_
 
 #include <array>
+#include <boost/asio.hpp>
 #include <cstdint>
 #include <deque>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/magnetic_field.hpp>
 #include <string>
 #include <thread>
 
-#include <boost/asio.hpp>
-
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/magnetic_field.hpp>
-
 class HWT901BIMUNode : public rclcpp::Node
 {
-public:
+ public:
   HWT901BIMUNode();
   ~HWT901BIMUNode() override;
 
-private:
+ private:
   static constexpr uint8_t IMU_HEADER = 0x55;
   static constexpr uint8_t MAGNETIC_FIELD = 0x54;
   static constexpr size_t FRAME_SIZE = 11;
@@ -44,14 +42,14 @@ private:
   void start_io_thread();
   void stop_io_thread();
   void start_async_read();
-  void on_read(const boost::system::error_code & ec, std::size_t n);
+  void on_read(const boost::system::error_code &ec, std::size_t n);
   void consume_frame();
 
   static int16_t to_int16(uint8_t low, uint8_t high);
-  static bool valid_checksum(const std::array<uint8_t, FRAME_SIZE> & frame);
+  static bool valid_checksum(const std::array<uint8_t, FRAME_SIZE> &frame);
 
   void parse_frames();
-  void decode_frame(const std::array<uint8_t, FRAME_SIZE> & frame);
+  void decode_frame(const std::array<uint8_t, FRAME_SIZE> &frame);
 };
 
 #endif  // HWT901B_IMU__HWT901B_IMU_NODE_HPP_
