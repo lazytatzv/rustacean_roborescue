@@ -136,7 +136,7 @@ cameras:
     enable_pointcloud: false  # 高負荷。必要時のみ true にする
     color_width: 640
     color_height: 480
-    color_fps: 30
+    color_fps: 15  # USB 2.1 接続のため 640x480 RGB で安定する上限
     depth_width: 640
     depth_height: 480
     depth_fps: 30
@@ -153,7 +153,7 @@ cameras:
   # use_t265_odom: true も必要。
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
   # これはアーム根元後ろのカメラ
-  # 性能は良いが実際使うかは分からない
+  # 使うな！！！！！！！！！！！！！！！！！
   - name: t265
     driver: realsense
     enabled: false

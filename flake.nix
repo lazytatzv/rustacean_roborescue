@@ -49,6 +49,14 @@
                   "-DProtobuf_DIR=${prev.protobuf_29}/lib/cmake/protobuf"
                 ];
               });
+              # python3Packages.opencv4 がカスタム opencv4 を使うようにする
+              python3 = prev.python3.override {
+                packageOverrides = pfinal: pprev: {
+                  opencv4 = pprev.opencv4.override {
+                    opencv4 = final.opencv4;
+                  };
+                };
+              };
             })
           ];
           config.allowUnfree = true;

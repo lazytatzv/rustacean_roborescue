@@ -8,6 +8,7 @@
 
 #include "custom_interfaces/msg/crawler_velocity.hpp"
 #include "custom_interfaces/msg/flipper_velocity.hpp"
+#include "custom_interfaces/msg/gripper_command.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
@@ -25,6 +26,9 @@ class JoyController : public rclcpp::Node
     this->declare_parameter("arm_linear_scale", 0.6);  // Increased to 0.6
     this->declare_parameter("arm_angular_scale", 0.5);
     this->declare_parameter("joint_speed_scale", 0.5);
+    this->declare_parameter("gripper_open_position", 1500);
+    this->declare_parameter("gripper_close_position", 2600);
+    this->declare_parameter("gripper_max_current", 300);
 
     max_speed_ = static_cast<float>(this->get_parameter("max_speed").as_double());
     deadzone_ = static_cast<float>(this->get_parameter("deadzone").as_double());
@@ -32,6 +36,9 @@ class JoyController : public rclcpp::Node
     arm_lin_scale_ = static_cast<float>(this->get_parameter("arm_linear_scale").as_double());
     arm_ang_scale_ = static_cast<float>(this->get_parameter("arm_angular_scale").as_double());
     joint_scale_ = static_cast<float>(this->get_parameter("joint_speed_scale").as_double());
+    gripper_open_pos_ = static_cast<uint16_t>(this->get_parameter("gripper_open_position").as_int());
+    gripper_close_pos_ = static_cast<uint16_t>(this->get_parameter("gripper_close_position").as_int());
+    gripper_max_current_ = static_cast<uint16_t>(this->get_parameter("gripper_max_current").as_int());
 
     subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 10, std::bind(&JoyController::joy_callback, this, std::placeholders::_1));
@@ -43,6 +50,8 @@ class JoyController : public rclcpp::Node
     arm_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/arm_cmd_vel", 10);
     joint_publisher_ =
         this->create_publisher<sensor_msgs::msg::JointState>("/arm_joint_cmd_vel", 10);
+    gripper_publisher_ =
+        this->create_publisher<custom_interfaces::msg::GripperCommand>("/gripper_cmd", 10);
     estop_publisher_ = this->create_publisher<std_msgs::msg::Bool>(
         "/emergency_stop", rclcpp::QoS(1).transient_local().reliable());
 
@@ -61,11 +70,13 @@ class JoyController : public rclcpp::Node
 
   float max_speed_, deadzone_, arm_lin_scale_, arm_ang_scale_, joint_scale_;
   int flipper_speed_;
+  uint16_t gripper_open_pos_, gripper_close_pos_, gripper_max_current_;
+  int prev_triangle_ = 0, prev_square_ = 0;
 
   static constexpr size_t BUTTON_SHARE = 8, BUTTON_OPTIONS = 9, BUTTON_PS = 10;
   static constexpr size_t AXIS_LEFT_X = 0, AXIS_LEFT_Y = 1, AXIS_RIGHT_X = 3, AXIS_RIGHT_Y = 4;
   static constexpr size_t AXIS_L2 = 2, AXIS_R2 = 5, AXIS_DPAD_Y = 7;
-  static constexpr size_t BUTTON_CROSS = 0, BUTTON_SQUARE = 2, BUTTON_L1 = 4, BUTTON_R1 = 5;
+  static constexpr size_t BUTTON_CROSS = 0, BUTTON_CIRCLE = 1, BUTTON_TRIANGLE = 2, BUTTON_SQUARE = 3, BUTTON_L1 = 4, BUTTON_R1 = 5;
 
   Mode mode_;
   bool estop_latched_ = false;
@@ -76,6 +87,7 @@ class JoyController : public rclcpp::Node
   rclcpp::Publisher<custom_interfaces::msg::FlipperVelocity>::SharedPtr flipper_publisher_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr arm_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher_;
+  rclcpp::Publisher<custom_interfaces::msg::GripperCommand>::SharedPtr gripper_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_publisher_;
 
   // Normalized command space shared by ARM(IK) and JOINT(direct) modes.
@@ -208,7 +220,7 @@ class JoyController : public rclcpp::Node
       crawler_msg.m2_vel = std::clamp(
           apply_deadzone(axis(msg, AXIS_LEFT_Y), deadzone_) * max_speed_, -max_speed_, max_speed_);
       int f1 = (axis(msg, AXIS_DPAD_Y) < -0.5f) ? 1 : (axis(msg, AXIS_DPAD_Y) > 0.5f ? -1 : 0);
-      int f2 = (button(msg, BUTTON_CROSS) == 1) ? 1 : (button(msg, BUTTON_SQUARE) == 1 ? -1 : 0);
+      int f2 = (button(msg, BUTTON_CROSS) == 1) ? 1 : (button(msg, BUTTON_TRIANGLE) == 1 ? -1 : 0);
       int f3 = (button(msg, BUTTON_L1) == 1) ? 1 : (axis(msg, AXIS_L2) < -0.9f ? -1 : 0);
       int f4 = (button(msg, BUTTON_R1) == 1) ? 1 : (axis(msg, AXIS_R2) < -0.9f ? -1 : 0);
       flipper_msg.flipper_vel = {
@@ -261,6 +273,34 @@ class JoyController : public rclcpp::Node
                         static_cast<double>(input.angular_y * joint_scale_)};
       joint_publisher_->publish(j_msg);
     }
+
+    // Gripper: × → open, □ → close (ARM/JOINT mode, rising edge)
+    if (mode_ == Mode::ARM || mode_ == Mode::JOINT)
+    {
+      const int triangle = button(msg, BUTTON_TRIANGLE);
+      const int square = button(msg, BUTTON_SQUARE);
+      const bool triangle_pressed = (triangle == 1 && prev_triangle_ == 0);
+      const bool square_pressed = (square == 1 && prev_square_ == 0);
+
+      if (triangle_pressed || square_pressed)
+      {
+        auto g_msg = custom_interfaces::msg::GripperCommand();
+        g_msg.max_current = gripper_max_current_;
+        if (triangle_pressed)
+        {
+          g_msg.position = gripper_open_pos_;
+          RCLCPP_INFO(this->get_logger(), "Gripper: OPEN");
+        }
+        else
+        {
+          g_msg.position = gripper_close_pos_;
+          RCLCPP_INFO(this->get_logger(), "Gripper: CLOSE");
+        }
+        gripper_publisher_->publish(g_msg);
+      }
+    }
+    prev_triangle_ = button(msg, BUTTON_TRIANGLE);
+    prev_square_ = button(msg, BUTTON_SQUARE);
   }
 };
 

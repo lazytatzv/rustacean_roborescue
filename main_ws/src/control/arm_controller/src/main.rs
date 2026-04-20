@@ -176,6 +176,8 @@ fn solve_velocity_ik(
     joint_positions: &[f64],
     cfg: &IkConfig,
 ) -> IkResult {
+    chain.set_joint_positions_clamped(joint_positions);
+    chain.update_transforms();
     let jacobian = k::jacobian(chain);
     let jt = jacobian.transpose();
     let n = jacobian.nrows();

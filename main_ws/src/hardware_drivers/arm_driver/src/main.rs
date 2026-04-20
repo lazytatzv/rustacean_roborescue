@@ -291,7 +291,7 @@ fn run() -> Result<()> {
         move |msg: GripperCommand| {
             let _ = tx_gripper.send(HwCommand {
                 arm_positions: None,
-                gripper_position: Some(msg.position as f64),
+                gripper_position: Some(driver::ticks_to_rad(msg.position as u32)),
             });
         },
     )?;

@@ -1,4 +1,5 @@
 #include <termios.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>
@@ -34,6 +35,13 @@ class SimpleRoboclaw
         boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
     serial_.set_option(boost::asio::serial_port_base::flow_control(
         boost::asio::serial_port_base::flow_control::none));
+
+    // ACK読み取りが無限ブロックしないよう50msのreadタイムアウトを設定
+    struct termios tty;
+    tcgetattr(serial_.lowest_layer().native_handle(), &tty);
+    tty.c_cc[VTIME] = 1;  // 100ms (単位: 100ms)
+    tty.c_cc[VMIN] = 0;
+    tcsetattr(serial_.lowest_layer().native_handle(), TCSANOW, &tty);
   }
 
   void sendCommand(uint8_t cmd, int32_t qpps)

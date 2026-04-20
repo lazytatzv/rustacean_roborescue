@@ -3,5 +3,8 @@ joy_controller:
     max_speed: 1.0           # クローラ最大速度 [m/s]
     deadzone: 0.1            # スティックデッドゾーン閾値
     flipper_speed: 1000      # フリッパ速度 [Dynamixel units]
-    arm_linear_scale: 0.6  # アーム手先移動速度スケール [m/s]
-    arm_angular_scale: 0.5   # アーム手先回転速度スケール [rad/s]
+    arm_linear_scale: 0.3    # アーム手先移動速度スケール [m/s]
+    arm_angular_scale: 0.25  # アーム手先回転速度スケール [rad/s]
+    gripper_open_position: 1500   # グリッパ開き目標位置 [Dynamixel ticks 0-4095]
+    gripper_close_position: 2600  # グリッパ閉じ目標位置 [Dynamixel ticks 0-4095]
+    gripper_max_current: 300      # グリッパ電流制限 [mA]

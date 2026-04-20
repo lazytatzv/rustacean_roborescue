@@ -28,6 +28,8 @@ gen-cert:
     -keyout main_ws/src/bringup/config/quic/server.key \
     -out main_ws/src/bringup/config/quic/server.crt \
     -subj "/CN=zenoh-robot" \
+    -addext "basicConstraints=CA:FALSE" \
+    -addext "extendedKeyUsage=serverAuth,clientAuth" \
     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.42.0.1,IP:100.114.200.30"
   cp main_ws/src/bringup/config/quic/server.crt operator_ws/quic/server.crt
   echo ""

@@ -13,7 +13,7 @@ arm_gripper_driver:
     gripper_joint: "gripper_joint"
     gripper_ids: [27, 28]
     gripper_directions: [1.0, -1.0]  # 28番は逆向き
-    gripper_max_current: 500 # 握力制限 [mA]
+    gripper_max_current: 300 # 握力制限 [mA] (ID 27/28 の Current_Limit EEPROM が 300 のため上限に合わせる)
 
     # ──────────────────────────────────────────────────────────────
     # ゼロ点オフセット [rad]: physical_angle = urdf_angle + offset
