@@ -12,8 +12,8 @@ arm_gripper_driver:
     # グリッパー設定 (2サーボ: ミラー構成)
     gripper_joint: "gripper_joint"
     gripper_ids: [27, 28]
-    gripper_directions: [1.0, -1.0]  # 28番は逆向き
-    gripper_max_current: 300 # 握力制限 [mA] (ID 27/28 の Current_Limit EEPROM が 300 のため上限に合わせる)
+    gripper_directions: [-1.0, -1.0]  # ID 27/28 両方を反転してみる
+    gripper_max_current: 600 # 握力制限 [mA]
 
     # ──────────────────────────────────────────────────────────────
     # ゼロ点オフセット [rad]: physical_angle = urdf_angle + offset

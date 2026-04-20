@@ -4,7 +4,7 @@ arm_controller:
     # k crate reads the file directly (not via ament), so the launch file
     # resolves the absolute path from bringup's share directory.
     # Name of the end-effector link in the URDF
-    end_link: "link_tip"
+    end_link: "arm6_link"
     # Watchdog timeout (ms) — arm stops if no command received within this period
     watchdog_timeout_ms: 500
 
@@ -16,7 +16,7 @@ arm_controller:
     # Manipulability threshold below which damping ramps up
     manipulability_threshold: 0.005
     # Manipulability below which we refuse to move (singularity lockout)
-    manipulability_lockout: 0.0005
+    manipulability_lockout: 0.00001
     # Joint velocity limit [rad/s]
     joint_vel_limit: 1.0
     # Safety margin from joint limits [rad] (~5.7°)

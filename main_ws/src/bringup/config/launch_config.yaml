@@ -4,10 +4,21 @@
 # 単一高可用構成を優先するため、起動時の細かい切替よりこのファイルを正として運用する。
 
 # 足回り
-use_crawler: true
-use_flipper: true
+use_crawler: false
+use_flipper: false
 
-use_arm: true
+use_arm: false
+
+# アームバックエンド選択
+# "direct"      : Rust arm_driver で直接 Dynamixel を制御 (デフォルト・軽量)
+# "ros2_control": dynamixel_hardware_interface + controller_manager を使用
+#                 MoveIt2 / joint_trajectory_controller が利用可能になる
+arm_backend: direct
+
+# MoveIt Servo (move_group + servo_node) を起動するか
+# arm_backend: ros2_control と組み合わせて使用
+# joy_controller の SERVO モード (SHARE 3回押し) と連携
+use_moveit: false
 
 # stm32のimuからデータをブリッジする
 # imuを使わない場合はfalse
@@ -20,9 +31,9 @@ use_lidar: false
 
 # カメラ制御全て
 # これがfalseだと遠隔操縦は不可能
-use_camera: false
+use_camera: true
 
-use_audio: false
+use_audio: true
 
 # 自動運転
 # CAUTION: use_lidarを必ずtrueにすること！

@@ -125,6 +125,19 @@ impl ArmDynamixelDriver {
     }
 
     pub fn init_motors(&mut self, profile_velocity: u32, gripper_max_current: u16) -> Result<()> {
+        println!("⚙️  arm_driver: Starting motor initialization...");
+        
+        // Ping all motors first to verify connection
+        let mut all_ids = self.arm_ids.clone();
+        all_ids.extend_from_slice(&self.gripper_ids);
+        for &id in &all_ids {
+            if let Err(e) = self.ping(id) {
+                eprintln!("❌ arm_driver: Failed to ping Dynamixel ID {id}: {e:?}");
+                return Err(e);
+            }
+        }
+        println!("✅ arm_driver: All motors (Arm + Gripper) responded to ping.");
+
         // Torque OFF (operating mode / profile_velocity は torque OFF 中でないと変更不可)
         for &id in &self.arm_ids {
             let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0);
@@ -144,6 +157,7 @@ impl ArmDynamixelDriver {
                 })?;
         }
         for &id in &self.gripper_ids {
+            println!("⚙️  arm_driver: Setting Gripper ID {id} to Current-based Position Mode...");
             self.bus
                 .write_u8(id, ADDR_OPERATING_MODE, MODE_CURRENT_BASED_POSITION)
                 .map_err(|e| anyhow::anyhow!("gripper ID {id} set operating_mode={MODE_CURRENT_BASED_POSITION} failed: {e:?}"))?;
@@ -209,6 +223,7 @@ impl ArmDynamixelDriver {
                 .map_err(|e| anyhow::anyhow!("gripper ID {id} torque enable failed: {e:?}"))?;
         }
 
+        println!("✅ arm_driver: Motor initialization complete.");
         Ok(())
     }
 
@@ -259,24 +274,33 @@ impl ArmDynamixelDriver {
             .collect())
     }
 
-    /// 最初のグリッパーサーボのステータスを返す (代表値)
+    /// 全グリッパーサーボのステータスを返す
+    pub fn read_gripper_statuses(&mut self) -> Result<Vec<MotorStatus>> {
+        let mut statuses = Vec::new();
+        for (i, &id) in self.gripper_ids.iter().enumerate() {
+            let dir = self.gripper_directions.get(i).copied().unwrap_or(1.0);
+            let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
+            
+            // 読み取り失敗しても他のモーターのために継続を試みる
+            let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION)?;
+            let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY)?;
+            let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT)?;
+            let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE)?;
+            
+            statuses.push(MotorStatus {
+                position_rad: ticks_to_rad(pos.data) * dir - offset,
+                velocity_rad_s: raw_vel_to_rad_s(vel.data as i32) * dir,
+                current_a: raw_current_to_a(cur.data as i16),
+                temperature_c: tmp.data,
+            });
+        }
+        Ok(statuses)
+    }
+
+    /// 最初のグリッパーサーボのステータスを返す (後方互換用)
     pub fn read_gripper_status(&mut self) -> Result<MotorStatus> {
-        let id = *self
-            .gripper_ids
-            .first()
-            .ok_or_else(|| anyhow::anyhow!("no gripper ids"))?;
-        let dir = self.gripper_directions.first().copied().unwrap_or(1.0);
-        let offset = self.gripper_offsets.first().copied().unwrap_or(0.0);
-        let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION)?;
-        let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY)?;
-        let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT)?;
-        let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE)?;
-        Ok(MotorStatus {
-            position_rad: ticks_to_rad(pos.data) * dir - offset,
-            velocity_rad_s: raw_vel_to_rad_s(vel.data as i32) * dir,
-            current_a: raw_current_to_a(cur.data as i16),
-            temperature_c: tmp.data,
-        })
+        let statuses = self.read_gripper_statuses()?;
+        statuses.into_iter().next().ok_or_else(|| anyhow::anyhow!("no gripper ids"))
     }
 
     pub fn emergency_stop(&mut self) {

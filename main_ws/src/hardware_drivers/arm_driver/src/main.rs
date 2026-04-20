@@ -82,6 +82,11 @@ fn hardware_thread(params: HardwareThreadParams) {
     const TEMP_CHECK_INTERVAL: u64 = HW_LOOP_HZ / 10;
     let mut loop_count: u64 = 0;
     let mut estop_was_active = false;
+    let mut grasp_over_counts = vec![0; params.gripper_ids.len()];
+    let mut is_holding = vec![false; params.gripper_ids.len()];
+    let mut last_target_rad: Option<f64> = None;
+    let grasp_threshold_ma = 450.0;
+    let consecutive_limit = 5;
 
     while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
@@ -117,10 +122,20 @@ fn hardware_thread(params: HardwareThreadParams) {
         // コマンド処理
         while let Ok(cmd) = params.rx_cmd.try_recv() {
             if let Some(p) = cmd.arm_positions {
-                let _ = driver.write_arm_positions(&p);
+                if let Err(e) = driver.write_arm_positions(&p) {
+                    eprintln!("⚠️  arm_driver: write_arm_positions failed: {e:?}");
+                }
             }
             if let Some(p) = cmd.gripper_position {
-                let _ = driver.write_gripper_position(p);
+                // 新しい指令が来たら保持状態とカウントをリセット
+                last_target_rad = Some(p);
+                for i in 0..params.gripper_ids.len() {
+                    grasp_over_counts[i] = 0;
+                    is_holding[i] = false;
+                }
+                if let Err(e) = driver.write_gripper_position(p) {
+                    eprintln!("⚠️  arm_driver: write_gripper_position failed: {e:?}");
+                }
             }
         }
 
@@ -131,17 +146,63 @@ fn hardware_thread(params: HardwareThreadParams) {
             msg.name = params.arm_joint_names.clone();
             msg.position = p;
             let _ = params.joint_state_pub.publish(&msg);
+        } else {
+            // Read arm positions failed - could be bus error
+            eprintln!("⚠️  arm_driver: read_arm_positions failed");
         }
 
-        // gripper_status publish
-        if let Ok(s) = driver.read_gripper_status() {
-            let msg = GripperStatus {
-                position: s.position_rad as i32,
-                current: s.current_a as i16,
-                temperature: s.temperature_c,
-                ..Default::default()
-            };
-            let _ = params.gripper_status_pub.publish(&msg);
+        // gripper_status publish & grasp detection
+        match driver.read_gripper_statuses() {
+            Ok(statuses) => {
+                // 代表値 (最初のモーター) の publish
+                if let Some(s) = statuses.first() {
+                    let msg = GripperStatus {
+                        position: s.position_rad as i32,
+                        current: (s.current_a * 1000.0) as i16,
+                        temperature: s.temperature_c,
+                        ..Default::default()
+                    };
+                    let _ = params.gripper_status_pub.publish(&msg);
+                }
+
+                    // 保持検出 (Grasp Detection) ロジック
+                    for (i, status) in statuses.iter().enumerate() {
+                        let id = params.gripper_ids[i];
+                        let current_ma = (status.current_a * 1000.0).abs();
+                        
+                        // 詳細ログ (1秒毎)
+                        if loop_count % HW_LOOP_HZ == 0 {
+                            println!("📊 arm_driver: Gripper ID {id}: pos={:.3} rad, current={:.1} mA, temp={} C",
+                                     status.position_rad, current_ma, status.temperature_c);
+                        }
+
+                        // 目標位置が現在より閉じ側（radが増える方向）の場合のみ保持検出
+                        let is_closing = if let Some(target) = last_target_rad {
+                            target > status.position_rad + 0.05
+                        } else {
+                            false
+                        };
+
+                        if !is_holding[i] {
+                            if is_closing && current_ma > grasp_threshold_ma {
+                                grasp_over_counts[i] += 1;
+                                if grasp_over_counts[i] >= consecutive_limit {
+                                    eprintln!("✊ arm_driver: Grasp detected on ID {id} ({:.1} mA). Holding position.", current_ma);
+                                    // 一度だけ現在位置を目標値として書き込む
+                                    let _ = driver.write_gripper_position(status.position_rad);
+                                    is_holding[i] = true;
+                                }
+                            } else {
+                                grasp_over_counts[i] = 0;
+                            }
+                        }
+                    }
+            }
+            Err(e) => {
+                if loop_count % 50 == 0 {
+                    eprintln!("⚠️  arm_driver: read_gripper_statuses failed: {e:?}");
+                }
+            }
         }
 
         // 温度監視 (10Hz)

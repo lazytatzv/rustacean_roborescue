@@ -75,7 +75,10 @@ class FlipperDriver : public rclcpp::Node
 
     for (const auto &id : dynamixel_ids_)
     {
-      if (!dxl_wb_.ping(id)) return;
+      if (!dxl_wb_.ping(id)) {
+        RCLCPP_WARN(get_logger(), "Failed to ping Flipper Dynamixel ID %ld on port %s", id, port_name_.c_str());
+        return;
+      }
       
       // トルクを一旦切って設定を反映
       dxl_wb_.torqueOff(id);

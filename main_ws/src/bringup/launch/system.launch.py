@@ -106,6 +106,8 @@ def generate_launch_description():
         default_use_imu = _b(cfg.get("use_imu", True))
         default_use_t265_odom = _b(cfg.get("use_t265_odom", False))
         default_use_depth_guard = _b(cfg.get("use_depth_guard", False))
+        default_arm_backend = cfg.get("arm_backend", "direct")
+        default_use_moveit = _b(cfg.get("use_moveit", False))
 
         arg_use_nav2 = DeclareLaunchArgument("use_nav2", default_value=default_use_nav2)
         arg_use_audio = DeclareLaunchArgument("use_audio", default_value=default_use_audio)
@@ -122,6 +124,12 @@ def generate_launch_description():
         arg_use_depth_guard = DeclareLaunchArgument(
             "use_depth_guard", default_value=default_use_depth_guard
         )
+        arg_arm_backend = DeclareLaunchArgument(
+            "arm_backend", default_value=default_arm_backend
+        )
+        arg_use_moveit = DeclareLaunchArgument(
+            "use_moveit", default_value=default_use_moveit
+        )
 
         use_nav2 = LaunchConfiguration("use_nav2")
         use_audio = LaunchConfiguration("use_audio")
@@ -134,6 +142,8 @@ def generate_launch_description():
         use_imu = LaunchConfiguration("use_imu")
         use_t265_odom = LaunchConfiguration("use_t265_odom")
         use_depth_guard = LaunchConfiguration("use_depth_guard")
+        arm_backend = LaunchConfiguration("arm_backend")
+        use_moveit = LaunchConfiguration("use_moveit")
         # ── Robot State Publisher (URDF → TF: base_link→各センサ/アーム/フリッパ) ──
         urdf_file = os.path.join(bringup_dir, "urdf", "robot.urdf.xacro")
         robot_state_publisher_actions = []
@@ -228,6 +238,8 @@ def generate_launch_description():
             arg_use_imu,
             arg_use_t265_odom,
             arg_use_depth_guard,
+            arg_arm_backend,
+            arg_use_moveit,
             # ==========================================
             # Zenoh / RMW 設定 (すべてのノードより前に実行)
             # ==========================================
@@ -282,6 +294,8 @@ def generate_launch_description():
                     "use_arm": use_arm,
                     "use_flipper": use_flipper,
                     "use_imu": use_imu,
+                    "arm_backend": arm_backend,
+                    "use_moveit": use_moveit,
                 },
             ),
             # Nav2 自律走行（オプション）

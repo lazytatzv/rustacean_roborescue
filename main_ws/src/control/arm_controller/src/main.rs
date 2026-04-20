@@ -482,27 +482,35 @@ fn run() -> Result<()> {
             s.target_positions = Some(current_positions.clone());
         } else if s.is_ik_mode {
             let twist_vec = na::DVector::from_column_slice(&s.target_twist);
-            // Try to enqueue a request for the worker (non-blocking)
-            let _ = req_tx.try_send((twist_vec.clone(), current_positions.clone()));
-            // Try to collect a worker result if available
-            if let Ok(res) = res_rx.try_recv() {
-                last_worker_result = Some(res);
-            }
-            if let Some((ref vel_vec, manipulability)) = last_worker_result {
-                joint_velocities = na::DVector::from_vec(vel_vec.clone());
-                if loop_count % 50 == 0 && manipulability < 0.001 {
-                    println!("⚠️ Low manipulability: {:.6}", manipulability);
-                }
-                // publish manipulability occasionally
-                if loop_count % 5 == 0 {
-                    let mmsg = std_msgs::msg::Float64 {
-                        data: manipulability,
-                    };
-                    let _ = diag_manip_pub.publish(&mmsg);
-                }
-            } else {
-                // no worker result yet: fallback to zeros to avoid blocking
+            let is_twist_zero = twist_vec.iter().all(|&v| v.abs() < 1e-6);
+
+            if is_twist_zero {
                 joint_velocities = na::DVector::zeros(dof);
+                // Clear the worker result to avoid using it in the next cycle
+                last_worker_result = Some((vec![0.0; dof], 1.0));
+            } else {
+                // Try to enqueue a request for the worker (non-blocking)
+                let _ = req_tx.try_send((twist_vec.clone(), current_positions.clone()));
+                // Try to collect a worker result if available
+                if let Ok(res) = res_rx.try_recv() {
+                    last_worker_result = Some(res);
+                }
+                if let Some((ref vel_vec, manipulability)) = last_worker_result {
+                    joint_velocities = na::DVector::from_vec(vel_vec.clone());
+                    if loop_count % 50 == 0 && manipulability < 0.001 {
+                        println!("⚠️ Low manipulability: {:.6}", manipulability);
+                    }
+                    // publish manipulability occasionally
+                    if loop_count % 5 == 0 {
+                        let mmsg = std_msgs::msg::Float64 {
+                            data: manipulability,
+                        };
+                        let _ = diag_manip_pub.publish(&mmsg);
+                    }
+                } else {
+                    // no worker result yet: fallback to zeros to avoid blocking
+                    joint_velocities = na::DVector::zeros(dof);
+                }
             }
         } else {
             joint_velocities = na::DVector::from_vec(s.target_joint_vel.clone());

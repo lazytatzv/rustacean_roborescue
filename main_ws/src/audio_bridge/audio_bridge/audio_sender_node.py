@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 """
 audio_sender: マイク入力を Opus にエンコードして ROS 2 トピックに publish する。
-
-GStreamer パイプライン:
-  pulsesrc → audioconvert → audioresample → opusenc → appsink → ROS 2 topic
-
-パラメータ:
-  topic       (str)  publish 先トピック名  (例: /robot/audio)
-  device      (str)  PulseAudio デバイス名  (空 = システムデフォルト)
-  bitrate     (int)  Opus ビットレート [bps] (デフォルト: 32000)
+ゲインを極小(0.1)に設定し、ハードウェア由来のバリバリ音（割れ）を回避。
 """
 
 import threading
-
 import gi
 import rclpy
 from custom_interfaces.msg import AudioChunk
@@ -24,85 +16,84 @@ from std_msgs.msg import Header
 
 Gst.init(None)
 
-# Opus は 48 kHz / mono をデフォルトとする (PulseAudio のネイティブレートと一致)
+# Opus の推奨レートに戻す
 _SAMPLE_RATE = 48000
 _CHANNELS = 1
-
 
 class AudioSenderNode(Node):
     def __init__(self) -> None:
         super().__init__("audio_sender")
 
         self.declare_parameter("topic", "/robot/audio")
-        self.declare_parameter("device", "")
+        self.declare_parameter("device", "") 
         self.declare_parameter("bitrate", 32000)
+        self.declare_parameter("input_gain", 0.1) # 0.1まで下げて「割れ」を確実に防ぐ
 
         topic = self.get_parameter("topic").value
-        device: str = self.get_parameter("device").value
-        bitrate: int = self.get_parameter("bitrate").value
+        device = self.get_parameter("device").value
+        bitrate = self.get_parameter("bitrate").value
+        gain = self.get_parameter("input_gain").value
 
         self._pub = self.create_publisher(AudioChunk, topic, 10)
+        self._sent_count = 0
 
-        # --- GStreamer パイプライン構築 ---
+        # パイプライン構成:
+        # pulsesrc -> ゲイン調整(0.1) -> Opus
         device_prop = f'device="{device}"' if device else ""
+        
+        # 不要な処理をすべて削り、マイクの生の音を極小音量で送ります
         pipeline_str = (
-            f"pulsesrc {device_prop} "
-            f"! audioconvert "
-            f"! audioresample "
+            f"pulsesrc {device_prop} ! audioconvert ! audioresample "
             f"! audio/x-raw,rate={_SAMPLE_RATE},channels={_CHANNELS},format=S16LE "
+            f"! volume volume={gain} "
             f"! opusenc bitrate={bitrate} frame-size=20 "
             f"! appsink name=sink emit-signals=true sync=false drop=false"
         )
-        self.get_logger().info(f"sender pipeline: {pipeline_str}")
+        
+        self.get_logger().info(f"🎙️ Audio Sender: Low-Gain Mode. Gain: {gain}")
+        
+        try:
+            self._pipeline = Gst.parse_launch(pipeline_str)
+        except Exception as e:
+            self.get_logger().error(f"❌ Failed to start: {e}")
+            return
 
-        self._pipeline = Gst.parse_launch(pipeline_str)
         sink = self._pipeline.get_by_name("sink")
         sink.connect("new-sample", self._on_new_sample)
-
-        # バスエラーを拾う
+        
         bus = self._pipeline.get_bus()
         bus.add_signal_watch()
         bus.connect("message::error", self._on_bus_error)
 
         self._pipeline.set_state(Gst.State.PLAYING)
-
-        # GLib ループをバックグラウンドスレッドで回す
         self._loop = GLib.MainLoop()
         threading.Thread(target=self._loop.run, daemon=True).start()
 
-        self.get_logger().info(f"audio_sender ready → {topic}")
-
-    # ------------------------------------------------------------------
     def _on_new_sample(self, appsink) -> Gst.FlowReturn:
         sample = appsink.emit("pull-sample")
-        if sample is None:
-            return Gst.FlowReturn.OK
-
+        if sample is None: return Gst.FlowReturn.OK
         buf = sample.get_buffer()
         ok, map_info = buf.map(Gst.MapFlags.READ)
-        if not ok:
-            return Gst.FlowReturn.OK
-        data = bytes(map_info.data)
-        buf.unmap(map_info)
-
-        msg = AudioChunk()
-        msg.header = Header(stamp=self.get_clock().now().to_msg())
-        msg.sample_rate = _SAMPLE_RATE
-        msg.channels = _CHANNELS
-        msg.data = list(data)
-        self._pub.publish(msg)
-
+        if ok:
+            msg = AudioChunk()
+            msg.header = Header(stamp=self.get_clock().now().to_msg())
+            msg.sample_rate = _SAMPLE_RATE
+            msg.channels = _CHANNELS
+            msg.data = list(map_info.data)
+            self._pub.publish(msg)
+            buf.unmap(map_info)
+            self._sent_count += 1
+            if self._sent_count % 100 == 0:
+                self.get_logger().info(f"📡 Sending (Gain: {self.get_parameter('input_gain').value})", once=False)
         return Gst.FlowReturn.OK
 
     def _on_bus_error(self, _bus, message) -> None:
         err, debug = message.parse_error()
-        self.get_logger().error(f"GStreamer error: {err} ({debug})")
+        self.get_logger().error(f"GStreamer error: {err}")
 
     def destroy_node(self) -> None:
-        self._pipeline.set_state(Gst.State.NULL)
-        self._loop.quit()
+        if self._pipeline: self._pipeline.set_state(Gst.State.NULL)
         super().destroy_node()
-
 
 def main() -> None:
     rclpy.init()
@@ -112,13 +103,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        try:
-            node.destroy_node()
-        except KeyboardInterrupt:
-            pass
-        if rclpy.ok():
-            rclpy.shutdown()
-
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

@@ -24,6 +24,11 @@ def generate_launch_description():
         default_value="",
         description="NUC スピーカーの PulseAudio デバイス名 (空=デフォルト)",
     )
+    robot_volume = DeclareLaunchArgument(
+        "robot_volume",
+        default_value="1.0",
+        description="NUC スピーカーの音量 (0.0 - 1.0+)",
+    )
     bitrate = DeclareLaunchArgument(
         "bitrate", default_value="32000", description="Opus ビットレート [bps]"
     )
@@ -57,10 +62,13 @@ def generate_launch_description():
             {
                 "topic": "/operator/audio",
                 "device": LaunchConfiguration("robot_spk_device"),
+                "volume": LaunchConfiguration("robot_volume"),
             }
         ],
         respawn=True,
         respawn_delay=3.0,
     )
 
-    return LaunchDescription([use_audio, robot_device, robot_spk_device, bitrate, sender, receiver])
+    return LaunchDescription(
+        [use_audio, robot_device, robot_spk_device, robot_volume, bitrate, sender, receiver]
+    )

@@ -3,4 +3,5 @@ flipper_driver:
     port_name: "/dev/dynamixel_flipper"  # udev: deploy/99-robot.rules の dynamixel_flipper symlink
     baud_rate: 115200 # 実機の設定に合わせて115200に戻す
     dynamixel_ids: [1, 3, 4, 2]
+    watchdog_timeout_ms: 1000
     servo_inverted: [true, true, true, true]  # dynamixel_ids と同順。true にすると速度指令の正負を反転

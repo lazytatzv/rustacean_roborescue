@@ -32,9 +32,11 @@ class AudioReceiverNode(Node):
 
         self.declare_parameter("topic", "/operator/audio")
         self.declare_parameter("device", "")
+        self.declare_parameter("volume", 1.0)
 
         topic = self.get_parameter("topic").value
         device: str = self.get_parameter("device").value
+        volume: float = self.get_parameter("volume").value
 
         self._sub = self.create_subscription(AudioChunk, topic, self._on_audio, 10)
 
@@ -47,6 +49,7 @@ class AudioReceiverNode(Node):
             f"! opusdec "
             f"! audioconvert "
             f"! audioresample "
+            f"! volume volume={volume} "
             f"! pulsesink {device_prop} sync=false"
         )
         self.get_logger().info(f"receiver pipeline: {pipeline_str}")

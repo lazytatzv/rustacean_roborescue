@@ -3,8 +3,9 @@ import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
@@ -14,11 +15,49 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def _load_robot_description(dxl_model_folder: str) -> str:
-    """URDF を読み込み DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER を実パスに置換して返す。"""
+def _generate_urdf(use_real_hw: bool, dxl_model_folder: str) -> tuple[str, str]:
+    """sekirei_moveit.xacro を展開して (urdf_string, urdf_file_path) を返す。
+    Rust arm_controller はファイルパスで読むため /tmp に書き出す。
+    ros2_control と Rust IK で同じ xacro を共有する。
+    """
+    import subprocess
+    import tempfile
+
+    try:
+        from ament_index_python.packages import get_package_share_directory as _gpsd
+        xacro_path = os.path.join(
+            _gpsd("sekirei_moveit"), "urdf", "sekirei_moveit.xacro"
+        )
+        if os.path.isfile(xacro_path):
+            args = [
+                "xacro", xacro_path,
+                f"use_real_hw:={'true' if use_real_hw else 'false'}",
+            ]
+            if dxl_model_folder:
+                args.append(f"dynamixel_model_folder:={dxl_model_folder}")
+            result = subprocess.run(args, capture_output=True, text=True, check=True)
+            urdf_str = result.stdout
+            # arm_controller (Rust) 用に一時ファイルへ書き出す
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".urdf", prefix="sekirei_moveit_",
+                delete=False
+            )
+            tmp.write(urdf_str)
+            tmp.flush()
+            return urdf_str, tmp.name
+    except Exception as e:
+        print(f"[control.launch] xacro failed ({e}), falling back to sekirei.urdf")
+
+    # フォールバック: sekirei.urdf
     urdf_path = os.path.join(get_package_share_directory("bringup"), "urdf", "sekirei.urdf")
     with open(urdf_path) as f:
-        return f.read().replace("DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER", dxl_model_folder)
+        urdf_str = f.read().replace("DYNAMIXEL_MODEL_FOLDER_PLACEHOLDER", dxl_model_folder)
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".urdf", prefix="sekirei_fallback_", delete=False
+    )
+    tmp.write(urdf_str)
+    tmp.flush()
+    return urdf_str, tmp.name
 
 
 def _load_device_path(config_path: str, root_key: str, param_key: str) -> str:
@@ -124,23 +163,36 @@ def generate_launch_description() -> LaunchDescription:
             "  direct       : Rust arm_driver で直接 Dynamixel を制御 (デフォルト)\n"
             "  ros2_control : dynamixel_hardware_interface + controller_manager を使用。\n"
             "                 MoveIt2 / joint_trajectory_controller が利用可能になる。\n"
-            "MoveIt2 を使う場合は起動後に:\n"
+            "MoveIt2 を使う場合は arm_backend:=ros2_control use_moveit:=true で起動し、\n"
+            "手動切り替えが必要な場合:\n"
             "  ros2 control switch_controllers \\\n"
             "    --deactivate forward_position_controller \\\n"
             "    --activate   joint_trajectory_controller"
+        ),
+    )
+    arg_use_moveit = DeclareLaunchArgument(
+        "use_moveit",
+        default_value="false",
+        description=(
+            "MoveIt Servo (move_group + servo_node) を起動する。\n"
+            "arm_backend:=ros2_control と組み合わせて使用。\n"
+            "joy_controller の SERVO モード (SHARE x3) と連携。"
         ),
     )
 
     ros2_control_available = True
     ros2_control_warning = None
     robot_description = ""
+    urdf_file_path = ""
     try:
         dxl_model_folder = os.path.join(
             get_package_share_directory("dynamixel_hardware_interface"),
             "param",
             "dxl_model",
         )
-        robot_description = _load_robot_description(dxl_model_folder)
+        robot_description, urdf_file_path = _generate_urdf(
+            use_real_hw=True, dxl_model_folder=dxl_model_folder
+        )
     except Exception:
         ros2_control_available = False
         ros2_control_warning = LogInfo(
@@ -149,6 +201,10 @@ def generate_launch_description() -> LaunchDescription:
                 "falling back to arm_backend=direct"
             )
         )
+
+    # direct モードでも同じ xacro (use_real_hw=false) を arm_controller に渡す
+    if not urdf_file_path:
+        _, urdf_file_path = _generate_urdf(use_real_hw=False, dxl_model_folder="")
 
     use_ros2_control = PythonExpression(
         [
@@ -227,7 +283,7 @@ def generate_launch_description() -> LaunchDescription:
         output="both",
         parameters=[
             LaunchConfiguration("arm_params"),
-            {"urdf_path": PathJoinSubstitution([bringup_share, "urdf", "sekirei.urdf"])},
+            {"urdf_path": urdf_file_path},
         ],
         condition=IfCondition(use_arm_effective),
         **ctrl_respawn,
@@ -340,6 +396,41 @@ def generate_launch_description() -> LaunchDescription:
         **ctrl_respawn,
     )
 
+    # MoveIt Servo (move_group + servo_node) — only when use_moveit=true AND ros2_control
+    moveit_servo_available = True
+    moveit_servo_warning = None
+    try:
+        get_package_share_directory("sekirei_moveit")
+    except Exception:
+        moveit_servo_available = False
+        moveit_servo_warning = LogInfo(
+            msg="[WARN][control.launch] sekirei_moveit not found; use_moveit ignored"
+        )
+
+    use_moveit_effective = PythonExpression(
+        [
+            "'",
+            LaunchConfiguration("use_moveit"),
+            "' == 'true' and '",
+            LaunchConfiguration("arm_backend"),
+            "' == 'ros2_control' and ",
+            str(moveit_servo_available),
+        ]
+    )
+
+    moveit_servo_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory("sekirei_moveit")
+                if moveit_servo_available
+                else "/dev/null",
+                "launch",
+                "moveit_servo.launch.py",
+            )
+        ),
+        condition=IfCondition(use_moveit_effective),
+    ) if moveit_servo_available else LogInfo(msg="")
+
     return LaunchDescription(
         [
             # 引数
@@ -354,8 +445,10 @@ def generate_launch_description() -> LaunchDescription:
             arg_arm_gripper_driver_params,
             arg_joy_params,
             arg_arm_backend,
+            arg_use_moveit,
             # 依存不足時のフォールバック告知
             *([ros2_control_warning] if ros2_control_warning is not None else []),
+            *([moveit_servo_warning] if moveit_servo_warning is not None else []),
             *availability_warnings,
             # 共通
             crawler_driver_node,
@@ -371,5 +464,7 @@ def generate_launch_description() -> LaunchDescription:
             spawn_forward_position_controller,
             spawn_joint_trajectory_controller,
             arm_cmd_bridge_node,
+            # MoveIt Servo (use_moveit:=true かつ arm_backend:=ros2_control の場合)
+            moveit_servo_launch,
         ]
     )

@@ -89,6 +89,8 @@ def _build_network_actions(context):
                     "-subj",
                     "/CN=zenoh-robot",
                     "-addext",
+                    "basicConstraints=critical,CA:FALSE",
+                    "-addext",
                     "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.42.0.1,IP:100.114.200.30",
                 ],
                 check=True,
