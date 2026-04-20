@@ -26,7 +26,7 @@ def _camera_available(cam: dict) -> tuple[bool, str]:
         return False, f"{cam.get('name', 'unknown')}: disabled by config"
 
     driver = cam.get("driver", "v4l2")
-    if driver in ("v4l2", "theta_s"):
+    if driver in ("v4l2", "theta_s", "mjpeg"):
         dev = cam.get("device", "")
         if not dev or not os.path.exists(dev):
             return False, f"{cam.get('name', 'unknown')}: missing video device {dev}"
@@ -77,6 +77,47 @@ def _v4l2_nodes(cam: dict, ns: str) -> list:
     ]
 
 
+def _mjpeg_nodes(cam: dict, ns: str) -> list:
+    """MJPEG カメラ (WideCam 2.0 等) のコンポーザブルノードを返す。
+
+    v4l2_camera は MJPEG 非対応のため gscam を使用。USB 帯域を大幅削減できる。
+    framerate caps は指定しない (カメラが 30fps 固定のため negotiate 失敗を避ける)。
+    """
+    device = cam.get("device", "/dev/video0")
+    width = cam.get("width", 640)
+    height = cam.get("height", 480)
+
+    pipeline = (
+        f"v4l2src device={device} ! "
+        f"image/jpeg,width={width},height={height} ! "
+        f"jpegdec ! videoconvert ! video/x-raw,format=RGB"
+    )
+
+    return [
+        ComposableNode(
+            package="gscam",
+            plugin="gscam::GSCam",
+            name="gscam",
+            namespace=ns,
+            remappings=[
+                ("camera/image_raw", "image_raw"),
+                ("camera/image_raw/compressed", "image_raw/compressed"),
+                ("camera/camera_info", "camera_info"),
+            ],
+            parameters=[
+                {
+                    "gscam_config": pipeline,
+                    "image_encoding": cam.get("output_encoding", "rgb8"),
+                    "camera_name": ns,
+                    "frame_id": cam.get("frame_id", f"{cam['name']}_camera_link"),
+                    "sync_sink": False,
+                }
+            ],
+            extra_arguments=[{"use_intra_process_comms": True}],
+        )
+    ]
+
+
 def _theta_s_nodes(cam: dict, ns: str) -> list:
     """RICOH THETA S (UVC live streaming) のコンポーザブルノードを返す。
 
@@ -109,7 +150,9 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
             remappings=[
                 # gscam は camera/image_raw に配信するが、
                 # 他ノード (QR検出・republish) は image_raw を期待するため合わせる
+                # compressed サブトピックは remapping が自動伝播しないため明示的に指定
                 ("camera/image_raw", "image_raw"),
+                ("camera/image_raw/compressed", "image_raw/compressed"),
                 ("camera/camera_info", "camera_info"),
             ],
             parameters=[
@@ -133,6 +176,8 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
         "base_frame_id": f"{ns}_link",
         "enable_color": cam.get("enable_color", True),
         "enable_depth": cam.get("enable_depth", False),
+        "enable_infra1": cam.get("enable_infra1", False),
+        "enable_infra2": cam.get("enable_infra2", False),
         "enable_pose": cam.get("enable_pose", False),
         "enable_accel": cam.get("enable_accel", False),
         "enable_gyro": cam.get("enable_gyro", False),
@@ -143,6 +188,9 @@ def _realsense_nodes(cam: dict, ns: str) -> list:
         "depth_width": cam.get("depth_width", 640),
         "depth_height": cam.get("depth_height", 480),
         "depth_fps": cam.get("depth_fps", 30),
+        "infra_width": cam.get("infra_width", 640),
+        "infra_height": cam.get("infra_height", 480),
+        "infra_fps": cam.get("infra_fps", 15),
     }
     return [
         ComposableNode(
@@ -245,10 +293,13 @@ def _make_camera_group(
         composable_nodes = _realsense_nodes(cam, ns)
     elif driver == "theta_s":
         composable_nodes = _theta_s_nodes(cam, ns)
+    elif driver == "mjpeg":
+        composable_nodes = _mjpeg_nodes(cam, ns)
     else:
         composable_nodes = _v4l2_nodes(cam, ns)
 
     has_color = driver != "realsense" or cam.get("enable_color", True)
+    startup_delay = cam.get("startup_delay", 0.0)
 
     container = ComposableNodeContainer(
         name=f"camera_{name}_container",
@@ -262,7 +313,10 @@ def _make_camera_group(
         respawn_delay=3.0,
     )
 
-    actions = [container]
+    if startup_delay > 0.0:
+        actions = [TimerAction(period=startup_delay, actions=[container])]
+    else:
+        actions = [container]
 
     # QR 検出ノード起動
     # qr_use_component: true  → カメラと同一コンテナ (intra-process通信、高パフォーマンス)
@@ -413,7 +467,7 @@ def generate_launch_description():
             continue
 
         driver = cam.get("driver", "v4l2")
-        if driver in ("v4l2", "theta_s"):
+        if driver in ("v4l2", "theta_s", "mjpeg"):
             dev = cam.get("device", "")
             key = _video_device_realpath_key(dev)
             if key:
