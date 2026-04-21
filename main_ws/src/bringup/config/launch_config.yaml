@@ -33,7 +33,7 @@ use_lidar: false
 # これがfalseだと遠隔操縦は不可能
 use_camera: true
 
-use_audio: true
+use_audio: false
 
 # 自動運転
 # CAUTION: use_lidarを必ずtrueにすること！
