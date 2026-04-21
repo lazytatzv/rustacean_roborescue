@@ -68,3 +68,7 @@ SUBSYSTEM=="video4linux", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b3a", ENV
 
 # 360 degree camera richo
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="05ca", ATTRS{idProduct}=="2711", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_ricoh", MODE="0666"
+
+# camera right back    logitech
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="082c", ENV{ID_V4L_CAPABILITIES}==":capture:", SYMLINK+="camera_logitech", MODE="0666"
+
