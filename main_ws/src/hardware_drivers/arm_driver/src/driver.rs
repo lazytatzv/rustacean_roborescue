@@ -245,26 +245,28 @@ impl ArmDynamixelDriver {
             .map_err(|e| anyhow::anyhow!("{:?}", e))
     }
 
-    pub fn write_gripper_position(&mut self, rad: f64) -> Result<()> {
-        let mut last_err = None;
-        for (i, &id) in self.gripper_ids.iter().enumerate() {
-            let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
-            let dir = self.gripper_directions.get(i).copied().unwrap_or(1.0);
-            if let Err(e) = self.bus.write_u32(id, ADDR_GOAL_POSITION, rad_to_ticks((rad + offset) * dir)) {
-                last_err = Some(anyhow::anyhow!("gripper ID {id}: {:?}", e));
-            }
-        }
-        match last_err {
-            Some(e) => Err(e),
-            None => Ok(()),
-        }
+    pub fn write_gripper_positions(&mut self, positions_rad: &[f64]) -> Result<()> {
+        let commands: Vec<SyncWriteData<u32>> = self
+            .gripper_ids
+            .iter()
+            .zip(positions_rad.iter())
+            .zip(self.gripper_offsets.iter())
+            .zip(self.gripper_directions.iter())
+            .map(|(((&id, &rad), &offset), &dir)| SyncWriteData {
+                motor_id: id,
+                data: rad_to_ticks((rad + offset) * dir),
+            })
+            .collect();
+        self.bus
+            .sync_write_u32(ADDR_GOAL_POSITION, &commands)
+            .map_err(|e| anyhow::anyhow!("sync_write gripper positions failed: {:?}", e))
     }
 
     pub fn read_arm_positions(&mut self) -> Result<Vec<f64>> {
         let resp = self
             .bus
             .sync_read_u32(&self.arm_ids, ADDR_PRESENT_POSITION)
-            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("sync_read arm positions failed: {:?}", e))?;
         // ticks → 物理角度 → URDF 角度 (direction 除算 → offset 減算)
         Ok(resp
             .iter()
@@ -276,20 +278,23 @@ impl ArmDynamixelDriver {
 
     /// 全グリッパーサーボのステータスを返す
     pub fn read_gripper_statuses(&mut self) -> Result<Vec<MotorStatus>> {
+        // Sync Read を使用して効率化 (Position, Velocity, Current をまとめて読むには本来別々だが、ここでは単純化のため個別または個別SyncRead)
+        // 実際には ADDR_PRESENT_CURRENT から 2+4+4 = 10 bytes 連続しているので SyncRead で一気に読める
+        // ADDR_PRESENT_CURRENT(126), PRESENT_VELOCITY(128), PRESENT_POSITION(132)
+        // ここでは実装の単純化のため、個別に読むが、エラーハンドリングを改善
         let mut statuses = Vec::new();
         for (i, &id) in self.gripper_ids.iter().enumerate() {
             let dir = self.gripper_directions.get(i).copied().unwrap_or(1.0);
             let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
             
-            // 読み取り失敗しても他のモーターのために継続を試みる
-            let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION)?;
-            let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY)?;
-            let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT)?;
-            let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE)?;
+            let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION).context("read pos")?;
+            let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY).context("read vel")?;
+            let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT).context("read cur")?;
+            let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE).context("read tmp")?;
             
             statuses.push(MotorStatus {
-                position_rad: ticks_to_rad(pos.data) * dir - offset,
-                velocity_rad_s: raw_vel_to_rad_s(vel.data as i32) * dir,
+                position_rad: ticks_to_rad(pos.data) / dir - offset,
+                velocity_rad_s: raw_vel_to_rad_s(vel.data as i32) / dir,
                 current_a: raw_current_to_a(cur.data as i16),
                 temperature_c: tmp.data,
             });
@@ -301,6 +306,21 @@ impl ArmDynamixelDriver {
     pub fn read_gripper_status(&mut self) -> Result<MotorStatus> {
         let statuses = self.read_gripper_statuses()?;
         statuses.into_iter().next().ok_or_else(|| anyhow::anyhow!("no gripper ids"))
+    }
+
+    /// 各グリッパーモーターをそれぞれの現在位置でホールドする。
+    /// write_gripper_position は全モーターに同一URDF角を送るため独立ホールドに使えない。
+    pub fn write_gripper_hold(&mut self, statuses: &[MotorStatus]) -> Result<()> {
+        let mut last_err = None;
+        for (i, (status, &id)) in statuses.iter().zip(self.gripper_ids.iter()).enumerate() {
+            let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
+            let dir    = self.gripper_directions.get(i).copied().unwrap_or(1.0);
+            let ticks  = rad_to_ticks((status.position_rad + offset) * dir);
+            if let Err(e) = self.bus.write_u32(id, ADDR_GOAL_POSITION, ticks) {
+                last_err = Some(anyhow::anyhow!("gripper hold ID {id}: {:?}", e));
+            }
+        }
+        last_err.map_or(Ok(()), Err)
     }
 
     pub fn emergency_stop(&mut self) {

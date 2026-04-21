@@ -20,7 +20,7 @@ const HW_LOOP_HZ: u64 = 50;
 
 struct HwCommand {
     arm_positions: Option<Vec<f64>>,
-    gripper_position: Option<f64>,
+    gripper_positions: Option<Vec<f64>>,
 }
 
 fn now_stamp() -> builtin_interfaces::msg::Time {
@@ -48,6 +48,10 @@ struct HardwareThreadParams {
     joint_state_pub: Publisher<JointState>,
     gripper_status_pub: Publisher<GripperStatus>,
     arm_joint_names: Vec<String>,
+    gripper_joint_names: Vec<String>,
+    use_grasp_detection: bool,
+    grasp_effort_threshold: f64,
+    grasp_consecutive_count: u32,
     shutdown_flag: Arc<AtomicBool>,
     estop_flag: Arc<AtomicBool>,
 }
@@ -78,15 +82,14 @@ fn hardware_thread(params: HardwareThreadParams) {
     }
 
     let loop_period = Duration::from_millis(1000 / HW_LOOP_HZ);
-    // 温度チェックは HW_LOOP_HZ/5 Hz (= 10Hz) で実施
     const TEMP_CHECK_INTERVAL: u64 = HW_LOOP_HZ / 10;
     let mut loop_count: u64 = 0;
     let mut estop_was_active = false;
-    let mut grasp_over_counts = vec![0; params.gripper_ids.len()];
-    let mut is_holding = vec![false; params.gripper_ids.len()];
-    let mut last_target_rad: Option<f64> = None;
-    let grasp_threshold_ma = 450.0;
-    let consecutive_limit = 5;
+    
+    // Grasp detection state
+    let mut over_count = 0;
+    let mut is_holding = false;
+    let mut gripper_closing = false;
 
     while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
@@ -94,12 +97,10 @@ fn hardware_thread(params: HardwareThreadParams) {
 
         if estop_now {
             if !estop_was_active {
-                // E-Stop 立ち上がりエッジ: トルクOFF
                 driver.emergency_stop();
                 estop_was_active = true;
                 eprintln!("🛑 arm_driver: E-Stop active — torque disabled");
             }
-            // E-Stop 中はコマンド受信のみ drain してモータには送らない
             while params.rx_cmd.try_recv().is_ok() {}
             let elapsed = loop_start.elapsed();
             if elapsed < loop_period {
@@ -109,7 +110,6 @@ fn hardware_thread(params: HardwareThreadParams) {
         }
 
         if estop_was_active {
-            // E-Stop 解除: 現在位置をゴールに再設定してからトルクON
             eprintln!("✅ arm_driver: E-Stop cleared — re-enabling torque at current position");
             if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current)
             {
@@ -126,38 +126,49 @@ fn hardware_thread(params: HardwareThreadParams) {
                     eprintln!("⚠️  arm_driver: write_arm_positions failed: {e:?}");
                 }
             }
-            if let Some(p) = cmd.gripper_position {
+            if let Some(p) = cmd.gripper_positions {
                 // 新しい指令が来たら保持状態とカウントをリセット
-                last_target_rad = Some(p);
-                for i in 0..params.gripper_ids.len() {
-                    grasp_over_counts[i] = 0;
-                    is_holding[i] = false;
-                }
-                if let Err(e) = driver.write_gripper_position(p) {
-                    eprintln!("⚠️  arm_driver: write_gripper_position failed: {e:?}");
+                is_holding = false;
+                over_count = 0;
+                
+                // closing かどうかの判定 (簡易的に: 前回の目標値より「閉じ方向」なら closing とする)
+                // あるいは C++ のように外部から明示的に判定が必要だが、ここでは「目標値が変わったら closing = true」として
+                // 保持検出を開始し、一度保持したら reset する運用とする
+                gripper_closing = true; 
+
+                if let Err(e) = driver.write_gripper_positions(&p) {
+                    eprintln!("⚠️  arm_driver: write_gripper_positions failed: {e:?}");
                 }
             }
         }
 
-        // joint_states publish
+        // joint_states & gripper_status publish
+        let mut joint_state_msg = JointState::default();
+        joint_state_msg.header.stamp = now_stamp();
+        
+        // Arm positions
         if let Ok(p) = driver.read_arm_positions() {
-            let mut msg = JointState::default();
-            msg.header.stamp = now_stamp();
-            msg.name = params.arm_joint_names.clone();
-            msg.position = p;
-            let _ = params.joint_state_pub.publish(&msg);
-        } else {
-            // Read arm positions failed - could be bus error
-            eprintln!("⚠️  arm_driver: read_arm_positions failed");
+            joint_state_msg.name.extend(params.arm_joint_names.clone());
+            joint_state_msg.position.extend(p);
         }
 
-        // gripper_status publish & grasp detection
+        // Gripper statuses
         match driver.read_gripper_statuses() {
             Ok(statuses) => {
-                // 代表値 (最初のモーター) の publish
+                // JointState にグリッパー情報を追加
+                for (i, status) in statuses.iter().enumerate() {
+                    if i < params.gripper_joint_names.len() {
+                        joint_state_msg.name.push(params.gripper_joint_names[i].clone());
+                        joint_state_msg.position.push(status.position_rad);
+                        joint_state_msg.velocity.push(status.velocity_rad_s);
+                        joint_state_msg.effort.push(status.current_a);
+                    }
+                }
+
+                // GripperStatus (最初のモーター分) の publish
                 if let Some(s) = statuses.first() {
                     let msg = GripperStatus {
-                        position: s.position_rad as i32,
+                        position: driver::rad_to_ticks(s.position_rad) as i32,
                         current: (s.current_a * 1000.0) as i16,
                         temperature: s.temperature_c,
                         ..Default::default()
@@ -165,38 +176,35 @@ fn hardware_thread(params: HardwareThreadParams) {
                     let _ = params.gripper_status_pub.publish(&msg);
                 }
 
-                    // 保持検出 (Grasp Detection) ロジック
+                // 保持検出 (Grasp Detection) ロジック (C++版に準拠: いずれかが閾値超えで全体ホールド)
+                if params.use_grasp_detection && gripper_closing && !is_holding {
+                    let any_over = statuses.iter().any(|s| s.current_a.abs() > params.grasp_effort_threshold);
+                    
+                    if any_over {
+                        over_count += 1;
+                    } else {
+                        over_count = 0;
+                    }
+
+                    if over_count >= params.grasp_consecutive_count {
+                        eprintln!("✊ arm_driver: Grasp detected (any motor over threshold). Holding all gripper joints.");
+                        if let Err(e) = driver.write_gripper_hold(&statuses) {
+                            eprintln!("⚠️  arm_driver: write_gripper_hold failed: {e:?}");
+                        }
+                        is_holding = true;
+                        gripper_closing = false;
+                        over_count = 0;
+                    }
+                }
+
+                // 詳細ログ (1秒毎)
+                if loop_count % HW_LOOP_HZ == 0 {
                     for (i, status) in statuses.iter().enumerate() {
                         let id = params.gripper_ids[i];
-                        let current_ma = (status.current_a * 1000.0).abs();
-                        
-                        // 詳細ログ (1秒毎)
-                        if loop_count % HW_LOOP_HZ == 0 {
-                            println!("📊 arm_driver: Gripper ID {id}: pos={:.3} rad, current={:.1} mA, temp={} C",
-                                     status.position_rad, current_ma, status.temperature_c);
-                        }
-
-                        // 目標位置が現在より閉じ側（radが増える方向）の場合のみ保持検出
-                        let is_closing = if let Some(target) = last_target_rad {
-                            target > status.position_rad + 0.05
-                        } else {
-                            false
-                        };
-
-                        if !is_holding[i] {
-                            if is_closing && current_ma > grasp_threshold_ma {
-                                grasp_over_counts[i] += 1;
-                                if grasp_over_counts[i] >= consecutive_limit {
-                                    eprintln!("✊ arm_driver: Grasp detected on ID {id} ({:.1} mA). Holding position.", current_ma);
-                                    // 一度だけ現在位置を目標値として書き込む
-                                    let _ = driver.write_gripper_position(status.position_rad);
-                                    is_holding[i] = true;
-                                }
-                            } else {
-                                grasp_over_counts[i] = 0;
-                            }
-                        }
+                        println!("📊 arm_driver: Gripper ID {id}: pos={:.3} rad, current={:.3} A, temp={} C",
+                                 status.position_rad, status.current_a, status.temperature_c);
                     }
+                }
             }
             Err(e) => {
                 if loop_count % 50 == 0 {
@@ -204,6 +212,8 @@ fn hardware_thread(params: HardwareThreadParams) {
                 }
             }
         }
+        
+        let _ = params.joint_state_pub.publish(&joint_state_msg);
 
         // 温度監視 (10Hz)
         loop_count += 1;
@@ -278,6 +288,20 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let gripper_ids: Vec<u8> = gripper_ids_arr.iter().copied().map(|id| id as u8).collect();
+    
+    let gripper_joints_arr: Arc<[Arc<str>]> = node
+        .declare_parameter("gripper_joints")
+        .default(Arc::from(
+            vec![
+                Arc::from("gripper_joint7"),
+                Arc::from("gripper_joint8"),
+            ]
+            .into_boxed_slice(),
+        ))
+        .mandatory()?
+        .get();
+    let gripper_joints: Vec<String> = gripper_joints_arr.iter().map(|s| s.to_string()).collect();
+
     let arm_directions_arr: Arc<[f64]> = node
         .declare_parameter("arm_directions")
         .default(Arc::from(vec![1.0_f64; 6].into_boxed_slice()))
@@ -316,6 +340,11 @@ fn run() -> Result<()> {
         .get();
     let gripper_offsets: Vec<f64> = gripper_offsets_arr.to_vec();
 
+    // Grasp Detection Parameters
+    let use_grasp_detection = node.declare_parameter("use_grasp_detection").default(true).mandatory()?.get();
+    let grasp_effort_threshold = node.declare_parameter("grasp_effort_threshold").default(0.45).mandatory()?.get();
+    let grasp_consecutive_count = node.declare_parameter("grasp_consecutive_count").default(3_i64).mandatory()?.get();
+
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
     let (tx_cmd, rx_cmd) = channel::<HwCommand>();
@@ -340,7 +369,7 @@ fn run() -> Result<()> {
             if p.len() == arm_names.len() {
                 let _ = tx_arm.send(HwCommand {
                     arm_positions: Some(p),
-                    gripper_position: None,
+                    gripper_positions: None,
                 });
             }
         },
@@ -350,9 +379,22 @@ fn run() -> Result<()> {
     let _gripper_sub = node.create_subscription::<GripperCommand, _>(
         "/gripper_cmd",
         move |msg: GripperCommand| {
+            // 単一の position (ticks) を受け取り、全グリッパーに適用
+            let rad = driver::ticks_to_rad(msg.position as u32);
             let _ = tx_gripper.send(HwCommand {
                 arm_positions: None,
-                gripper_position: Some(driver::ticks_to_rad(msg.position as u32)),
+                gripper_positions: Some(vec![rad, rad]), // IDsの数に合わせる必要があるが、とりあえず2つ
+            });
+        },
+    )?;
+    
+    let tx_gripper_multi = tx_cmd.clone();
+    let _gripper_multi_sub = node.create_subscription::<std_msgs::msg::Float64MultiArray, _>(
+        "/gripper_controller/commands",
+        move |msg: std_msgs::msg::Float64MultiArray| {
+            let _ = tx_gripper_multi.send(HwCommand {
+                arm_positions: None,
+                gripper_positions: Some(msg.data.clone()),
             });
         },
     )?;
@@ -368,6 +410,7 @@ fn run() -> Result<()> {
 
     let shutdown_c = Arc::clone(&shutdown_flag);
     let estop_c = Arc::clone(&estop_flag);
+    let gripper_names = gripper_joints.clone();
     let hw_thread = thread::spawn(move || {
         hardware_thread(HardwareThreadParams {
             port_name,
@@ -384,6 +427,10 @@ fn run() -> Result<()> {
             joint_state_pub,
             gripper_status_pub,
             arm_joint_names: arm_joints,
+            gripper_joint_names: gripper_names,
+            use_grasp_detection,
+            grasp_effort_threshold,
+            grasp_consecutive_count: grasp_consecutive_count as u32,
             shutdown_flag: shutdown_c,
             estop_flag: estop_c,
         });

@@ -12,7 +12,7 @@ arm_gripper_driver:
     # グリッパー設定 (2サーボ: ミラー構成)
     gripper_joint: "gripper_joint"
     gripper_ids: [27, 28]
-    gripper_directions: [-1.0, -1.0]  # ID 27/28 両方を反転してみる
+    gripper_directions: [-1.0, 1.0]   # 27=CW閉じ(反転), 28=CCW閉じ(正方向)
     gripper_max_current: 600 # 握力制限 [mA]
 
     # ──────────────────────────────────────────────────────────────
