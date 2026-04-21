@@ -12,7 +12,8 @@ arm_gripper_driver:
     # グリッパー設定 (2サーボ: ミラー構成)
     gripper_joint: "gripper_joint"
     gripper_ids: [27, 28]
-    gripper_directions: [-1.0, -1.0]  # ID 27/28 両方を反転してみる
+    # ミラー構成のため、片方を反転 (1.0, -1.0)
+    gripper_directions: [1.0, -1.0]
     gripper_max_current: 600 # 握力制限 [mA]
 
     # ──────────────────────────────────────────────────────────────
@@ -30,5 +31,8 @@ arm_gripper_driver:
     # 方向反転 [j1..j6]: +1.0=正方向, -1.0=反転
     # 23番はウォームギアでURDF関節方向とサーボ回転方向が逆のため -1.0
     arm_directions: [1.0, 1.0, -1.0, 1.0, 1.0, 1.0]
+    # ギア減速比 [j1..j6]: physical_motor_angle = urdf_joint_angle * gear_ratio
+    # 21番(J1)=4:1, 22番(J2)=10:1, 23番(J3)=10:1 (ウォームギア)
+    arm_gear_ratios: [4.0, 10.0, 10.0, 1.0, 1.0, 1.0]
     arm_offsets: [0.0, 0.0, -2.4222, 0.0, 0.0, 0.0]  # [j1, j2, j3, j4, j5, j6]
     gripper_offsets: [0.0, 0.0]  # [gripper_id[0], gripper_id[1]]

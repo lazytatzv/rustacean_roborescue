@@ -41,6 +41,7 @@ struct HardwareThreadParams {
     gripper_ids: Vec<u8>,
     arm_directions: Vec<f64>,
     gripper_directions: Vec<f64>,
+    arm_gear_ratios: Vec<f64>,
     gripper_max_current: u16,
     arm_offsets: Vec<f64>,
     gripper_offsets: Vec<f64>,
@@ -60,6 +61,7 @@ fn hardware_thread(params: HardwareThreadParams) {
         params.gripper_ids.clone(),
         params.arm_directions.clone(),
         params.gripper_directions.clone(),
+        params.arm_gear_ratios.clone(),
         params.arm_offsets.clone(),
         params.gripper_offsets.clone(),
     ) {
@@ -157,7 +159,7 @@ fn hardware_thread(params: HardwareThreadParams) {
                 // 代表値 (最初のモーター) の publish
                 if let Some(s) = statuses.first() {
                     let msg = GripperStatus {
-                        position: s.position_rad as i32,
+                        position: s.position_ticks,
                         current: (s.current_a * 1000.0) as i16,
                         temperature: s.temperature_c,
                         ..Default::default()
@@ -170,6 +172,11 @@ fn hardware_thread(params: HardwareThreadParams) {
                         let id = params.gripper_ids[i];
                         let current_ma = (status.current_a * 1000.0).abs();
                         
+                        // エラーログ
+                        if status.hardware_error != 0 {
+                            eprintln!("🔥 arm_driver: Gripper ID {id} Hardware Error: 0x{:02X}", status.hardware_error);
+                        }
+
                         // 詳細ログ (1秒毎)
                         if loop_count % HW_LOOP_HZ == 0 {
                             println!("📊 arm_driver: Gripper ID {id}: pos={:.3} rad, current={:.1} mA, temp={} C",
@@ -284,6 +291,12 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let arm_directions: Vec<f64> = arm_directions_arr.to_vec();
+    let arm_gear_ratios_arr: Arc<[f64]> = node
+        .declare_parameter("arm_gear_ratios")
+        .default(Arc::from(vec![1.0_f64; 6].into_boxed_slice()))
+        .mandatory()?
+        .get();
+    let arm_gear_ratios: Vec<f64> = arm_gear_ratios_arr.to_vec();
     let gripper_directions_arr: Arc<[f64]> = node
         .declare_parameter("gripper_directions")
         .default(Arc::from(vec![1.0_f64, -1.0_f64].into_boxed_slice()))
@@ -352,7 +365,7 @@ fn run() -> Result<()> {
         move |msg: GripperCommand| {
             let _ = tx_gripper.send(HwCommand {
                 arm_positions: None,
-                gripper_position: Some(driver::ticks_to_rad(msg.position as u32)),
+                gripper_position: Some(driver::ticks_to_rad(msg.position as i32)),
             });
         },
     )?;
@@ -377,6 +390,7 @@ fn run() -> Result<()> {
             gripper_ids,
             arm_directions,
             gripper_directions,
+            arm_gear_ratios,
             gripper_max_current: gripper_max_current as u16,
             arm_offsets,
             gripper_offsets,
