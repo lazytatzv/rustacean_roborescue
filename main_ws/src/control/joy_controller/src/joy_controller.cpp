@@ -469,12 +469,12 @@ class JoyController : public rclcpp::Node
       msg.name     = {"arm_joint1", "arm_joint2", "arm_joint3",
                       "arm_joint4", "arm_joint5", "arm_joint6"};
       msg.velocity = {
-          smooth(nonlin(dz( ax(joy, AX_LEFT_X)))  * joint_scale_ * precision, prev_j_[0]),
-          smooth(nonlin(dz( ax(joy, AX_LEFT_Y)))  * joint_scale_ * precision, prev_j_[1]),
-          smooth(nonlin(dz( ax(joy, AX_RIGHT_Y))) * joint_scale_ * precision, prev_j_[2]),
-          smooth(nonlin(dz( ax(joy, AX_RIGHT_X))) * joint_scale_ * precision, prev_j_[3]),
-          smooth(static_cast<double>(r2 - l2)     * joint_scale_ * precision, prev_j_[4]),
-          smooth(nonlin(dz( ax(joy, AX_DPAD_Y)))  * joint_scale_ * precision, prev_j_[5]),
+          smooth(nonlin(dz( ax(joy, AX_LEFT_X)))  * joint_scale_ * precision, prev_j_[0]), // J1 (Yaw)
+          smooth(nonlin(dz(-ax(joy, AX_LEFT_Y)))  * joint_scale_ * precision, prev_j_[1]), // J2 (Shoulder)
+          smooth(nonlin(dz( ax(joy, AX_RIGHT_Y))) * joint_scale_ * precision, prev_j_[2]), // J3 (Elbow1)
+          smooth(nonlin(dz(-ax(joy, AX_RIGHT_X))) * joint_scale_ * precision, prev_j_[3]), // J4 (Elbow2)
+          smooth(static_cast<double>(r2 - l2)     * joint_scale_ * precision, prev_j_[4]), // J5 (Wrist Yaw)
+          smooth(nonlin(dz( ax(joy, AX_DPAD_Y)))  * joint_scale_ * precision, prev_j_[5]), // J6 (Wrist Pitch)
       };
       arm_joint_pub_->publish(msg);
 
