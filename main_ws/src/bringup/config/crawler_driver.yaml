@@ -3,7 +3,7 @@ crawler_driver:
     serial_port: "/dev/roboclaw" # ここはudevで名前を縛る必要がある
     baud_rate: 38400 # Roboclaw本体設定に合わせる
     crawler_circumference: 0.39
-    counts_per_rev: 256
+    counts_per_rev: 256.0
     gearhead_ratio: 66
     pulley_ratio: 2
     watchdog_timeout_ms: 500

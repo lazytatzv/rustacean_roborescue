@@ -206,7 +206,7 @@ def generate_launch_description() -> LaunchDescription:
 
     # direct モードでも同じ xacro (use_real_hw=false) を arm_controller に渡す
     if not urdf_file_path:
-        _, urdf_file_path = _generate_urdf(use_real_hw=False, dxl_model_folder="")
+        robot_description, urdf_file_path = _generate_urdf(use_real_hw=False, dxl_model_folder="")
 
     use_ros2_control = PythonExpression(
         [
