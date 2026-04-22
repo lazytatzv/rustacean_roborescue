@@ -140,9 +140,9 @@ def generate_launch_description() -> LaunchDescription:
         "arm_gripper_driver_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "arm_gripper_driver.yaml"]),
     )
-    arg_joy_params = DeclareLaunchArgument(
-        "joy_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
+    arg_arm_params = DeclareLaunchArgument(
+        "arm_params",
+        default_value=PathJoinSubstitution([bringup_share, "config", "arm_controller.yaml"]),
     )
 
     arg_use_crawler = DeclareLaunchArgument(
