@@ -29,6 +29,9 @@ arm_gripper_driver:
     # ──────────────────────────────────────────────────────────────
     # 方向反転 [j1..j6]: +1.0=正方向, -1.0=反転
     # 23番はウォームギアでURDF関節方向とサーボ回転方向が逆のため -1.0
-    arm_directions: [1.0, 1.0, -1.0, 1.0, 1.0, 1.0]
+    arm_directions: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     arm_offsets: [0.0, 0.0, -2.4222, 0.0, 0.0, 0.0]  # [j1, j2, j3, j4, j5, j6]
+    # 減速比 [j1..j6]: motor_rad = (urdf_rad + offset) * direction * reduction
+    # ギアボックス等がある場合に設定 (1.0 = ダイレクトドライブ)
+    arm_reductions: [4.0, 10.0, 10.0, 1.0, 1.0, 1.0]  # [j1(ID21), j2(ID22), j3(ID23), j4, j5, j6]
     gripper_offsets: [0.0, 0.0]  # [gripper_id[0], gripper_id[1]]

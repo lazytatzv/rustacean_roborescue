@@ -5,7 +5,7 @@ use anyhow::Result;
 use custom_interfaces::msg::{GripperCommand, GripperStatus};
 use driver::ArmDynamixelDriver;
 use rclrs::{
-    Context, CreateBasicExecutor, IntoPrimitiveOptions, Publisher, RclrsErrorFilter, SpinOptions,
+    Context, CreateBasicExecutor, Publisher, RclrsErrorFilter, SpinOptions,
 };
 use sensor_msgs::msg::JointState;
 use std::collections::HashMap;
@@ -41,9 +41,9 @@ struct HardwareThreadParams {
     gripper_ids: Vec<u8>,
     arm_directions: Vec<f64>,
     gripper_directions: Vec<f64>,
-    gripper_max_current: u16,
     arm_offsets: Vec<f64>,
     gripper_offsets: Vec<f64>,
+    arm_reductions: Vec<f64>,
     rx_cmd: Receiver<HwCommand>,
     joint_state_pub: Publisher<JointState>,
     gripper_status_pub: Publisher<GripperStatus>,
@@ -53,7 +53,6 @@ struct HardwareThreadParams {
     grasp_effort_threshold: f64,
     grasp_consecutive_count: u32,
     shutdown_flag: Arc<AtomicBool>,
-    estop_flag: Arc<AtomicBool>,
 }
 
 fn hardware_thread(params: HardwareThreadParams) {
@@ -66,6 +65,7 @@ fn hardware_thread(params: HardwareThreadParams) {
         params.gripper_directions.clone(),
         params.arm_offsets.clone(),
         params.gripper_offsets.clone(),
+        params.arm_reductions.clone(),
     ) {
         Ok(d) => d,
         Err(e) => {
@@ -76,7 +76,7 @@ fn hardware_thread(params: HardwareThreadParams) {
         }
     };
 
-    if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current) {
+    if let Err(e) = driver.init_motors(params.profile_velocity) {
         eprintln!("🔥 arm_gripper_driver: motor init failed: {e:#}");
         std::process::exit(1);
     }
@@ -84,8 +84,7 @@ fn hardware_thread(params: HardwareThreadParams) {
     let loop_period = Duration::from_millis(1000 / HW_LOOP_HZ);
     const TEMP_CHECK_INTERVAL: u64 = HW_LOOP_HZ / 10;
     let mut loop_count: u64 = 0;
-    let mut estop_was_active = false;
-    
+
     // Grasp detection state
     let mut over_count = 0;
     let mut is_holding = false;
@@ -93,31 +92,6 @@ fn hardware_thread(params: HardwareThreadParams) {
 
     while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
-        let estop_now = params.estop_flag.load(Ordering::Relaxed);
-
-        if estop_now {
-            if !estop_was_active {
-                driver.emergency_stop();
-                estop_was_active = true;
-                eprintln!("🛑 arm_driver: E-Stop active — torque disabled");
-            }
-            while params.rx_cmd.try_recv().is_ok() {}
-            let elapsed = loop_start.elapsed();
-            if elapsed < loop_period {
-                thread::sleep(loop_period - elapsed);
-            }
-            continue;
-        }
-
-        if estop_was_active {
-            eprintln!("✅ arm_driver: E-Stop cleared — re-enabling torque at current position");
-            if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current)
-            {
-                eprintln!("🔥 arm_driver: re-init after E-Stop failed: {e:#}");
-                std::process::exit(1);
-            }
-            estop_was_active = false;
-        }
 
         // コマンド処理
         while let Ok(cmd) = params.rx_cmd.try_recv() {
@@ -227,7 +201,6 @@ fn hardware_thread(params: HardwareThreadParams) {
                     eprintln!("🔥 arm_driver: Dynamixel ID {id} CRITICAL temperature: {temp}°C — disabling torque");
                 }
                 driver.torque_off_all();
-                params.estop_flag.store(true, Ordering::Relaxed);
             }
         }
 
@@ -314,11 +287,6 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let gripper_directions: Vec<f64> = gripper_directions_arr.to_vec();
-    let gripper_max_current: i64 = node
-        .declare_parameter("gripper_max_current")
-        .default(500_i64)
-        .mandatory()?
-        .get();
     let profile_velocity: i64 = node
         .declare_parameter("profile_velocity")
         .default(100_i64)
@@ -339,6 +307,12 @@ fn run() -> Result<()> {
         .mandatory()?
         .get();
     let gripper_offsets: Vec<f64> = gripper_offsets_arr.to_vec();
+    let arm_reductions_arr: Arc<[f64]> = node
+        .declare_parameter("arm_reductions")
+        .default(Arc::from(vec![1.0_f64; 6].into_boxed_slice()))
+        .mandatory()?
+        .get();
+    let arm_reductions: Vec<f64> = arm_reductions_arr.to_vec();
 
     // Grasp Detection Parameters
     let use_grasp_detection = node.declare_parameter("use_grasp_detection").default(true).mandatory()?.get();
@@ -349,7 +323,6 @@ fn run() -> Result<()> {
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
     let (tx_cmd, rx_cmd) = channel::<HwCommand>();
     let shutdown_flag = Arc::new(AtomicBool::new(false));
-    let estop_flag = Arc::new(AtomicBool::new(false));
 
     let tx_arm = tx_cmd.clone();
     let arm_names = arm_joints.clone();
@@ -399,17 +372,7 @@ fn run() -> Result<()> {
         },
     )?;
 
-    // /emergency_stop subscriber (transient_local: 再起動直後も latched 値を受信)
-    let estop_sub_flag = Arc::clone(&estop_flag);
-    let _estop_sub = node.create_subscription::<std_msgs::msg::Bool, _>(
-        "/emergency_stop".reliable().transient_local().keep_last(1),
-        move |msg: std_msgs::msg::Bool| {
-            estop_sub_flag.store(msg.data, Ordering::Relaxed);
-        },
-    )?;
-
     let shutdown_c = Arc::clone(&shutdown_flag);
-    let estop_c = Arc::clone(&estop_flag);
     let gripper_names = gripper_joints.clone();
     let hw_thread = thread::spawn(move || {
         hardware_thread(HardwareThreadParams {
@@ -420,9 +383,9 @@ fn run() -> Result<()> {
             gripper_ids,
             arm_directions,
             gripper_directions,
-            gripper_max_current: gripper_max_current as u16,
             arm_offsets,
             gripper_offsets,
+            arm_reductions,
             rx_cmd,
             joint_state_pub,
             gripper_status_pub,
@@ -432,7 +395,6 @@ fn run() -> Result<()> {
             grasp_effort_threshold,
             grasp_consecutive_count: grasp_consecutive_count as u32,
             shutdown_flag: shutdown_c,
-            estop_flag: estop_c,
         });
     });
 
