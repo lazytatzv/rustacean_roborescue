@@ -402,28 +402,8 @@ fn run() -> Result<()> {
     let mut last_js_count: u64 = 0;
     let mut last_diag_instant = Instant::now();
 
-    // Setup a background worker for IK to avoid blocking the timer callback
-    let (req_tx, req_rx): (SyncSender<WorkerRequest>, Receiver<WorkerRequest>) = sync_channel(1);
-    let (res_tx, res_rx): (SyncSender<WorkerResponse>, Receiver<WorkerResponse>) = sync_channel(1);
-
-    let serial_for_worker = serial_chain.clone();
-    let limits_for_worker = limits.clone();
-    let cfg_for_worker = cfg.clone();
-    std::thread::spawn(move || {
-        while let Ok((twist_vec, positions)) = req_rx.recv() {
-            let res = solve_velocity_ik(
-                &serial_for_worker,
-                &twist_vec,
-                &limits_for_worker,
-                &positions,
-                &cfg_for_worker,
-            );
-            let vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
-            let _ = res_tx.send((vel, res.manipulability));
-        }
-    });
-
-    let mut last_worker_result: Option<(Vec<f64>, f64)> = None;
+    let limits_for_timer = limits.clone();
+    let cfg_for_timer = cfg.clone();
 
     let _timer = node.create_timer_repeating(control_period, move || {
         loop_count += 1;
@@ -468,61 +448,57 @@ fn run() -> Result<()> {
         pose_msg.pose.orientation.w = q.coords[3];
         let _ = pose_pub.publish(&pose_msg);
 
-        if loop_count % 50 == 0 {
-            println!(
-                "📊 EE Pose: x={:.3}, y={:.3}, z={:.3}",
-                iso.translation.vector[0], iso.translation.vector[1], iso.translation.vector[2]
-            );
-        }
-
-        let joint_velocities: na::DVector<f64>;
+        let final_vel: Vec<f64>;
         if s.last_cmd_time.elapsed() > watchdog_timeout {
-            joint_velocities = na::DVector::zeros(dof);
-            // Sync target to feedback when stationary to prevent drift buildup
+            final_vel = vec![0.0; dof];
             s.target_positions = Some(current_positions.clone());
         } else if s.is_ik_mode {
             let twist_vec = na::DVector::from_column_slice(&s.target_twist);
             let is_twist_zero = twist_vec.iter().all(|&v| v.abs() < 1e-6);
 
             if is_twist_zero {
-                joint_velocities = na::DVector::zeros(dof);
-                // Clear the worker result to avoid using it in the next cycle
-                last_worker_result = Some((vec![0.0; dof], 1.0));
+                final_vel = vec![0.0; dof];
             } else {
-                // Try to enqueue a request for the worker (non-blocking)
-                let _ = req_tx.try_send((twist_vec.clone(), current_positions.clone()));
-                // Try to collect a worker result if available
-                if let Ok(res) = res_rx.try_recv() {
-                    last_worker_result = Some(res);
+                // Synchronous IK calculation
+                let res = solve_velocity_ik(
+                    &serial_chain,
+                    &twist_vec,
+                    &limits_for_timer,
+                    &current_positions,
+                    &cfg_for_timer,
+                );
+                
+                let raw_vel: Vec<f64> = res.joint_velocities.iter().copied().collect();
+                let scale = limits_for_timer.velocity_scale(&current_positions, &raw_vel, cfg_for_timer.joint_limit_margin);
+                
+                // --- LIMIT LOGGING (Throttled to ~1Hz) ---
+                if loop_count % 50 == 0 {
+                    for (i, &s) in scale.iter().enumerate() {
+                        if s < 0.5 && raw_vel[i].abs() > 1e-3 {
+                            println!("⚠️  Limit: {} (Servo #{})", names_clone[i], i+1);
+                        }
+                    }
                 }
-                if let Some((ref vel_vec, manipulability)) = last_worker_result {
-                    joint_velocities = na::DVector::from_vec(vel_vec.clone());
-                    if loop_count % 50 == 0 && manipulability < 0.001 {
-                        println!("⚠️ Low manipulability: {:.6}", manipulability);
-                    }
-                    // publish manipulability occasionally
-                    if loop_count % 5 == 0 {
-                        let mmsg = std_msgs::msg::Float64 {
-                            data: manipulability,
-                        };
-                        let _ = diag_manip_pub.publish(&mmsg);
-                    }
-                } else {
-                    // no worker result yet: fallback to zeros to avoid blocking
-                    joint_velocities = na::DVector::zeros(dof);
+
+                final_vel = raw_vel
+                    .iter()
+                    .zip(scale.iter())
+                    .map(|(&v, &sc)| (v * sc).clamp(-cfg_for_timer.joint_vel_limit, cfg_for_timer.joint_vel_limit))
+                    .collect();
+
+                if loop_count % 5 == 0 {
+                    let _ = diag_manip_pub.publish(&std_msgs::msg::Float64 { data: res.manipulability });
                 }
             }
         } else {
-            joint_velocities = na::DVector::from_vec(s.target_joint_vel.clone());
+            let raw_vel = s.target_joint_vel.clone();
+            let scale = limits_for_timer.velocity_scale(&current_positions, &raw_vel, cfg_for_timer.joint_limit_margin);
+            final_vel = raw_vel
+                .iter()
+                .zip(scale.iter())
+                .map(|(&v, &sc)| (v * sc).clamp(-cfg_for_timer.joint_vel_limit, cfg_for_timer.joint_vel_limit))
+                .collect();
         }
-
-        let raw_vel: Vec<f64> = joint_velocities.iter().copied().collect();
-        let scale = limits.velocity_scale(&current_positions, &raw_vel, cfg.joint_limit_margin);
-        let final_vel: Vec<f64> = raw_vel
-            .iter()
-            .zip(scale.iter())
-            .map(|(&v, &sc)| (v * sc).clamp(-cfg.joint_vel_limit, cfg.joint_vel_limit))
-            .collect();
 
         // Integrate from target_positions for smoothness, but keep it tethered to feedback
         let mut new_targets: Vec<f64> = target_positions

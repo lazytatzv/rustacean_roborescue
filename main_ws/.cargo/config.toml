@@ -1,6 +1,9 @@
 [patch.crates-io.test_msgs]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/test_msgs/rust"
 
+[patch.crates-io.arm_driver]
+path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/arm_driver/rust"
+
 [patch.crates-io.type_description_interfaces]
 path = "/home/tatsv/working/rustacean_roborescue/main_ws/install/share/type_description_interfaces/rust"
 

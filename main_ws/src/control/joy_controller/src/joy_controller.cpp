@@ -326,25 +326,15 @@ class JoyController : public rclcpp::Node
         switch (mode_) {
           case Mode::ARM:
             mode_ = Mode::JOINT;
-            RCLCPP_INFO(get_logger(), "Mode: JOINT (Rust direct)");
+            RCLCPP_INFO(get_logger(), "Mode: JOINT (Direct control)");
             break;
           case Mode::JOINT:
-            if (use_servo_mode_) {
-              mode_          = Mode::SERVO;
-              servo_cmd_type_ = -1;
-              RCLCPP_INFO(get_logger(), "Mode: SERVO (MoveIt Servo; needs moveit_servo.launch.py)");
-            } else {
-              mode_ = Mode::ARM;
-              RCLCPP_INFO(get_logger(), "Mode: ARM (Rust IK)");
-            }
-            break;
-          case Mode::SERVO:
             mode_ = Mode::ARM;
-            RCLCPP_INFO(get_logger(), "Mode: ARM (Rust IK)");
+            RCLCPP_INFO(get_logger(), "Mode: ARM (Inverse Kinematics)");
             break;
           default:
             mode_ = Mode::ARM;
-            RCLCPP_INFO(get_logger(), "Mode: ARM (Rust IK)");
+            RCLCPP_INFO(get_logger(), "Mode: ARM (Inverse Kinematics)");
             break;
         }
       }
