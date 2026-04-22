@@ -365,3 +365,355 @@ impl ArmDynamixelDriver {
         println!("✅ arm_driver: Reboot complete");
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Unit tests — ハードウェア不要、変換関数の数学的正しさを検証
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f64::consts::PI;
+
+    const COUNTS: f64 = COUNTS_PER_REV; // 4096.0
+    const HALF: f64 = COUNTS_PER_REV / 2.0; // 2048.0
+
+    // ─── rad_to_ticks_ext / ticks_to_rad_ext 基本 ────────────────────────
+
+    #[test]
+    fn ext_zero_rad_is_2048_ticks() {
+        assert_eq!(rad_to_ticks_ext(0.0), 2048);
+    }
+
+    #[test]
+    fn ext_2pi_rad_is_6144_ticks() {
+        // 2π → (2π / 2π) * 4096 + 2048 = 4096 + 2048 = 6144
+        assert_eq!(rad_to_ticks_ext(2.0 * PI), 6144);
+    }
+
+    #[test]
+    fn ext_neg_2pi_rad_is_neg2048_ticks() {
+        // -2π → -4096 + 2048 = -2048
+        assert_eq!(rad_to_ticks_ext(-2.0 * PI), -2048);
+    }
+
+    #[test]
+    fn ext_pi_rad_is_4096_ticks() {
+        assert_eq!(rad_to_ticks_ext(PI), 4096);
+    }
+
+    #[test]
+    fn ext_neg_pi_rad_is_zero_ticks() {
+        assert_eq!(rad_to_ticks_ext(-PI), 0);
+    }
+
+    #[test]
+    fn ext_ticks_center_is_zero_rad() {
+        assert!((ticks_to_rad_ext(2048) - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ext_ticks_6144_is_2pi_rad() {
+        assert!((ticks_to_rad_ext(6144) - 2.0 * PI).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ext_ticks_neg2048_is_neg_2pi_rad() {
+        assert!((ticks_to_rad_ext(-2048) - (-2.0 * PI)).abs() < 1e-9);
+    }
+
+    // ─── ラウンドトリップ: rad → ticks → rad ─────────────────────────────
+
+    #[test]
+    fn ext_roundtrip_various_angles() {
+        // 量子化誤差上限: 2π / 4096 ≈ 0.001534 rad
+        let max_err = 2.0 * PI / COUNTS;
+        let angles = [
+            -5.0 * PI, -3.0 * PI, -PI, -PI / 2.0, -PI / 4.0,
+            0.0, PI / 4.0, PI / 2.0, PI, 3.0 * PI, 5.0 * PI,
+        ];
+        for &a in &angles {
+            let t = rad_to_ticks_ext(a);
+            let back = ticks_to_rad_ext(t);
+            let err = (back - a).abs();
+            assert!(
+                err <= max_err + 1e-12,
+                "roundtrip error for {:.4} rad: {:.6} (ticks={})", a, err, t
+            );
+        }
+    }
+
+    #[test]
+    fn ext_roundtrip_monotone() {
+        // rad_to_ticks_ext は単調増加であることを確認
+        let angles: Vec<f64> = (-10..=10).map(|i| i as f64 * PI / 5.0).collect();
+        let ticks: Vec<i32> = angles.iter().map(|&a| rad_to_ticks_ext(a)).collect();
+        for i in 0..ticks.len() - 1 {
+            assert!(
+                ticks[i] <= ticks[i + 1],
+                "rad_to_ticks_ext must be monotone: [{i}]={} > [{}]={}",
+                ticks[i], i + 1, ticks[i + 1]
+            );
+        }
+    }
+
+    #[test]
+    fn ext_quantization_bound() {
+        // 1 tick = 2π/4096 rad ≈ 0.001534 rad (< 0.088°)
+        let one_tick_rad = 2.0 * PI / COUNTS;
+        println!("[quant] 1 tick = {:.6} rad = {:.4}°", one_tick_rad, one_tick_rad.to_degrees());
+        assert!(one_tick_rad < 0.002);
+    }
+
+    // ─── グリッパー用 rad_to_ticks / ticks_to_rad ────────────────────────
+
+    #[test]
+    fn gripper_zero_is_2048() {
+        assert_eq!(rad_to_ticks(0.0), 2048);
+    }
+
+    #[test]
+    fn gripper_clamps_to_0_4095() {
+        assert_eq!(rad_to_ticks(-100.0), 0);
+        assert_eq!(rad_to_ticks(100.0), 4095);
+    }
+
+    #[test]
+    fn gripper_roundtrip() {
+        let angles = [-PI / 2.0, -PI / 4.0, 0.0, PI / 4.0, PI / 2.0];
+        let max_err = 2.0 * PI / COUNTS;
+        for &a in &angles {
+            let t = rad_to_ticks(a);
+            let back = ticks_to_rad(t);
+            let err = (back - a).abs();
+            assert!(err <= max_err + 1e-12,
+                    "gripper roundtrip error for {:.4} rad: {:.6}", a, err);
+        }
+    }
+
+    // ─── 角速度変換 raw_vel_to_rad_s ─────────────────────────────────────
+
+    #[test]
+    fn vel_zero_is_zero() {
+        assert_eq!(raw_vel_to_rad_s(0), 0.0);
+    }
+
+    #[test]
+    fn vel_1lsb_equals_0229rpm_in_rad_s() {
+        // 0.229 RPM = 0.229 * 2π / 60 rad/s
+        let expected = VEL_UNIT_RPM * 2.0 * PI / 60.0;
+        let result = raw_vel_to_rad_s(1);
+        println!("[vel] 1 LSB = {:.6} rad/s", result);
+        assert!((result - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn vel_sign_symmetric() {
+        let pos = raw_vel_to_rad_s(100);
+        let neg = raw_vel_to_rad_s(-100);
+        assert!((pos + neg).abs() < 1e-12);
+    }
+
+    #[test]
+    fn vel_proportional() {
+        // 2倍の生値 → 2倍のrad/s
+        let v1 = raw_vel_to_rad_s(50);
+        let v2 = raw_vel_to_rad_s(100);
+        assert!((v2 / v1 - 2.0).abs() < 1e-12);
+    }
+
+    // ─── 電流変換 raw_current_to_a ────────────────────────────────────────
+
+    #[test]
+    fn current_zero_is_zero() {
+        assert_eq!(raw_current_to_a(0), 0.0);
+    }
+
+    #[test]
+    fn current_1lsb_is_2p69ma() {
+        let result = raw_current_to_a(1);
+        assert!((result - 0.00269).abs() < 1e-12);
+    }
+
+    #[test]
+    fn current_sign_symmetric() {
+        let pos = raw_current_to_a(500);
+        let neg = raw_current_to_a(-500);
+        assert!((pos + neg).abs() < 1e-12);
+    }
+
+    // ─── 減速比・オフセット・方向の変換計算 ──────────────────────────────
+    // 公式: motor_rad = (urdf_rad + offset) * direction * reduction
+    //       urdf_rad  = ticks_to_rad_ext(ticks) / direction / reduction - offset
+
+    fn to_motor(urdf: f64, offset: f64, dir: f64, red: f64) -> f64 {
+        (urdf + offset) * dir * red
+    }
+
+    fn from_motor(motor: f64, offset: f64, dir: f64, red: f64) -> f64 {
+        motor / dir / red - offset
+    }
+
+    #[test]
+    fn joint1_red4_zero_maps_to_zero() {
+        // joint1: offset=0, dir=1, red=4
+        assert!((to_motor(0.0, 0.0, 1.0, 4.0) - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn joint1_red4_one_rad_maps_to_4rad() {
+        assert!((to_motor(1.0, 0.0, 1.0, 4.0) - 4.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn joint2_red10_zero_maps_to_zero() {
+        assert!((to_motor(0.0, 0.0, 1.0, 10.0) - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn joint2_red10_lower_limit() {
+        // joint2 lower=-6.28 → motor = -62.8 rad
+        let motor = to_motor(-6.28, 0.0, 1.0, 10.0);
+        assert!((motor - (-62.8)).abs() < 1e-9, "motor={}", motor);
+    }
+
+    #[test]
+    fn joint3_offset_red10_zero() {
+        // joint3: offset=-2.4222, red=10, dir=1
+        // URDF=0 → motor = (0 + (-2.4222)) * 1 * 10 = -24.222
+        let motor = to_motor(0.0, -2.4222, 1.0, 10.0);
+        assert!((motor - (-24.222)).abs() < 1e-9, "motor={}", motor);
+    }
+
+    #[test]
+    fn joint3_zero_urdf_produces_large_negative_ticks() {
+        // joint3 URDF=0 → motor=-24.222 rad → 大きな負のtick値
+        let motor = to_motor(0.0, -2.4222, 1.0, 10.0);
+        let ticks = rad_to_ticks_ext(motor);
+        let expected = (motor / (2.0 * PI) * COUNTS + HALF).round() as i32;
+        println!("[joint3 zero] motor={:.3}rad ticks={} expected={}", motor, ticks, expected);
+        assert_eq!(ticks, expected);
+        assert!(ticks < -10000, "joint3 URDF=0 must produce large negative ticks (got {})", ticks);
+    }
+
+    #[test]
+    fn all_6_joints_roundtrip_urdf_to_ticks_and_back() {
+        // 実際のパラメータ設定で全関節のラウンドトリップを確認
+        // arm_gripper_driver.yaml の値
+        let offsets    = [0.0,     0.0,     -2.4222, 0.0, 0.0, 0.0];
+        let directions = [1.0_f64; 6];
+        let reductions = [4.0,    10.0,     10.0,    1.0, 1.0, 1.0];
+
+        // joint2はupper=0なので負の値のみ, 他は±1.0
+        let test_angles: &[&[f64]] = &[
+            &[-1.0, -0.5, 0.0, 0.5],      // j1
+            &[-1.0, -0.5, 0.0],            // j2 (upper=0)
+            &[-1.0, -0.5, 0.0, 0.5],      // j3
+            &[-1.0, -0.5, 0.0, 0.5],      // j4
+            &[-1.0, -0.5, 0.0, 0.5],      // j5
+            &[-1.0, -0.5, 0.0, 0.5],      // j6
+        ];
+
+        for j in 0..6 {
+            let off = offsets[j];
+            let dir = directions[j];
+            let red = reductions[j];
+            let max_err = 2.0 * PI / (COUNTS * red); // 減速比によって分解能向上
+
+            for &urdf in test_angles[j] {
+                let motor = to_motor(urdf, off, dir, red);
+                let ticks = rad_to_ticks_ext(motor);
+                let motor_back = ticks_to_rad_ext(ticks);
+                let urdf_back = from_motor(motor_back, off, dir, red);
+                let err = (urdf_back - urdf).abs();
+                println!("[j{} red={:.0}] URDF={:.3} → ticks={} → back={:.6} err={:.8}",
+                         j + 1, red, urdf, ticks, urdf_back, err);
+                assert!(
+                    err <= max_err + 1e-12,
+                    "joint{} roundtrip error {:.8} exceeds max {:.8} (red={})",
+                    j + 1, err, max_err, red
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn resolution_improves_with_reduction() {
+        // 減速比が大きいほど角度分解能が高い
+        let res_direct = 2.0 * PI / COUNTS;       // reduction=1: ≈ 0.001534 rad/tick
+        let res_red4   = 2.0 * PI / (COUNTS * 4.0);  // joint1: ≈ 0.000383 rad/tick
+        let res_red10  = 2.0 * PI / (COUNTS * 10.0); // joint2,3: ≈ 0.000153 rad/tick
+        println!("[resolution] direct={:.6} red4={:.6} red10={:.6}", res_direct, res_red4, res_red10);
+        assert!(res_red4 < res_direct,  "reduction=4 should give finer resolution");
+        assert!(res_red10 < res_red4,   "reduction=10 should give finer resolution than 4");
+        assert!(res_red10 < 0.0002,     "joint2,3 resolution < 0.2 mrad");
+    }
+
+    #[test]
+    fn direction_inversion_flips_sign() {
+        // direction=-1 のとき ticks が逆方向になる
+        let urdf = 1.0_f64;
+        let ticks_pos = rad_to_ticks_ext(to_motor(urdf, 0.0,  1.0, 1.0));
+        let ticks_neg = rad_to_ticks_ext(to_motor(urdf, 0.0, -1.0, 1.0));
+        // center = 2048 → 2048 + delta と 2048 - delta
+        let delta_pos = ticks_pos - 2048;
+        let delta_neg = ticks_neg - 2048;
+        println!("[dir invert] ticks_pos={} ticks_neg={}", ticks_pos, ticks_neg);
+        assert_eq!(delta_pos, -delta_neg, "direction inversion must flip tick delta");
+    }
+
+    #[test]
+    fn gripper_mirror_symmetric() {
+        // グリッパー: directions=[-1, +1] で同じURDF角度がミラー対称なtickに
+        let urdf = 0.5_f64;
+        let offset = 0.0;
+        let t0 = rad_to_ticks_ext(to_motor(urdf, offset, -1.0, 1.0));
+        let t1 = rad_to_ticks_ext(to_motor(urdf, offset,  1.0, 1.0));
+        let d0 = t0 - 2048;
+        let d1 = t1 - 2048;
+        println!("[gripper mirror] t0={} t1={} d0={} d1={}", t0, t1, d0, d1);
+        assert_eq!(d0, -d1, "gripper motors must be mirror-symmetric in ticks");
+    }
+
+    #[test]
+    fn write_read_logical_roundtrip_all_joints() {
+        // write_arm_positions と read_arm_positions のロジックを関数レベルで確認
+        // (ハードウェアなし: ticks変換のみを検証)
+        let offsets    = [0.0,  0.0,  -2.4222, 0.0, 0.0, 0.0];
+        let directions = [1.0_f64; 6];
+        let reductions = [4.0, 10.0,  10.0,    1.0, 1.0, 1.0];
+
+        let input_positions = [-0.5_f64, -0.5, 0.3, -0.3, 0.5, 0.2];
+
+        // write: urdf → ticks
+        let ticks: Vec<i32> = (0..6).map(|i| {
+            rad_to_ticks_ext((input_positions[i] + offsets[i]) * directions[i] * reductions[i])
+        }).collect();
+
+        // read: ticks → urdf
+        let recovered: Vec<f64> = (0..6).map(|i| {
+            ticks_to_rad_ext(ticks[i]) / directions[i] / reductions[i] - offsets[i]
+        }).collect();
+
+        for i in 0..6 {
+            let err = (recovered[i] - input_positions[i]).abs();
+            let max_err = 2.0 * PI / (COUNTS * reductions[i]);
+            println!("[write→read j{}] in={:.4} out={:.6} err={:.8} max={:.8}",
+                     i + 1, input_positions[i], recovered[i], err, max_err);
+            assert!(err <= max_err + 1e-12,
+                    "joint{} write→read error {:.8} exceeds {:.8}", i + 1, err, max_err);
+        }
+    }
+
+    #[test]
+    fn joint3_offset_effect_on_zero_position() {
+        // offset=-2.4222があることでURDF 0 rad ≠ DXL tick 2048 になることを確認
+        // (offset=0のjoint1との比較)
+        let ticks_j1_zero = rad_to_ticks_ext(to_motor(0.0, 0.0,    1.0, 4.0));
+        let ticks_j3_zero = rad_to_ticks_ext(to_motor(0.0, -2.4222, 1.0, 10.0));
+        println!("[offset effect] j1 URDF=0 → ticks={}", ticks_j1_zero);
+        println!("[offset effect] j3 URDF=0 → ticks={}", ticks_j3_zero);
+        // j1のゼロはDXL center (2048), j3のゼロはずれている
+        assert_eq!(ticks_j1_zero, 2048, "joint1 URDF=0 must be DXL center tick");
+        assert_ne!(ticks_j3_zero, 2048, "joint3 URDF=0 must NOT be DXL center tick due to offset");
+    }
+}
