@@ -248,11 +248,30 @@ impl ArmDynamixelDriver {
             .zip(self.arm_offsets.iter())
             .zip(self.arm_directions.iter())
             .zip(self.arm_gear_ratios.iter())
-            .map(|((((&id, &rad), &offset), &dir), &ratio)| SyncWriteData {
-                motor_id: id,
-                data: rad_to_ticks((rad + offset) * dir * ratio) as u32,
+            .enumerate()
+            .map(|(i, ((((&id, &rad), &offset), &dir), &ratio))| {
+                let ticks = rad_to_ticks((rad + offset) * dir * ratio);
+                // --- DEBUG: Print math once every ~5 seconds (at 50Hz) ---
+                if id == self.arm_ids[0] && (ticks % 100 == 0) { // Slight throttle logic
+                     // Only print for J1 to keep it clean, or use a proper counter
+                }
+                SyncWriteData {
+                    motor_id: id,
+                    data: ticks as u32,
+                }
             })
             .collect();
+        
+        // Simple periodic debug summary
+        static mut COUNT: u64 = 0;
+        unsafe {
+            COUNT += 1;
+            if COUNT % 250 == 0 {
+                println!("🛠️ [Arm Math Check] URDF[J1]={:.3}rad -> Ratio:{:.1}*Dir:{:.1} -> Ticks:{}", 
+                    positions_rad[0], self.arm_gear_ratios[0], self.arm_directions[0], rad_to_ticks((positions_rad[0] + self.arm_offsets[0]) * self.arm_directions[0] * self.arm_gear_ratios[0]));
+            }
+        }
+
         self.bus
             .sync_write_u32(ADDR_GOAL_POSITION, &commands)
             .map_err(|e| anyhow::anyhow!("{:?}", e))

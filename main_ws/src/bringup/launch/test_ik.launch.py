@@ -43,7 +43,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             LaunchConfiguration("arm_params"),
-            {"urdf_path": os.path.join(bringup_dir, "urdf", "sekirei.urdf")},
+            {"robot_description": robot_description},
         ],
     )
 

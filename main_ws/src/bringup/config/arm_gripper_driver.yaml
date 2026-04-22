@@ -1,38 +1,29 @@
-# アームとグリッパーの統合設定 (同じRS485バスに接続)
+# アームとグリッパーの統合設定 (実績のある MoveIt2/sekirei_moveit.xacro に準拠)
 arm_gripper_driver:
   ros__parameters:
-    port_name: "/dev/dynamixel_arm"  # udev: deploy/99-robot.rules の dynamixel_arm symlink
-    baud_rate: 1000000 # アーム側の高速通信に合わせるのが一般的
+    port_name: "/dev/dynamixel_arm"
+    baud_rate: 1000000
 
-    # 腕ジョイント設定: 名称とIDの対応
     arm_joints: ["arm_joint1", "arm_joint2", "arm_joint3", "arm_joint4", "arm_joint5", "arm_joint6"]
     arm_ids: [21, 22, 23, 24, 25, 26]
     profile_velocity: 100
 
-    # グリッパー設定 (2サーボ: ミラー構成)
     gripper_joint: "gripper_joint"
     gripper_ids: [27, 28]
-    # ミラー構成のため、片方を反転 (1.0, -1.0)
     gripper_directions: [1.0, -1.0]
-    gripper_max_current: 600 # 握力制限 [mA]
+    gripper_max_current: 600
 
     # ──────────────────────────────────────────────────────────────
-    # ゼロ点オフセット [rad]: physical_angle = urdf_angle + offset
-    #
-    # Dynamixel tick 2048 が URDF joint 0 rad と一致しない場合に設定。
-    # 測定方法:
-    #   1. アームを URDF ゼロ姿勢 (arm_joint2=0 = 水平, 等) に手動で合わせる
-    #   2. `ros2 topic echo /joint_states` で報告される角度を読む
-    #   3. offset = -(報告値)  [報告値がゼロになるように打ち消す]
-    #
-    # Dynamixel Wizard で Homing Offset レジスタ (addr 20) を設定済みの場合は
-    # すべて 0.0 のままで問題ない。
-    # ──────────────────────────────────────────────────────────────
     # 方向反転 [j1..j6]: +1.0=正方向, -1.0=反転
-    # 23番はウォームギアでURDF関節方向とサーボ回転方向が逆のため -1.0
-    arm_directions: [1.0, 1.0, -1.0, 1.0, 1.0, 1.0]
+    # ros2_control の Drive Mode 1 (反転) 設定を反映: J1 と J3 を反転
+    # ──────────────────────────────────────────────────────────────
+    arm_directions: [-1.0, 1.0, -1.0, 1.0, 1.0, 1.0]
+
     # ギア減速比 [j1..j6]: physical_motor_angle = urdf_joint_angle * gear_ratio
-    # 21番(J1)=4:1, 22番(J2)=10:1, 23番(J3)=10:1 (ウォームギア)
-    arm_gear_ratios: [4.0, 10.0, 10.0, 1.0, 1.0, 1.0]
-    arm_offsets: [0.0, 0.0, -2.4222, 0.0, 0.0, 0.0]  # [j1, j2, j3, j4, j5, j6]
-    gripper_offsets: [0.0, 0.0]  # [gripper_id[0], gripper_id[1]]
+    # sekirei_moveit.xacro の mechanicalReduction=20 に完全に合わせる
+    arm_gear_ratios: [20.0, 20.0, 20.0, 1.0, 1.0, 1.0]
+
+    # ゼロ点オフセット [rad]
+    # 実機の実績値 -2.4222 を継承
+    arm_offsets: [0.0, 0.0, -2.4222, 0.0, 0.0, 0.0]
+    gripper_offsets: [0.0, 0.0]
