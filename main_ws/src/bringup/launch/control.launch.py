@@ -127,10 +127,11 @@ def generate_launch_description() -> LaunchDescription:
         "flipper_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "flipper_driver.yaml"]),
     )
-    arg_arm_params = DeclareLaunchArgument(
-        "arm_params",
-        default_value=PathJoinSubstitution([bringup_share, "config", "arm_controller.yaml"]),
+    arg_joy_params = DeclareLaunchArgument(
+        "joy_params",
+        default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
     )
+
     arg_sensor_gw_params = DeclareLaunchArgument(
         "sensor_gw_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "sensor_gateway.yaml"]),
@@ -143,6 +144,7 @@ def generate_launch_description() -> LaunchDescription:
         "joy_params",
         default_value=PathJoinSubstitution([bringup_share, "config", "joy_controller.yaml"]),
     )
+
     arg_use_crawler = DeclareLaunchArgument(
         "use_crawler", default_value="true", description="Roboclaw 走行ドライバを有効にする"
     )
@@ -283,7 +285,7 @@ def generate_launch_description() -> LaunchDescription:
         output="both",
         parameters=[
             LaunchConfiguration("arm_params"),
-            {"urdf_path": urdf_file_path},
+            {"robot_description": robot_description},
         ],
         condition=IfCondition(use_arm_effective),
         **ctrl_respawn,

@@ -1,12 +1,24 @@
 joy_controller:
   ros__parameters:
-    max_speed: 1.0           # クローラ最大速度 [m/s]
-    deadzone: 0.1            # スティックデッドゾーン閾値
-    flipper_speed: 1000      # フリッパ速度 [Dynamixel units]
-    arm_linear_scale: 0.3    # アーム手先移動速度スケール [m/s]
-    arm_angular_scale: 0.25  # アーム手先回転速度スケール [rad/s]
-    gripper_open_position: 1500   # グリッパ開き目標位置 [Dynamixel ticks 0-4095]
-    gripper_close_position: 2600  # グリッパ閉じ目標位置 [Dynamixel ticks 0-4095]
-    gripper_max_current: 600      # グリッパ電流制限 [mA]
-    gripper_effort_threshold: 300 # 保持検出電流閾値 [mA]
-    use_grasp_detection: true    # 保持検出を有効化
+    # --- 走行（Crawler）の設定 ---
+    max_speed: 0.7            # 最高前進速度 [m/s]
+    deadzone: 0.1             # スティック遊び
+    
+    # --- フリッパー（Sub-crawler）の設定 ---
+    flipper_speed: 1000       # 回転速度 [tick/s]
+    
+    # --- アーム（IK/JOINT）の操作感 ---
+    arm_linear_scale: 0.6     # IKモードの移動速さ
+    arm_angular_scale: 0.5    # IKモードの回転速さ
+    joint_speed_scale: 0.5    # JOINTモードの回転速さ
+    alpha: 0.2                # 指令値の平滑化（大きいほど機敏）
+    max_acc: 2.0              # 加速度制限
+    
+    # --- グリッパー（Gripper）の設定 ---
+    gripper_open_position: 1500
+    gripper_close_position: 2600
+    gripper_max_current: 600       # 保持中の最大電流 [mA]
+    gripper_effort_threshold: 400  # 把握検出のしきい値 [mA]
+    
+    # --- システム ---
+    joy_timeout_sec: 0.25

@@ -16,11 +16,14 @@ const ADDR_GOAL_POSITION: u16 = 116; // 4 bytes
 const ADDR_PRESENT_CURRENT: u16 = 126; // 2 bytes (signed)
 const ADDR_PRESENT_VELOCITY: u16 = 128; // 4 bytes (signed)
 const ADDR_PRESENT_POSITION: u16 = 132; // 4 bytes
+const ADDR_HARDWARE_ERROR_STATUS: u16 = 70; // 1 byte
 const ADDR_CURRENT_LIMIT: u16 = 38; // 2 bytes (EEPROM)
 const ADDR_PRESENT_TEMPERATURE: u16 = 146; // 1 byte
 
-/// Position Control Mode
+/// Position Control Mode (0 ~ 4095)
 const MODE_POSITION_CONTROL: u8 = 3;
+/// Extended Position Control Mode (-1,048,575 ~ 1,048,575)
+const MODE_EXTENDED_POSITION: u8 = 4;
 /// Current-based Position Control Mode
 const MODE_CURRENT_BASED_POSITION: u8 = 5;
 
@@ -39,12 +42,12 @@ const TEMP_SHUTDOWN_THRESHOLD: u8 = 75;
 //  Conversion helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub fn rad_to_ticks(rad: f64) -> u32 {
+pub fn rad_to_ticks(rad: f64) -> i32 {
     let ticks = (rad / (2.0 * std::f64::consts::PI) * COUNTS_PER_REV) + (COUNTS_PER_REV / 2.0);
-    (ticks.round() as i64).clamp(0, 4095) as u32
+    ticks.round() as i32
 }
 
-pub fn ticks_to_rad(ticks: u32) -> f64 {
+pub fn ticks_to_rad(ticks: i32) -> f64 {
     (ticks as f64 - COUNTS_PER_REV / 2.0) / COUNTS_PER_REV * 2.0 * std::f64::consts::PI
 }
 
@@ -64,12 +67,14 @@ pub struct ArmDynamixelDriver {
     bus: Bus<Vec<u8>, Vec<u8>>,
     arm_ids: Vec<u8>,
     gripper_ids: Vec<u8>,
-    /// arm_directions[i]: +1.0 or -1.0. physical_rad = (urdf_rad + offset) * direction
+    /// arm_directions[i]: +1.0 or -1.0. physical_rad = (urdf_rad + offset) * direction * gear_ratio
     /// ウォームギア等でURDF関節方向とサーボ回転方向が逆の場合は -1.0 を設定する。
     arm_directions: Vec<f64>,
     /// gripper_directions[i]: +1.0 or -1.0. physical_rad = (urdf_rad + offset) * direction
     gripper_directions: Vec<f64>,
-    /// per-joint offset [rad]: physical_rad = (urdf_rad + offset) * direction
+    /// per-joint gear ratio: physical_motor_rad = joint_rad * gear_ratio
+    arm_gear_ratios: Vec<f64>,
+    /// per-joint offset [rad]: physical_rad = (urdf_rad + offset) * direction * gear_ratio
     /// URDF 0 rad が Dynamixel tick 2048 と一致しない場合に設定する。
     /// 正値: URDF ゼロ時にモーターが正方向にずれている
     arm_offsets: Vec<f64>,
@@ -78,9 +83,11 @@ pub struct ArmDynamixelDriver {
 
 pub struct MotorStatus {
     pub position_rad: f64,
+    pub position_ticks: i32,
     pub velocity_rad_s: f64,
     pub current_a: f64,
     pub temperature_c: u8,
+    pub hardware_error: u8,
 }
 
 type TemperatureReport = (u8, u8);
@@ -93,6 +100,7 @@ impl ArmDynamixelDriver {
         gripper_ids: Vec<u8>,
         arm_directions: Vec<f64>,
         gripper_directions: Vec<f64>,
+        arm_gear_ratios: Vec<f64>,
         arm_offsets: Vec<f64>,
         gripper_offsets: Vec<f64>,
     ) -> Result<Self> {
@@ -106,12 +114,15 @@ impl ArmDynamixelDriver {
         a_dir.resize(arm_ids.len(), 1.0);
         let mut g_dir = gripper_directions;
         g_dir.resize(gripper_ids.len(), 1.0);
+        let mut a_ratio = arm_gear_ratios;
+        a_ratio.resize(arm_ids.len(), 1.0);
         Ok(Self {
             bus,
             arm_ids,
             gripper_ids,
             arm_directions: a_dir,
             gripper_directions: g_dir,
+            arm_gear_ratios: a_ratio,
             arm_offsets: arm_off,
             gripper_offsets: g_off,
         })
@@ -126,7 +137,7 @@ impl ArmDynamixelDriver {
 
     pub fn init_motors(&mut self, profile_velocity: u32, gripper_max_current: u16) -> Result<()> {
         println!("⚙️  arm_driver: Starting motor initialization...");
-        
+
         // Ping all motors first to verify connection
         let mut all_ids = self.arm_ids.clone();
         all_ids.extend_from_slice(&self.gripper_ids);
@@ -148,11 +159,12 @@ impl ArmDynamixelDriver {
 
         // Set Modes
         for &id in &self.arm_ids {
+            // High gear ratio motors or those needing multi-turn should use Extended Position Mode
             self.bus
-                .write_u8(id, ADDR_OPERATING_MODE, MODE_POSITION_CONTROL)
+                .write_u8(id, ADDR_OPERATING_MODE, MODE_EXTENDED_POSITION)
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "ID {id} set operating_mode={MODE_POSITION_CONTROL} failed: {e:?}"
+                        "ID {id} set operating_mode={MODE_EXTENDED_POSITION} failed: {e:?}"
                     )
                 })?;
         }
@@ -228,51 +240,72 @@ impl ArmDynamixelDriver {
     }
 
     pub fn write_arm_positions(&mut self, positions_rad: &[f64]) -> Result<()> {
-        // URDF 角度 → 物理角度 (offset 加算 → direction 乗算) → ticks
+        // physical_rad = (urdf_rad + offset) * direction * gear_ratio
         let commands: Vec<SyncWriteData<u32>> = self
             .arm_ids
             .iter()
             .zip(positions_rad.iter())
             .zip(self.arm_offsets.iter())
             .zip(self.arm_directions.iter())
-            .map(|(((&id, &rad), &offset), &dir)| SyncWriteData {
-                motor_id: id,
-                data: rad_to_ticks((rad + offset) * dir),
+            .zip(self.arm_gear_ratios.iter())
+            .enumerate()
+            .map(|(i, ((((&id, &rad), &offset), &dir), &ratio))| {
+                let ticks = rad_to_ticks((rad + offset) * dir * ratio);
+                // --- DEBUG: Print math once every ~5 seconds (at 50Hz) ---
+                if id == self.arm_ids[0] && (ticks % 100 == 0) { // Slight throttle logic
+                     // Only print for J1 to keep it clean, or use a proper counter
+                }
+                SyncWriteData {
+                    motor_id: id,
+                    data: ticks as u32,
+                }
             })
             .collect();
+        
+        // Simple periodic debug summary
+        static mut COUNT: u64 = 0;
+        unsafe {
+            COUNT += 1;
+            if COUNT % 250 == 0 {
+                println!("🛠️ [Arm Math Check] URDF[J1]={:.3}rad -> Ratio:{:.1}*Dir:{:.1} -> Ticks:{}", 
+                    positions_rad[0], self.arm_gear_ratios[0], self.arm_directions[0], rad_to_ticks((positions_rad[0] + self.arm_offsets[0]) * self.arm_directions[0] * self.arm_gear_ratios[0]));
+            }
+        }
+
         self.bus
             .sync_write_u32(ADDR_GOAL_POSITION, &commands)
             .map_err(|e| anyhow::anyhow!("{:?}", e))
     }
 
-    pub fn write_gripper_positions(&mut self, positions_rad: &[f64]) -> Result<()> {
-        let commands: Vec<SyncWriteData<u32>> = self
-            .gripper_ids
-            .iter()
-            .zip(positions_rad.iter())
-            .zip(self.gripper_offsets.iter())
-            .zip(self.gripper_directions.iter())
-            .map(|(((&id, &rad), &offset), &dir)| SyncWriteData {
-                motor_id: id,
-                data: rad_to_ticks((rad + offset) * dir),
-            })
-            .collect();
-        self.bus
-            .sync_write_u32(ADDR_GOAL_POSITION, &commands)
-            .map_err(|e| anyhow::anyhow!("sync_write gripper positions failed: {:?}", e))
+    pub fn write_gripper_position(&mut self, rad: f64) -> Result<()> {
+        let mut last_err = None;
+        for (i, &id) in self.gripper_ids.iter().enumerate() {
+            let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
+            let dir = self.gripper_directions.get(i).copied().unwrap_or(1.0);
+            if let Err(e) = self.bus.write_u32(id, ADDR_GOAL_POSITION, rad_to_ticks((rad + offset) * dir) as u32) {
+                last_err = Some(anyhow::anyhow!("gripper ID {id}: {:?}", e));
+            }
+        }
+        match last_err {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     pub fn read_arm_positions(&mut self) -> Result<Vec<f64>> {
         let resp = self
             .bus
             .sync_read_u32(&self.arm_ids, ADDR_PRESENT_POSITION)
-            .map_err(|e| anyhow::anyhow!("sync_read arm positions failed: {:?}", e))?;
-        // ticks → 物理角度 → URDF 角度 (direction 除算 → offset 減算)
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        // urdf_rad = physical_rad / (dir * ratio) - offset
         Ok(resp
             .iter()
             .zip(self.arm_offsets.iter())
             .zip(self.arm_directions.iter())
-            .map(|((r, &offset), &dir)| ticks_to_rad(r.data) / dir - offset)
+            .zip(self.arm_gear_ratios.iter())
+            .map(|(((r, &offset), &dir), &ratio)| {
+                ticks_to_rad(r.data as i32) / (dir * ratio) - offset
+            })
             .collect())
     }
 
@@ -286,17 +319,20 @@ impl ArmDynamixelDriver {
         for (i, &id) in self.gripper_ids.iter().enumerate() {
             let dir = self.gripper_directions.get(i).copied().unwrap_or(1.0);
             let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
-            
-            let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION).context("read pos")?;
-            let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY).context("read vel")?;
-            let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT).context("read cur")?;
-            let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE).context("read tmp")?;
-            
+
+            let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION)?;
+            let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY)?;
+            let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT)?;
+            let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE)?;
+            let err = self.bus.read_u8(id, ADDR_HARDWARE_ERROR_STATUS)?;
+
             statuses.push(MotorStatus {
-                position_rad: ticks_to_rad(pos.data) / dir - offset,
+                position_rad: ticks_to_rad(pos.data as i32) / dir - offset,
+                position_ticks: pos.data as i32,
                 velocity_rad_s: raw_vel_to_rad_s(vel.data as i32) / dir,
                 current_a: raw_current_to_a(cur.data as i16),
                 temperature_c: tmp.data,
+                hardware_error: err.data,
             });
         }
         Ok(statuses)
@@ -352,5 +388,13 @@ impl ArmDynamixelDriver {
         for &id in &self.gripper_ids {
             let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0);
         }
+        println!("🪫 arm_driver: All motor torques disabled.");
+    }
+}
+
+impl Drop for ArmDynamixelDriver {
+    fn drop(&mut self) {
+        // Fail-safe: Ensure torque is OFF when the driver is dropped
+        self.torque_off_all();
     }
 }
