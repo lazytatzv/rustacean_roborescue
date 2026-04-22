@@ -352,7 +352,7 @@ impl ArmDynamixelDriver {
             let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
             let dir    = self.gripper_directions.get(i).copied().unwrap_or(1.0);
             let ticks  = rad_to_ticks((status.position_rad + offset) * dir);
-            if let Err(e) = self.bus.write_u32(id, ADDR_GOAL_POSITION, ticks) {
+            if let Err(e) = self.bus.write_u32(id, ADDR_GOAL_POSITION, ticks as u32) {
                 last_err = Some(anyhow::anyhow!("gripper hold ID {id}: {:?}", e));
             }
         }

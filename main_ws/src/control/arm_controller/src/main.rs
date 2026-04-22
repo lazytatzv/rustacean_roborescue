@@ -221,7 +221,7 @@ fn run() -> Result<()> {
         null_space_repulsion_gain: node.declare_parameter("null_space_repulsion_gain").default(DEFAULT_NULL_SPACE_REPULSION_GAIN).mandatory()?.get(),
     };
 
-    let end_node = chain_full.find(&end_link).with_context(|| format!("End link '{}' not found in URDF", end_link))?;
+    let end_node = chain_full.find_link(&end_link).with_context(|| format!("End link '{}' not found in URDF", end_link))?;
     let serial = SerialChain::from_end(end_node);
     let joint_names: Vec<String> = serial.iter_joints()
         .filter(|j| !matches!(j.joint_type, k::JointType::Fixed))

@@ -27,7 +27,7 @@ use_imu: false
 
 # use_slamと同値
 # velodyne lidar周辺ノードを立ち上げ、slam_toolboxもする
-use_lidar: false
+use_lidar: true
 
 # カメラ制御全て
 # これがfalseだと遠隔操縦は不可能

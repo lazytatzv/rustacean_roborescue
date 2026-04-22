@@ -1,3 +1,3 @@
 [cache.disk]
-dir = "/home/tatsv/.cache/sccache"
+dir = "/home/yano/.cache/sccache"
 size = 21474836480
