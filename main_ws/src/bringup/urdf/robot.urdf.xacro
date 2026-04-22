@@ -1,295 +1,304 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="sekirei">
 
-  <!-- ======================== Arguments & Properties ======================== -->
-  <xacro:arg name="use_real_hw" default="false"/>
-  <xacro:arg name="dynamixel_model_folder" default="/opt/ros/humble/share/dynamixel_hardware_interface/param/dxl_model"/>
-
-  <xacro:property name="base_length" value="0.60"/>
-  <xacro:property name="base_width"  value="0.35"/>
-  <xacro:property name="base_height" value="0.15"/>
-  <xacro:property name="track_width"   value="0.4"/>
-  <xacro:property name="wheel_radius"  value="0.062"/>
-  <xacro:property name="wheel_width"   value="0.05"/>
-
-  <material name="silver"><color rgba="0.7 0.7 0.7 1"/></material>
-  <material name="white"><color rgba="1 1 1 1"/></material>
-
-  <!-- Dummy inertial for links -->
-  <xacro:macro name="dummy_inertial" params="mass:=0.01 i:=1e-5">
-    <inertial>
-      <mass value="${mass}"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="${i}" ixy="0" ixz="0" iyy="${i}" iyz="0" izz="${i}"/>
-    </inertial>
-  </xacro:macro>
-
-  <!-- ======================== Base Links ======================== -->
-  <link name="base_footprint"/>
-  <joint name="base_footprint_joint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin xyz="0 0 ${wheel_radius}"/>
-  </joint>
-
-  <link name="base_link">
-    <visual>
-      <geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry>
-      <material name="silver"/>
-    </visual>
-    <collision>
-      <geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry>
-    </collision>
-    <inertial>
-      <mass value="15.0"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="0.175" ixy="0" ixz="0" iyy="0.600" iyz="0" izz="0.725"/>
-    </inertial>
-  </link>
-
-  <!-- Flippers (Integrated from robot.urdf.xacro) -->
-  <xacro:macro name="flipper" params="name x_offset y_offset flip_rpy">
-    <link name="${name}">
-      <visual>
-        <origin xyz="0 0 0" rpy="${flip_rpy}"/>
-        <geometry><mesh filename="package://bringup/meshes/flipper.STL"/></geometry>
-        <material name="white"/>
-      </visual>
-      <xacro:dummy_inertial/>
-    </link>
-    <joint name="${name}_joint" type="revolute">
-      <origin xyz="${x_offset} ${y_offset} ${-base_height/2}" rpy="0 0 0"/>
-      <axis xyz="0 1 0"/><parent link="base_link"/><child link="${name}"/>
-      <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+    <!-- Base link with inertial -->
+    <xacro:arg name="use_real_hw" default="false"/>
+    
+    <link name="base_footprint"/>
+    <joint name="base_footprint_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0.062" rpy="0 0 0"/>
     </joint>
-  </xacro:macro>
 
-  <xacro:flipper name="flipper_fl" x_offset="0.3"  y_offset="0.2"   flip_rpy="${-pi/2} 0 ${-pi/2}"/>
-  <xacro:flipper name="flipper_fr" x_offset="0.3"  y_offset="-0.2"  flip_rpy="${pi/2} 0 ${pi/2}"/>
-  <xacro:flipper name="flipper_bl" x_offset="-0.3" y_offset="0.2"   flip_rpy="${pi/2} 0 ${-pi/2}"/>
-  <xacro:flipper name="flipper_br" x_offset="-0.3" y_offset="-0.2"  flip_rpy="${-pi/2} 0 ${pi/2}"/>
-
-  <!-- ======================== Arm (Based on sekirei_moveit.xacro) ======================== -->
-  <link name="arm_base_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm1.STL"/></geometry>
-      <origin xyz="-0.08 -0.081 0" rpy="1.57 0 0"/>
-      <material name="white"/>
-    </visual>
-    <collision>
-      <geometry><cylinder length="0.1" radius="0.05"/></geometry>
-      <origin xyz="0 0 0.05" rpy="0 0 0"/>
-    </collision>
-    <inertial>
-      <mass value="0.5"/>
-      <origin xyz="0 0 0.05"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-  </link>
-  <joint name="arm_base_link_joint" type="fixed">
-    <origin xyz="0.2 0 0.1" rpy="0 0 0"/>
-    <parent link="base_link"/>
-    <child link="arm_base_link"/>
-  </joint>
-
-  <link name="arm1_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm2.STL"/></geometry>
-      <origin xyz="0 0 0.004" rpy="1.57 0 0"/>
-    </visual>
-    <collision>
-      <geometry><cylinder length="0.08" radius="0.04"/></geometry>
-      <origin xyz="0 0 0.04" rpy="0 0 0"/>
-    </collision>
-    <xacro:dummy_inertial mass="0.3"/>
-  </link>
-  <joint name="arm_joint1" type="revolute">
-    <origin xyz="0 0 0" rpy="0 0 0"/><axis xyz="0 0 1"/>
-    <parent link="arm_base_link"/><child link="arm1_link"/>
-    <limit effort="10" lower="-3.14" upper="3.14" velocity="1.571"/>
-  </joint>
-
-  <link name="arm2_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm3.STL"/></geometry>
-      <origin xyz="0 0 0" rpy="1.57 0 0"/>
-    </visual>
-    <collision>
-      <geometry><box size="0.45 0.08 0.08"/></geometry>
-      <origin xyz="0.225 0 0" rpy="0 0 0"/>
-    </collision>
-    <xacro:dummy_inertial mass="0.6"/>
-  </link>
-  <joint name="arm_joint2" type="revolute">
-    <origin xyz="0 -0.048 0.078" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <parent link="arm1_link"/><child link="arm2_link"/>
-    <limit effort="20" lower="-3.14" upper="0" velocity="1.571"/>
-  </joint>
-
-  <link name="arm3_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm4.STL"/></geometry>
-      <origin xyz="0 0 0" rpy="1.57 0 0"/>
-    </visual>
-    <collision>
-      <geometry><box size="0.5 0.08 0.08"/></geometry>
-      <origin xyz="-0.25 0 0" rpy="0 0 0"/>
-    </collision>
-    <xacro:dummy_inertial mass="0.5"/>
-  </link>
-  <joint name="arm_joint3" type="revolute">
-    <!-- MASTER CONFIGURATION: Axis 0 -1 0 confirmed by sekirei_moveit -->
-    <origin xyz="0.45 0.007 0.084" rpy="0 0 0"/><axis xyz="0 -1 0"/>
-    <parent link="arm2_link"/><child link="arm3_link"/>
-    <limit effort="20" lower="0" upper="3.14" velocity="1.571"/>
-  </joint>
-
-  <link name="arm4_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_2020_asm5.STL"/></geometry>
-      <origin xyz="0 0 0" rpy="1.57 3.14 0"/>
-    </visual>
-    <collision>
-      <geometry><cylinder length="0.08" radius="0.03"/></geometry>
-      <origin xyz="0 0 0.04" rpy="0 0 0"/>
-    </collision>
-    <xacro:dummy_inertial mass="0.2"/>
-  </link>
-  <joint name="arm_joint4" type="revolute">
-    <origin xyz="-0.5 0.012 0" rpy="0 0 0"/><axis xyz="0 1 0"/>
-    <parent link="arm3_link"/><child link="arm4_link"/>
-    <limit effort="10" lower="-4.71" upper="0" velocity="1.571"/>
-  </joint>
-
-  <link name="arm5_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm6.STL"/></geometry>
-      <origin xyz="0 0 0" rpy="1.57 3.14 0"/>
-    </visual>
-    <collision>
-      <geometry><cylinder length="0.06" radius="0.025"/></geometry>
-      <origin xyz="0 0 0.03" rpy="0 0 0"/>
-    </collision>
-    <xacro:dummy_inertial mass="0.1"/>
-  </link>
-  <joint name="arm_joint5" type="revolute">
-    <origin xyz="0.06525 0.028 0.029647" rpy="0 0 0"/><axis xyz="0 0 1"/>
-    <parent link="arm4_link"/><child link="arm5_link"/>
-    <limit effort="5" lower="-1.57" upper="1.57" velocity="1.571"/>
-  </joint>
-
-  <link name="arm6_link">
-    <visual>
-      <geometry><mesh filename="package://bringup/meshes/r_a_2019_l_asm7_ver2.STL"/></geometry>
-      <origin xyz="0 0 0" rpy="0 3.14 0"/>
-    </visual>
-    <collision>
-      <geometry><cylinder length="0.05" radius="0.02"/></geometry>
-      <origin xyz="0 0 0.025" rpy="0 0 0"/>
-    </collision>
-    <xacro:dummy_inertial mass="0.1"/>
-  </link>
-  <joint name="arm_joint6" type="revolute">
-    <origin xyz="0.07425 0 -0.03" rpy="0 0 0"/><axis xyz="1 0 0"/>
-    <parent link="arm5_link"/><child link="arm6_link"/>
-    <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
-  </joint>
-
-  <!-- ======================== Gripper & Sensors ======================== -->
-  <link name="gripper_left_link"/><link name="gripper_right_link"/>
-  <joint name="gripper_joint7" type="revolute">
-    <parent link="arm6_link"/><child link="gripper_left_link"/>
-    <origin xyz="0 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="5" velocity="1.0"/>
-  </joint>
-  <joint name="gripper_joint8" type="revolute">
-    <parent link="arm6_link"/><child link="gripper_right_link"/>
-    <origin xyz="0 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="5" velocity="1.0"/>
-  </joint>
-
-  <link name="velodyne">
-    <visual><geometry><cylinder radius="0.05" length="0.07"/></geometry><material name="silver"/></visual>
-    <xacro:dummy_inertial mass="0.8"/>
-  </link>
-  <joint name="velodyne_joint" type="fixed"><parent link="base_link"/><child link="velodyne"/><origin xyz="0 0 0"/></joint>
-
-  <link name="imu_link"><xacro:dummy_inertial/></link>
-  <joint name="imu_joint" type="fixed"><parent link="base_link"/><child link="imu_link"/><origin xyz="0 0 0"/></joint>
-
-  <!-- RealSense & Other Cameras (From robot.urdf.xacro) -->
-  <link name="camera_t265_link"><visual><geometry><mesh filename="package://bringup/meshes/t265.STL"/></geometry></visual><xacro:dummy_inertial/></link>
-  <joint name="camera_t265_joint" type="fixed"><parent link="arm_base_link"/><child link="camera_t265_link"/><origin xyz="0.0 -0.05 0.02" rpy="0 ${-pi/2} 0"/></joint>
-
-  <link name="camera_d435i_link"><visual><geometry><mesh filename="package://bringup/meshes/d435.STL"/></geometry></visual><xacro:dummy_inertial/></link>
-  <joint name="camera_d435i_joint" type="fixed"><parent link="arm6_link"/><child link="camera_d435i_link"/><origin xyz="0.0 0.04 0.0" rpy="0 0 0"/></joint>
-
-  <link name="front_camera_link"/><joint name="front_camera_joint" type="fixed"><parent link="base_link"/><child link="front_camera_link"/><origin xyz="${base_length/2} 0 ${base_height/2 + 0.02}"/></joint>
-  <link name="back_camera_link"/><joint name="back_camera_joint" type="fixed"><parent link="base_link"/><child link="back_camera_link"/><origin xyz="${-base_length/2} 0 ${base_height/2 + 0.02}" rpy="0 0 ${pi}"/></joint>
-
-  <!-- ======================== Simulation Wheels ======================== -->
-  <xacro:macro name="drive_wheel" params="name y_offset">
-    <link name="${name}">
-      <visual><origin rpy="${pi/2} 0 0"/><geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry></visual>
-      <xacro:dummy_inertial mass="1.0"/>
+    <link name="base_link">
+        <visual>
+            <geometry><box size="0.60 0.35 0.15"/></geometry>
+            <material name="silver"><color rgba="0.7 0.7 0.7 1"/></material>
+        </visual>
+        <collision><geometry><box size="0.60 0.35 0.15"/></geometry></collision>
+        <inertial>
+            <mass value="1.0"/><origin xyz="0 0 0"/>
+            <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
+        </inertial>
     </link>
-    <joint name="${name}_joint" type="continuous"><parent link="base_link"/><child link="${name}"/><origin xyz="0 ${y_offset} ${-base_height/2}"/><axis xyz="0 1 0"/></joint>
-  </xacro:macro>
-  <xacro:drive_wheel name="left_wheel"  y_offset="${track_width/2}"/>
-  <xacro:drive_wheel name="right_wheel" y_offset="${-track_width/2}"/>
 
-  <!-- ======================== ros2_control (Unified) ======================== -->
-  <xacro:if value="$(arg use_real_hw)">
+    <!-- Flippers (Mounting bottom-edge) -->
+    <xacro:macro name="flipper" params="name x_offset y_offset flip_rpy">
+        <link name="${name}">
+            <visual>
+                <origin xyz="0 0 0" rpy="${flip_rpy}"/>
+                <geometry><mesh filename="package://bringup/meshes/flipper.STL"/></geometry>
+                <material name="white"><color rgba="1 1 1 1"/></material>
+            </visual>
+        </link>
+        <joint name="${name}_joint" type="revolute">
+            <origin xyz="${x_offset} ${y_offset} -0.075" rpy="0 0 0"/>
+            <axis xyz="0 1 0"/><parent link="base_link"/><child link="${name}"/>
+            <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+        </joint>
+    </xacro:macro>
+
+    <xacro:flipper name="flipper_fl" x_offset="0.3"  y_offset="0.26"   flip_rpy="${-pi/2} 0 ${-pi/2}"/>
+    <xacro:flipper name="flipper_fr" x_offset="0.3"  y_offset="-0.26"  flip_rpy="${-pi/2} 0 ${pi/2}"/>
+    <xacro:flipper name="flipper_bl" x_offset="-0.3" y_offset="0.26"   flip_rpy="${-pi/2} 0 ${-pi/2}"/>
+    <xacro:flipper name="flipper_br" x_offset="-0.3" y_offset="-0.26"  flip_rpy="${-pi/2} 0 ${pi/2}"/>
+
+    <!-- ======================================================================= -->
+    <!--  ARM SECTION: LITERALLY COPIED FROM YOUR PROVEN SOURCE (DO NOT CHANGE) -->
+    <!-- ======================================================================= -->
+
+    <!-- Arm Base Link -->
+    <link name="arm_base_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_2020_asm1.STL"/>
+            </geometry>
+            <origin xyz="-0.08 -0.081 0" rpy="1.57 0 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.1" radius="0.05"/>
+            </geometry>
+            <origin xyz="0 0 0.05" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.5"/>
+            <origin xyz="0 0 0.05"/>
+            <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_base_link_joint" type="fixed">
+        <origin xyz="0.2 0 0.1" rpy="0 0 0"/>
+        <parent link="base_link"/>
+        <child link="arm_base_link"/>
+    </joint>
+
+    <!-- Arm Link 1 -->
+    <link name="arm1_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_2020_asm2.STL"/>
+            </geometry>
+            <origin xyz="0 0 0.004" rpy="1.57 0 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.08" radius="0.04"/>
+            </geometry>
+            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.3"/>
+            <origin xyz="0 0 0.04"/>
+            <inertia ixx="0.0008" ixy="0.0" ixz="0.0" iyy="0.0008" iyz="0.0" izz="0.0002"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_joint1" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <parent link="arm_base_link"/>
+        <child link="arm1_link"/>
+        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+    </joint>
+
+    <!-- Arm Link 2 -->
+    <link name="arm2_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_2020_asm3.STL"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 0 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.45 0.08 0.08"/>
+            </geometry>
+            <origin xyz="0.225 0 0" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.6"/>
+            <origin xyz="0.225 0 0"/>
+            <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.010" iyz="0.0" izz="0.010"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_joint2" type="revolute">
+        <origin xyz="0 -0.048 0.078" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="arm1_link"/>
+        <child link="arm2_link"/>
+        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+    </joint>
+
+    <!-- Arm Link 3 -->
+    <link name="arm3_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_2020_asm4.STL"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 0 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.5 0.08 0.08"/>
+            </geometry>
+            <origin xyz="-0.25 0 0" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.5"/>
+            <origin xyz="-0.25 0 0"/>
+            <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.010" iyz="0.0" izz="0.010"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_joint3" type="revolute">
+        <origin xyz="0.45 0.007 0.084" rpy="0 0 0"/><axis xyz="0 -1 0"/>
+        <parent link="arm2_link"/><child link="arm3_link"/>
+        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+    </joint>
+
+    <!-- Arm Link 4 -->
+    <link name="arm4_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_2020_asm5.STL"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 3.14 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.08" radius="0.03"/>
+            </geometry>
+            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.2"/>
+            <origin xyz="0 0 0.04"/>
+            <inertia ixx="0.0005" ixy="0.0" ixz="0.0" iyy="0.0005" iyz="0.0" izz="0.0001"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_joint4" type="revolute">
+        <origin xyz="-0.5 0.012 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="arm3_link"/>
+        <child link="arm4_link"/>
+        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+    </joint>
+
+    <!-- Arm Link 5 -->
+    <link name="arm5_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_l_asm6.STL"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 3.14 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.06" radius="0.025"/>
+            </geometry>
+            <origin xyz="0 0 0.03" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.1"/>
+            <origin xyz="0 0 0.03"/>
+            <inertia ixx="0.0002" ixy="0.0" ixz="0.0" iyy="0.0002" iyz="0.0" izz="0.0001"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_joint5" type="revolute">
+        <origin xyz="0.06525 0.028 0.029647" rpy="0 0 0"/><axis xyz="0 0 1"/>
+        <parent link="arm4_link"/><child link="arm5_link"/>
+        <limit effort="5" lower="-1.57" upper="1.57" velocity="1.571"/>
+    </joint>
+
+    <!-- Arm Link 6 -->
+    <link name="arm6_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://bringup/meshes/r_a_2019_l_asm7_ver2.STL"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 3.14 0"/>
+            <material name="white">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.05" radius="0.02"/>
+            </geometry>
+            <origin xyz="0 0 0.025" rpy="0 0 0"/>
+        </collision>
+        <inertial>
+            <mass value="0.1"/>
+            <origin xyz="0 0 0.025"/>
+            <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
+        </inertial>
+    </link>
+
+    <joint name="arm_joint6" type="revolute">
+        <origin xyz="0.07425 0 -0.03" rpy="0 0 0"/><axis xyz="1 0 0"/>
+        <parent link="arm5_link"/><child link="arm6_link"/>
+        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+    </joint>
+
+    <!-- ======================================================================= -->
+
+    <link name="gripper_left_link"/><link name="gripper_right_link"/>
+    <joint name="gripper_joint7" type="revolute"><parent link="arm6_link"/><child link="gripper_left_link"/><origin xyz="0 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="5" velocity="1.0"/></joint>
+    <joint name="gripper_joint8" type="revolute"><parent link="arm6_link"/><child link="gripper_right_link"/><origin xyz="0 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="5" velocity="1.0"/></joint>
+
+    <link name="velodyne"><visual><geometry><cylinder radius="0.05" length="0.07"/></geometry><material name="silver"/></visual></link>
+    <joint name="velodyne_joint" type="fixed"><parent link="base_link"/><child link="velodyne"/><origin xyz="0 0 0"/></joint>
+    
+    <link name="imu_link"/>
+    <joint name="imu_joint" type="fixed"><parent link="base_link"/><child link="imu_link"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+
+    <xacro:macro name="sim_wheel" params="name y_offset">
+        <link name="${name}"><visual><origin rpy="${pi/2} 0 0"/><geometry><cylinder radius="0.062" length="0.05"/></geometry></visual></link>
+        <joint name="${name}_joint" type="continuous"><parent link="base_link"/><child link="${name}"/><origin xyz="0 ${y_offset} -0.075"/><axis xyz="0 1 0"/></joint>
+    </xacro:macro>
+    <xacro:sim_wheel name="left_wheel"  y_offset="0.2"/>
+    <xacro:sim_wheel name="right_wheel" y_offset="-0.2"/>
+
     <ros2_control name="sekirei_dynamixel_hw" type="system">
-      <hardware>
-        <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
-        <param name="port_name">/dev/dynamixel_arm</param>
-        <param name="baud_rate">1000000</param>
-        <param name="error_timeout_ms">1000</param>
-        <param name="number_of_joints">8</param>
-        <param name="number_of_transmissions">8</param>
-        <param name="dynamixel_model_folder">$(arg dynamixel_model_folder)</param>
-        <param name="disable_torque_at_init">true</param>
-        <param name="ignore_hardware_error">true</param>
-        <param name="ping_retry_count">3</param>
-        <param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,0, 0,1,0,0,0,0,0,0, 0,0,1,0,0,0,0,0, 0,0,0,1,0,0,0,0, 0,0,0,0,1,0,0,0, 0,0,0,0,0,1,0,0, 0,0,0,0,0,0,1,0, 0,0,0,0,0,0,0,1</param>
-        <param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,0, 0,1,0,0,0,0,0,0, 0,0,1,0,0,0,0,0, 0,0,0,1,0,0,0,0, 0,0,0,0,1,0,0,0, 0,0,0,0,0,1,0,0, 0,0,0,0,0,0,1,0, 0,0,0,0,0,0,0,1</param>
-      </hardware>
-      <joint name="arm_joint1"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint2"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint3"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint4"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint5"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint6"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="gripper_joint7"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
-      <joint name="gripper_joint8"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
-
-      <!-- IDs & GPIO (Drive Mode 1=reverse) -->
-      <gpio name="dxl1"><param name="type">dxl</param><param name="ID">21</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">1</param></gpio>
-      <gpio name="dxl2"><param name="type">dxl</param><param name="ID">22</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">0</param></gpio>
-      <gpio name="dxl3"><param name="type">dxl</param><param name="ID">23</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">1</param></gpio>
-      <gpio name="dxl4"><param name="type">dxl</param><param name="ID">24</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">0</param></gpio>
-      <gpio name="dxl5"><param name="type">dxl</param><param name="ID">25</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">0</param></gpio>
-      <gpio name="dxl6"><param name="type">dxl</param><param name="ID">26</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">0</param></gpio>
-      <gpio name="dxl7"><param name="type">dxl</param><param name="ID">27</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">0</param></gpio>
-      <gpio name="dxl8"><param name="type">dxl</param><param name="ID">28</param><command_interface name="Goal Position"/><state_interface name="Present Position"/><state_interface name="Present Velocity"/><state_interface name="Present Current"/><param name="Drive Mode">0</param></gpio>
+        <hardware>
+            <xacro:if value="$(arg use_real_hw)">
+                <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
+                <param name="port_name">/dev/dynamixel_arm</param>
+                <param name="baud_rate">1000000</param>
+            </xacro:if>
+            <xacro:unless value="$(arg use_real_hw)">
+                <plugin>mock_components/GenericSystem</plugin>
+            </xacro:unless>
+        </hardware>
+        <joint name="arm_joint1"><command_interface name="position"/><state_interface name="position"/></joint>
+        <joint name="arm_joint2"><command_interface name="position"/><state_interface name="position"/></joint>
+        <joint name="arm_joint3"><command_interface name="position"/><state_interface name="position"/></joint>
+        <joint name="arm_joint4"><command_interface name="position"/><state_interface name="position"/></joint>
+        <joint name="arm_joint5"><command_interface name="position"/><state_interface name="position"/></joint>
+        <joint name="arm_joint6"><command_interface name="position"/><state_interface name="position"/></joint>
     </ros2_control>
-  </xacro:if>
-
-  <xacro:unless value="$(arg use_real_hw)">
-    <ros2_control name="sekirei_dynamixel_hw" type="system">
-      <hardware><plugin>mock_components/GenericSystem</plugin></hardware>
-      <joint name="arm_joint1"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint2"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint3"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint4"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint5"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="arm_joint6"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="gripper_joint7"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-      <joint name="gripper_joint8"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
-    </ros2_control>
-  </xacro:unless>
-
-  <!-- Gazebo Plugins -->
-  <gazebo><plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive"><left_joint>left_wheel_joint</left_joint><right_joint>right_wheel_joint</right_joint><wheel_separation>${track_width}</wheel_separation><wheel_radius>${wheel_radius}</wheel_radius><topic>cmd_vel</topic><odom_topic>odom</odom_topic><frame_id>odom</frame_id><child_frame_id>base_footprint</child_frame_id></plugin></gazebo>
-  <gazebo><plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"><topic>joint_states</topic><update_rate>50</update_rate></plugin></gazebo>
-
 </robot>
