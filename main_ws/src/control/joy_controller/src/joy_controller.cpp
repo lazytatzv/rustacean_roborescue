@@ -22,6 +22,7 @@
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/empty.hpp"
 
 // Mode cycle (SHARE button):
 //   STOP/DRIVE  ->  ARM
@@ -99,8 +100,10 @@ class JoyController : public rclcpp::Node
           last_gripper_status_ = *msg;
           have_gripper_status_ = true;
         });
-    estop_pub_       = create_publisher<std_msgs::msg::Bool>(
+    estop_pub_        = create_publisher<std_msgs::msg::Bool>(
         "/emergency_stop", rclcpp::QoS(1).transient_local().reliable());
+    torque_off_pub_   = create_publisher<std_msgs::msg::Empty>("/arm_torque_off", 1);
+    reboot_pub_       = create_publisher<std_msgs::msg::Empty>("/arm_reboot", 1);
     servo_twist_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(
         "/servo_node/delta_twist_cmds", 10);
     servo_joint_pub_ = create_publisher<control_msgs::msg::JointJog>(
@@ -160,6 +163,9 @@ class JoyController : public rclcpp::Node
   Mode mode_;
   bool estop_latched_{false};
   int  prev_ps_{0}, prev_options_{0}, prev_share_{0};
+  rclcpp::Time ps_press_time_;
+  bool         ps_held_{false};
+  static constexpr double kRebootHoldSec = 3.0;
   int  prev_triangle_{0}, prev_square_{0}, prev_circle_{0};
   bool gripper_open_{true};  // toggle state for SERVO mode gripper
   bool gripper_closing_{false};
@@ -188,7 +194,9 @@ class JoyController : public rclcpp::Node
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_joint_pub_;
   rclcpp::Publisher<custom_interfaces::msg::GripperCommand>::SharedPtr gripper_pub_;
   rclcpp::Subscription<custom_interfaces::msg::GripperStatus>::SharedPtr gripper_status_sub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr  estop_pub_;
+  rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr torque_off_pub_;
+  rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr reboot_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr servo_twist_pub_;
   rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr servo_joint_pub_;
 #ifdef HAVE_MOVEIT_MSGS
@@ -296,14 +304,23 @@ class JoyController : public rclcpp::Node
     const int options = btn(joy, BTN_OPTIONS);
     const int share   = btn(joy, BTN_SHARE);
 
+    // PS: 押した瞬間にタイマー開始、離した時に判定
     if (ps == 1 && prev_ps_ == 0) {
-      estop_latched_ = true;
-      mode_          = Mode::STOP;
-      std_msgs::msg::Bool msg;
-      msg.data = true;
-      estop_pub_->publish(msg);
-      RCLCPP_WARN(get_logger(), "EMERGENCY STOP");
-    } else if (options == 1 && prev_options_ == 0) {
+      ps_press_time_ = now();
+      ps_held_       = true;
+    } else if (ps == 0 && prev_ps_ == 1 && ps_held_) {
+      const double held_sec = (now() - ps_press_time_).seconds();
+      ps_held_ = false;
+      if (held_sec >= kRebootHoldSec) {
+        RCLCPP_WARN(get_logger(), "🔄 PS 長押し(%.1f s) → arm REBOOT", held_sec);
+        reboot_pub_->publish(std_msgs::msg::Empty{});
+      } else {
+        RCLCPP_INFO(get_logger(), "🔴 PS → arm torque OFF");
+        torque_off_pub_->publish(std_msgs::msg::Empty{});
+      }
+    }
+
+    if (options == 1 && prev_options_ == 0) {
       if (estop_latched_) {
         estop_latched_ = false;
         std_msgs::msg::Bool msg;
@@ -439,12 +456,12 @@ class JoyController : public rclcpp::Node
 
     if (mode_ == Mode::ARM) {
       geometry_msgs::msg::Twist msg;
-      msg.linear.x  = smooth(nonlin(dz(-ax(joy, AX_LEFT_Y)))  * arm_lin_scale_ * precision, prev_t_[0]);
+      msg.linear.x  = smooth(nonlin(dz( ax(joy, AX_LEFT_Y)))  * arm_lin_scale_ * precision, prev_t_[0]);
       msg.linear.y  = smooth(nonlin(dz( ax(joy, AX_LEFT_X)))  * arm_lin_scale_ * precision, prev_t_[1]);
       msg.linear.z  = smooth(nonlin(dz( ax(joy, AX_RIGHT_Y))) * arm_lin_scale_ * precision, prev_t_[2]);
       msg.angular.x = smooth(static_cast<double>(r2 - l2)     * arm_ang_scale_ * precision, prev_t_[3]);
       msg.angular.y = smooth(nonlin(dz( ax(joy, AX_DPAD_Y)))  * arm_ang_scale_ * precision, prev_t_[4]);
-      msg.angular.z = smooth(nonlin(dz(-ax(joy, AX_RIGHT_X))) * arm_ang_scale_ * precision, prev_t_[5]);
+      msg.angular.z = smooth(nonlin(dz( ax(joy, AX_RIGHT_X))) * arm_ang_scale_ * precision, prev_t_[5]);
       arm_twist_pub_->publish(msg);
 
     } else if (mode_ == Mode::JOINT) {
@@ -452,10 +469,10 @@ class JoyController : public rclcpp::Node
       msg.name     = {"arm_joint1", "arm_joint2", "arm_joint3",
                       "arm_joint4", "arm_joint5", "arm_joint6"};
       msg.velocity = {
-          smooth(nonlin(dz(-ax(joy, AX_LEFT_Y)))  * joint_scale_ * precision, prev_j_[0]),
-          smooth(nonlin(dz( ax(joy, AX_LEFT_X)))  * joint_scale_ * precision, prev_j_[1]),
+          smooth(nonlin(dz( ax(joy, AX_LEFT_X)))  * joint_scale_ * precision, prev_j_[0]),
+          smooth(nonlin(dz( ax(joy, AX_LEFT_Y)))  * joint_scale_ * precision, prev_j_[1]),
           smooth(nonlin(dz( ax(joy, AX_RIGHT_Y))) * joint_scale_ * precision, prev_j_[2]),
-          smooth(nonlin(dz(-ax(joy, AX_RIGHT_X))) * joint_scale_ * precision, prev_j_[3]),
+          smooth(nonlin(dz( ax(joy, AX_RIGHT_X))) * joint_scale_ * precision, prev_j_[3]),
           smooth(static_cast<double>(r2 - l2)     * joint_scale_ * precision, prev_j_[4]),
           smooth(nonlin(dz( ax(joy, AX_DPAD_Y)))  * joint_scale_ * precision, prev_j_[5]),
       };

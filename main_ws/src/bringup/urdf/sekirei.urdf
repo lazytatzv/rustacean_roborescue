@@ -48,7 +48,7 @@
         <axis xyz="0 0 1"/>
         <parent link="arm_base_link"/>
         <child link="arm1_link"/>
-        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+        <limit effort="5" lower="-6.28" upper="6.28" velocity="1.571"/>
     </joint>
     <link name="arm2_link">
         <visual>
@@ -71,7 +71,7 @@
         <axis xyz="0 1 0"/>
         <parent link="arm1_link"/>
         <child link="arm2_link"/>
-        <limit effort="5" lower="-3.14" upper="0" velocity="1.571"/>
+        <limit effort="5" lower="-6.28" upper="0" velocity="1.571"/>
     </joint>
     <link name="arm3_link">
         <visual>
@@ -94,7 +94,7 @@
         <axis xyz="0 1 0"/>
         <parent link="arm2_link"/>
         <child link="arm3_link"/>
-        <limit effort="5" lower="-0.72" upper="3.14" velocity="1.571"/>
+        <limit effort="5" lower="-6.28" upper="6.28" velocity="1.571"/>
     </joint>
     <link name="arm4_link">
         <visual>
@@ -117,7 +117,7 @@
         <axis xyz="0 1 0"/>
         <parent link="arm3_link"/>
         <child link="arm4_link"/>
-        <limit effort="5" lower="-4.71" upper="0" velocity="1.571"/>
+        <limit effort="5" lower="-6.28" upper="6.28" velocity="1.571"/>
     </joint>
     <link name="arm5_link">
         <visual>
@@ -140,7 +140,7 @@
         <axis xyz="0 0 1"/>
         <parent link="arm4_link"/>
         <child link="arm5_link"/>
-        <limit effort="5" lower="-1.57" upper="1.57" velocity="1.571"/>
+        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
     </joint>
     <link name="arm6_link">
         <visual>
@@ -163,7 +163,7 @@
         <axis xyz="1 0 0"/>
         <parent link="arm5_link"/>
         <child link="arm6_link"/>
-        <limit effort="5" lower="-3.14" upper="3.14" velocity="1.571"/>
+        <limit effort="5" lower="-6.28" upper="6.28" velocity="1.571"/>
     </joint>
     <!-- Gripper (parallel link, 2x Dynamixel) -->
     <link name="gripper_left_link">

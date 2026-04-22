@@ -53,6 +53,8 @@ struct HardwareThreadParams {
     grasp_effort_threshold: f64,
     grasp_consecutive_count: u32,
     shutdown_flag: Arc<AtomicBool>,
+    torque_off_flag: Arc<AtomicBool>,
+    reboot_flag: Arc<AtomicBool>,
 }
 
 fn hardware_thread(params: HardwareThreadParams) {
@@ -86,12 +88,24 @@ fn hardware_thread(params: HardwareThreadParams) {
     let mut loop_count: u64 = 0;
 
     // Grasp detection state
+
     let mut over_count = 0;
     let mut is_holding = false;
     let mut gripper_closing = false;
 
     while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
+
+        // トルクOFF / リブートリクエスト処理
+        if params.torque_off_flag.swap(false, Ordering::Relaxed) {
+            driver.torque_off_all();
+        }
+        if params.reboot_flag.swap(false, Ordering::Relaxed) {
+            driver.reboot_all();
+            if let Err(e) = driver.init_motors(params.profile_velocity) {
+                eprintln!("⚠️  arm_driver: re-init after reboot failed: {e:#}");
+            }
+        }
 
         // コマンド処理
         while let Ok(cmd) = params.rx_cmd.try_recv() {
@@ -322,7 +336,21 @@ fn run() -> Result<()> {
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
     let (tx_cmd, rx_cmd) = channel::<HwCommand>();
-    let shutdown_flag = Arc::new(AtomicBool::new(false));
+    let shutdown_flag   = Arc::new(AtomicBool::new(false));
+    let torque_off_flag = Arc::new(AtomicBool::new(false));
+    let reboot_flag     = Arc::new(AtomicBool::new(false));
+
+    let tof_sub_flag = Arc::clone(&torque_off_flag);
+    let _torque_off_sub = node.create_subscription::<std_msgs::msg::Empty, _>(
+        "/arm_torque_off",
+        move |_: std_msgs::msg::Empty| { tof_sub_flag.store(true, Ordering::Relaxed); },
+    )?;
+
+    let rb_sub_flag = Arc::clone(&reboot_flag);
+    let _reboot_sub = node.create_subscription::<std_msgs::msg::Empty, _>(
+        "/arm_reboot",
+        move |_: std_msgs::msg::Empty| { rb_sub_flag.store(true, Ordering::Relaxed); },
+    )?;
 
     let tx_arm = tx_cmd.clone();
     let arm_names = arm_joints.clone();
@@ -372,7 +400,9 @@ fn run() -> Result<()> {
         },
     )?;
 
-    let shutdown_c = Arc::clone(&shutdown_flag);
+    let shutdown_c    = Arc::clone(&shutdown_flag);
+    let torque_off_c  = Arc::clone(&torque_off_flag);
+    let reboot_c      = Arc::clone(&reboot_flag);
     let gripper_names = gripper_joints.clone();
     let hw_thread = thread::spawn(move || {
         hardware_thread(HardwareThreadParams {
@@ -394,7 +424,9 @@ fn run() -> Result<()> {
             use_grasp_detection,
             grasp_effort_threshold,
             grasp_consecutive_count: grasp_consecutive_count as u32,
-            shutdown_flag: shutdown_c,
+            shutdown_flag:   shutdown_c,
+            torque_off_flag: torque_off_c,
+            reboot_flag:     reboot_c,
         });
     });
 

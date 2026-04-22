@@ -348,5 +348,20 @@ impl ArmDynamixelDriver {
         for &id in &self.gripper_ids {
             let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0);
         }
+        println!("🔴 arm_driver: All torques OFF");
+    }
+
+    pub fn reboot_all(&mut self) {
+        let mut all_ids = self.arm_ids.clone();
+        all_ids.extend_from_slice(&self.gripper_ids);
+        for id in all_ids {
+            match self.bus.reboot(id) {
+                Ok(_) => println!("🔄 arm_driver: Reboot sent to ID {id}"),
+                Err(e) => eprintln!("⚠️  arm_driver: Reboot ID {id} failed: {e:?}"),
+            }
+        }
+        // モーター再起動待機
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+        println!("✅ arm_driver: Reboot complete");
     }
 }
