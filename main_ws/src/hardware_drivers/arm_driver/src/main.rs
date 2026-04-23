@@ -52,9 +52,13 @@ struct HardwareThreadParams {
     use_grasp_detection: bool,
     grasp_effort_threshold: f64,
     grasp_consecutive_count: u32,
+    gripper_max_current: u16,
     shutdown_flag: Arc<AtomicBool>,
     torque_off_flag: Arc<AtomicBool>,
     reboot_flag: Arc<AtomicBool>,
+    /// 起動時のキャリブ用ホームポジション [URDF rad]。
+    /// 起動時はアームが必ずここにいることを前提に goal_position を設定する。
+    home_positions: Vec<f64>,
 }
 
 fn hardware_thread(params: HardwareThreadParams) {
@@ -78,7 +82,7 @@ fn hardware_thread(params: HardwareThreadParams) {
         }
     };
 
-    if let Err(e) = driver.init_motors(params.profile_velocity) {
+    if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current, &params.home_positions) {
         eprintln!("🔥 arm_gripper_driver: motor init failed: {e:#}");
         std::process::exit(1);
     }
@@ -88,10 +92,11 @@ fn hardware_thread(params: HardwareThreadParams) {
     let mut loop_count: u64 = 0;
 
     // Grasp detection state
-
     let mut over_count = 0;
     let mut is_holding = false;
     let mut gripper_closing = false;
+    // 最後に送ったグリッパー指令（開閉方向の判定用）。初期値=閉じきり
+    let mut last_gripper_cmd: Vec<f64> = vec![0.0; params.gripper_ids.len()];
 
     while !params.shutdown_flag.load(Ordering::Relaxed) {
         let loop_start = Instant::now();
@@ -102,7 +107,7 @@ fn hardware_thread(params: HardwareThreadParams) {
         }
         if params.reboot_flag.swap(false, Ordering::Relaxed) {
             driver.reboot_all();
-            if let Err(e) = driver.init_motors(params.profile_velocity) {
+            if let Err(e) = driver.init_motors(params.profile_velocity, params.gripper_max_current, &params.home_positions) {
                 eprintln!("⚠️  arm_driver: re-init after reboot failed: {e:#}");
             }
         }
@@ -115,14 +120,16 @@ fn hardware_thread(params: HardwareThreadParams) {
                 }
             }
             if let Some(p) = cmd.gripper_positions {
-                // 新しい指令が来たら保持状態とカウントをリセット
                 is_holding = false;
                 over_count = 0;
-                
-                // closing かどうかの判定 (簡易的に: 前回の目標値より「閉じ方向」なら closing とする)
-                // あるいは C++ のように外部から明示的に判定が必要だが、ここでは「目標値が変わったら closing = true」として
-                // 保持検出を開始し、一度保持したら reset する運用とする
-                gripper_closing = true; 
+
+                // ゼロ（閉じきり）からの距離で開閉方向を判定。
+                // 新指令がゼロへ近づく = 閉じる → 把持検出を有効化
+                // 新指令がゼロから離れる = 開く → 把持検出を無効化
+                let dist_new: f64 = p.iter().map(|&x| x * x).sum::<f64>();
+                let dist_cur: f64 = last_gripper_cmd.iter().map(|&x| x * x).sum::<f64>();
+                gripper_closing = dist_new < dist_cur;
+                last_gripper_cmd = p.clone();
 
                 if let Err(e) = driver.write_gripper_positions(&p) {
                     eprintln!("⚠️  arm_driver: write_gripper_positions failed: {e:?}");
@@ -328,10 +335,26 @@ fn run() -> Result<()> {
         .get();
     let arm_reductions: Vec<f64> = arm_reductions_arr.to_vec();
 
+    let gripper_max_current: i64 = node
+        .declare_parameter("gripper_max_current")
+        .default(600_i64)
+        .mandatory()?
+        .get();
+
     // Grasp Detection Parameters
     let use_grasp_detection = node.declare_parameter("use_grasp_detection").default(true).mandatory()?.get();
     let grasp_effort_threshold = node.declare_parameter("grasp_effort_threshold").default(0.45).mandatory()?.get();
     let grasp_consecutive_count = node.declare_parameter("grasp_consecutive_count").default(3_i64).mandatory()?.get();
+
+    // 起動時キャリブ用ホームポジション [URDF rad]
+    // 起動時はアームが必ずこの位置にいることを前提に goal_position を設定する。
+    let home_positions_arr: Arc<[f64]> = node
+        .declare_parameter("arm_home_position")
+        .default(Arc::from(vec![0.0_f64; 6].into_boxed_slice()))
+        .mandatory()?
+        .get();
+    let home_positions: Vec<f64> = home_positions_arr.to_vec();
+    println!("✅ arm_driver: Home position: {:?}", home_positions);
 
     let joint_state_pub = node.create_publisher::<JointState>("/joint_states")?;
     let gripper_status_pub = node.create_publisher::<GripperStatus>("/gripper_status")?;
@@ -424,9 +447,11 @@ fn run() -> Result<()> {
             use_grasp_detection,
             grasp_effort_threshold,
             grasp_consecutive_count: grasp_consecutive_count as u32,
+            gripper_max_current: gripper_max_current as u16,
             shutdown_flag:   shutdown_c,
             torque_off_flag: torque_off_c,
             reboot_flag:     reboot_c,
+            home_positions,
         });
     });
 

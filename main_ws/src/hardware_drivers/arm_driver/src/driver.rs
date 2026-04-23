@@ -139,9 +139,15 @@ impl ArmDynamixelDriver {
             .map_err(|e| anyhow::anyhow!("Ping ID {} failed: {:?}", id, e))
     }
 
-    pub fn init_motors(&mut self, profile_velocity: u32) -> Result<()> {
+    /// モーター初期化。起動時はアームが必ずホームポジションにいることを前提に、
+    /// home_urdf をゴール位置として書き込んでからトルクONする。
+    /// これにより電源断後のマルチターンリセット問題を自動解決する。
+    /// モーター初期化。起動時はアームが必ずホームポジションにいることを前提に、
+    /// home_urdf をゴール位置として書き込んでからトルクONする。
+    /// これにより電源断後のマルチターンリセット問題を自動解決する。
+    pub fn init_motors(&mut self, profile_velocity: u32, gripper_max_current: u16, home_urdf: &[f64]) -> Result<()> {
         println!("⚙️  arm_driver: Starting motor initialization...");
-        
+
         // Ping all motors first to verify connection
         let mut all_ids = self.arm_ids.clone();
         all_ids.extend_from_slice(&self.gripper_ids);
@@ -161,44 +167,60 @@ impl ArmDynamixelDriver {
             let _ = self.bus.write_u8(id, ADDR_TORQUE_ENABLE, 0);
         }
 
-        // Set Modes
+        // アーム: Extended Position Mode (マルチターン対応)
         for &id in &self.arm_ids {
             self.bus
                 .write_u8(id, ADDR_OPERATING_MODE, MODE_EXTENDED_POSITION)
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "ID {id} set operating_mode=ExtendedPosition failed: {e:?}"
-                    )
-                })?;
+                .map_err(|e| anyhow::anyhow!("ID {id} set operating_mode=ExtendedPosition failed: {e:?}"))?;
         }
+        // グリッパー: Current-based Position Mode (電流=握力上限を設定できる)
         for &id in &self.gripper_ids {
             self.bus
-                .write_u8(id, ADDR_OPERATING_MODE, MODE_EXTENDED_POSITION)
-                .map_err(|e| anyhow::anyhow!("gripper ID {id} set operating_mode=ExtendedPosition failed: {e:?}"))?;
+                .write_u8(id, ADDR_OPERATING_MODE, MODE_CURRENT_BASED_POSITION)
+                .map_err(|e| anyhow::anyhow!("gripper ID {id} set operating_mode=CurrentBasedPosition failed: {e:?}"))?;
         }
 
-        // Configs
+        // アーム: profile_velocity
         for &id in &self.arm_ids {
             self.bus
                 .write_u32(id, ADDR_PROFILE_VELOCITY, profile_velocity)
-                .map_err(|e| {
-                    anyhow::anyhow!("ID {id} set profile_velocity={profile_velocity} failed: {e:?}")
-                })?;
+                .map_err(|e| anyhow::anyhow!("ID {id} set profile_velocity={profile_velocity} failed: {e:?}"))?;
         }
+        // グリッパー: 握力上限 (GOAL_CURRENT) — Current_Limit (EEPROM) を超えないようクランプ
         for &id in &self.gripper_ids {
+            let effective = match self.bus.read_u16(id, ADDR_CURRENT_LIMIT) {
+                Ok(resp) => {
+                    if gripper_max_current > resp.data {
+                        eprintln!("⚠️  gripper ID {id}: gripper_max_current={gripper_max_current} > Current_Limit={}, clamping", resp.data);
+                        resp.data
+                    } else {
+                        gripper_max_current
+                    }
+                }
+                Err(_) => gripper_max_current,
+            };
             self.bus
-                .write_u32(id, ADDR_PROFILE_VELOCITY, profile_velocity)
-                .map_err(|e| {
-                    anyhow::anyhow!("gripper ID {id} set profile_velocity={profile_velocity} failed: {e:?}")
-                })?;
+                .write_u16(id, ADDR_GOAL_CURRENT, effective)
+                .map_err(|e| anyhow::anyhow!("gripper ID {id} set goal_current={effective} failed: {e:?}"))?;
         }
 
-        // トルクON前に現在位置をゴールとして書き込む。
-        for &id in &self.arm_ids {
-            if let Ok(resp) = self.bus.read_u32(id, ADDR_PRESENT_POSITION) {
-                let _ = self.bus.write_u32(id, ADDR_GOAL_POSITION, resp.data);
-            }
-        }
+        // アーム: ホームポジションのUDRF角度からモーターtickを計算してgoal_positionに書く。
+        // 起動時はアームが必ずホームにいるという運用上の前提により、
+        // 電源断後のマルチターンリセット問題を解決する。
+        let home_len = home_urdf.len().min(self.arm_ids.len());
+        let arm_commands: Vec<SyncWriteData<u32>> = self.arm_ids[..home_len].iter().enumerate()
+            .map(|(i, &id)| {
+                let ticks = rad_to_ticks_ext(
+                    (home_urdf[i] + self.arm_offsets[i]) * self.arm_directions[i] * self.arm_reductions[i]
+                ) as u32;
+                println!("✅ arm_driver: joint{} home → ticks={}", i + 1, ticks as i32);
+                SyncWriteData { motor_id: id, data: ticks }
+            })
+            .collect();
+        self.bus.sync_write_u32(ADDR_GOAL_POSITION, &arm_commands)
+            .map_err(|e| anyhow::anyhow!("sync_write home positions failed: {:?}", e))?;
+
+        // グリッパー: 現在位置をそのままゴールに（シングルターンで問題なし）
         for &id in &self.gripper_ids {
             if let Ok(resp) = self.bus.read_u32(id, ADDR_PRESENT_POSITION) {
                 let _ = self.bus.write_u32(id, ADDR_GOAL_POSITION, resp.data);
@@ -282,12 +304,12 @@ impl ArmDynamixelDriver {
         for (i, &id) in self.gripper_ids.iter().enumerate() {
             let dir = self.gripper_directions.get(i).copied().unwrap_or(1.0);
             let offset = self.gripper_offsets.get(i).copied().unwrap_or(0.0);
-            
+
             let pos = self.bus.read_u32(id, ADDR_PRESENT_POSITION).context("read pos")?;
             let vel = self.bus.read_u32(id, ADDR_PRESENT_VELOCITY).context("read vel")?;
             let cur = self.bus.read_u16(id, ADDR_PRESENT_CURRENT).context("read cur")?;
             let tmp = self.bus.read_u8(id, ADDR_PRESENT_TEMPERATURE).context("read tmp")?;
-            
+
             statuses.push(MotorStatus {
                 position_rad: ticks_to_rad_ext(pos.data as i32) / dir - offset,
                 velocity_rad_s: raw_vel_to_rad_s(vel.data as i32) / dir,
