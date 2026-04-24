@@ -33,10 +33,10 @@ def _build_operator_actions(context):
 
     if os.path.isfile(cert):
         tls_block = f'    link: {{\n      tls: {{\n        root_ca_certificate: "{cert}"\n      }}\n    }}\n'
-        endpoints = '"quic/10.42.0.1:7447", "tcp/10.42.0.1:7447", "quic/100.114.200.30:7447", "tcp/100.114.200.30:7447"'
+        endpoints = '"quic/192.168.11.10:7447", "tcp/192.168.11.10:7447", "quic/100.114.200.30:7447", "tcp/100.114.200.30:7447"'
     else:
         tls_block = ""
-        endpoints = '"tcp/10.42.0.1:7447", "tcp/100.114.200.30:7447"'
+        endpoints = '"tcp/192.168.11.10:7447", "tcp/100.114.200.30:7447"'
 
     ope_cfg_content = f"""\
 {{

@@ -1,0 +1,31 @@
+{
+  // peer モードにすることで、ロボット側 zenohd が一時的に落ちていても
+  // operator ノード自体は起動できる。
+  mode: "client",
+  connect: {
+    // QUIC 優先、失敗時は TCP フォールバック。
+    // ROBOT_IP = 10.42.0.1 (ロボット側ホットスポット固定 IP)
+    endpoints: [
+      "quic/10.42.0.1:7447",
+      "tcp/10.42.0.1:7447",
+      "quic/10.42.0.1:17447",
+      "tcp/10.42.0.1:17447"
+    ]
+  },
+  scouting: { multicast: { enabled: false } },
+  transport: {
+    shared_memory: { enabled: true },
+    link: {
+      tls: {
+        // ロボット側の自己署名証明書を CA として信頼させる。
+        // 事前にロボットから取得:
+        //   scp robot@10.42.0.1:~/.ros/zenoh_quic/server.crt \
+        //       operator_ws/quic/server.crt
+        // server.crt がない場合はこの行をコメントアウトすると TCP のみで動作する。
+        //root_ca_certificate: "quic/server.crt"
+        root_ca_certificate: "/home/yano/working/rustacean_roborescue/operator_ws/quic/server.crt",
+        verify_name_on_connect: false
+      }
+    }
+  }
+}
