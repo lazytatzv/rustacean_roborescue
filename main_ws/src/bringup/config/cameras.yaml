@@ -80,7 +80,7 @@ cameras:
     device: /dev/camera_front_left
     width: 640
     height: 480
-    fps: 30
+    fps: 15
     output_encoding: rgb8
     frame_id: front_left_camera_link
     use_qr: false
@@ -94,29 +94,12 @@ cameras:
     device: /dev/camera_front_right
     width: 640
     height: 480
-    fps: 30
+    fps: 15
     output_encoding: rgb8
     frame_id: front_right_camera_link
     use_qr: false
     jpeg_quality: 65
     startup_delay: 3.0
-
-  # Camera Logitech
-  - name: camera_logitech
-    driver: mjpeg
-    enabled: true
-    device: /dev/camera_logitech
-    width: 640
-    height: 480
-    fps: 30
-    output_encoding: rgb8
-    frame_id: logitech_link
-    use_qr: false
-    jpeg_quality: 65
-    startup_delay: 3.0
-
-
-
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   # THETA S は MJPEG のみ出力するため v4l2_camera 非対応。gscam (GStreamer) を使用。
@@ -125,7 +108,7 @@ cameras:
   # GStreamer framerate caps では逆数 (fps_denominator/fps_numerator = 2997/200) を使用。
   - name: theta
     driver: theta_s
-    enabled: false
+    enabled: true
     device: /dev/camera_ricoh
     width: 1280
     height: 720
@@ -153,7 +136,7 @@ cameras:
     enable_pointcloud: false  # 高負荷。必要時のみ true にする
     color_width: 640
     color_height: 480
-    color_fps: 15  # USB 2.1 接続のため 640x480 RGB で安定する上限
+    color_fps: 30
     depth_width: 640
     depth_height: 480
     depth_fps: 30
@@ -170,7 +153,7 @@ cameras:
   # use_t265_odom: true も必要。
   # serial はロボットに取り付けた際に `rs-enumerate-devices` で確認して設定する。
   # これはアーム根元後ろのカメラ
-  # 使うな！！！！！！！！！！！！！！！！！
+  # 性能は良いが実際使うかは分からない
   - name: t265
     driver: realsense
     enabled: false

@@ -81,17 +81,16 @@ def _mjpeg_nodes(cam: dict, ns: str) -> list:
     """MJPEG カメラ (WideCam 2.0 等) のコンポーザブルノードを返す。
 
     v4l2_camera は MJPEG 非対応のため gscam を使用。USB 帯域を大幅削減できる。
+    framerate caps は指定しない (カメラが 30fps 固定のため negotiate 失敗を避ける)。
     """
     device = cam.get("device", "/dev/video0")
     width = cam.get("width", 640)
     height = cam.get("height", 480)
-    fps = cam.get("fps", 30)
 
-    # do-timestamp=true と jpegparse を追加して安定化
     pipeline = (
-        f"v4l2src device={device} do-timestamp=true ! "
-        f"image/jpeg,width={width},height={height},framerate={fps}/1 ! "
-        f"jpegparse ! jpegdec ! videoconvert ! video/x-raw,format=RGB"
+        f"v4l2src device={device} ! "
+        f"image/jpeg,width={width},height={height} ! "
+        f"jpegdec ! videoconvert ! video/x-raw,format=RGB"
     )
 
     return [
@@ -137,9 +136,9 @@ def _theta_s_nodes(cam: dict, ns: str) -> list:
 
     # framerate = fps = fps_den/fps_num = 2997/200 ≒ 14.985 fps
     pipeline = (
-        f"v4l2src device={device} do-timestamp=true ! "
+        f"v4l2src device={device} ! "
         f"image/jpeg,width={width},height={height},framerate={fps_den}/{fps_num} ! "
-        f"jpegparse ! jpegdec ! videoconvert ! video/x-raw,format=RGB"
+        f"jpegdec ! videoconvert ! video/x-raw,format=RGB"
     )
 
     return [
