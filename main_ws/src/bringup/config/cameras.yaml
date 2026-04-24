@@ -63,7 +63,7 @@ cameras:
     width: 352
     height: 288
     output_encoding: rgb8
-    fps: 30
+    fps: 15
     frame_id: arm_camera_link
     use_qr: false
     jpeg_quality: 60
