@@ -55,13 +55,25 @@ cameras:
   # これはテスト！！！！！！！！
   - name: test
     driver: mjpeg
-    enabled: true
+    enabled: false
     device: /dev/video0
     width: 640
     height: 480
     output_encoding: rgb8
     fps: 15
     frame_id: test_camera_link
+    use_qr: false
+    jpeg_quality: 60
+
+  - name: logi
+    driver: mjpeg
+    enabled: true
+    device: /dev/camera_logitech
+    width: 640
+    height: 480
+    output_encoding: rgb8
+    fps: 15
+    frame_id: logi_camera_link
     use_qr: false
     jpeg_quality: 60
 
@@ -111,20 +123,6 @@ cameras:
     fps: 15
     output_encoding: rgb8
     frame_id: front_right_camera_link
-    use_qr: false
-    jpeg_quality: 65
-    startup_delay: 3.0
-
-# Camera Logitech
-  - name: camera_logitech
-    driver: mjpeg
-    enabled: true
-    device: /dev/camera_logitech
-    width: 640
-    height: 480
-    fps: 30
-    output_encoding: rgb8
-    frame_id: logitech_link
     use_qr: false
     jpeg_quality: 65
     startup_delay: 3.0
