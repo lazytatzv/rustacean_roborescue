@@ -89,7 +89,7 @@ cameras:
     width: 352
     height: 288
     output_encoding: rgb8
-    fps: 15
+    fps: 10
     frame_id: arm_camera_link
     use_qr: false
     jpeg_quality: 60
@@ -143,7 +143,7 @@ cameras:
     output_encoding: rgb8
     frame_id: theta_camera_link
     use_qr: false
-    jpeg_quality: 85  # THETA S は解像度が大きいため少し高めに
+    jpeg_quality: 50  # THETA S は解像度が大きいため少し高めに
 
   # ── RealSense D435i (RGB-D + IMU) ─────────────────────────────────────────
   # アーム先端横に搭載。深度+カラー+IMU(400Hz)。
@@ -162,7 +162,7 @@ cameras:
     enable_pointcloud: false  # 高負荷。必要時のみ true にする
     color_width: 640
     color_height: 480
-    color_fps: 30
+    color_fps: 15
     depth_width: 640
     depth_height: 480
     depth_fps: 30
