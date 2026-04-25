@@ -69,8 +69,8 @@ cameras:
     driver: mjpeg
     enabled: true
     device: /dev/camera_logitech
-    width: 640
-    height: 480
+    width: 320
+    height: 240
     output_encoding: rgb8
     fps: 15
     frame_id: logi_camera_link
@@ -106,7 +106,7 @@ cameras:
     device: /dev/camera_front_left
     width: 640
     height: 480
-    fps: 15
+    fps: 10
     output_encoding: rgb8
     frame_id: front_left_camera_link
     use_qr: false
@@ -120,12 +120,12 @@ cameras:
     device: /dev/camera_front_right
     width: 640
     height: 480
-    fps: 15
+    fps: 10
     output_encoding: rgb8
     frame_id: front_right_camera_link
     use_qr: false
     jpeg_quality: 65
-    startup_delay: 3.0
+    startup_delay: 1.0
 
   # ── RICOH THETA S (360度カメラ、USB UVC/MJPEGモード) ─────────────────────
   # THETA S は MJPEG のみ出力するため v4l2_camera 非対応。gscam (GStreamer) を使用。
