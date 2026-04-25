@@ -7,7 +7,7 @@
 use_crawler: true
 use_flipper: true
 
-use_arm: true
+use_arm: false
 
 # アームバックエンド選択
 # "direct"      : Rust arm_driver で直接 Dynamixel を制御 (デフォルト・軽量)
