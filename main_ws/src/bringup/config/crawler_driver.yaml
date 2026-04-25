@@ -24,7 +24,7 @@ crawler_driver:
     # モーター向き補正: 実機配線や取り付け向き差を吸収 (+1 or -1)
     # ログ上で cmd と actual の符号が逆なら -1 を設定
     m1_direction_sign: -1
-    m2_direction_sign: -1
+    m2_direction_sign: 1
     # エンコーダリセット方針:
     # 初回接続時のみリセットし、再接続時は既定でリセットしない
     reset_encoders_on_connect: true
