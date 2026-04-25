@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # QUIC用のCA証明書とサーバー証明書を生成するスクリプト
 #
 # 使い方:
