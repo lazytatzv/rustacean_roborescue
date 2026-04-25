@@ -72,7 +72,7 @@ cameras:
     width: 320
     height: 240
     output_encoding: rgb8
-    fps: 15
+    fps: 10
     frame_id: logi_camera_link
     use_qr: false
     jpeg_quality: 60
