@@ -104,8 +104,8 @@ cameras:
     driver: mjpeg
     enabled: true
     device: /dev/camera_front_left
-    width: 640
-    height: 480
+    width: 352
+    height: 288
     fps: 10
     output_encoding: rgb8
     frame_id: front_left_camera_link
@@ -118,8 +118,8 @@ cameras:
     driver: mjpeg
     enabled: true
     device: /dev/camera_front_right
-    width: 640
-    height: 480
+    width: 352
+    height: 288
     fps: 10
     output_encoding: rgb8
     frame_id: front_right_camera_link
