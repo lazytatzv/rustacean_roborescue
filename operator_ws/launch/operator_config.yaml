@@ -2,6 +2,11 @@
 # robot側の launch_config.yaml に相当。
 # ros2 launch launch/operator.launch.py で読み込まれる。
 
+# ロボット接続設定
+# QUIC接続用。証明書がある場合はQUIC優先、なければTCPフォールバック。
+robot_ip: "100.117.111.73"       # Tailscale IP を推奨
+robot_user: "yano"               # SSH/SCPのユーザー名 (fetch_cert.sh用)
+
 # Foxglove Bridge (Foxglove Studio の WebSocket 接続先 ws://localhost:8765)
 use_foxglove: true
 foxglove_port: 8765

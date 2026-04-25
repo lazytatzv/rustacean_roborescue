@@ -51,6 +51,20 @@
 #   v4l2-ctl --list-formats-ext -d /dev/camera_front
 
 cameras:
+
+  # これはテスト！！！！！！！！
+  - name: test
+    driver: mjpeg
+    enabled: true
+    device: /dev/video0
+    width: 640
+    height: 480
+    output_encoding: rgb8
+    fps: 15
+    frame_id: test_camera_link
+    use_qr: false
+    jpeg_quality: 60
+
   # ── v4l2 カメラ (USB 汎用) ────────────────────────────────────────────────
 
   # アームの先端中のカメラ

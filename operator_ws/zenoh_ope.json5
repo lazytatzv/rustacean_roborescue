@@ -2,8 +2,10 @@
   mode: "client",
   connect: {
     endpoints: [
-      "tcp/192.168.11.10:7447",
-      "tcp/100.114.200.30:7447"
+      "quic/172.16.200.222:7447",
+      "quic/100.117.111.73:7447",
+      "tcp/172.16.200.222:7447",
+      "tcp/100.117.111.73:7447"
     ]
   },
   scouting: {
@@ -13,7 +15,12 @@
   },
   transport: {
     shared_memory: {
-      enabled: true
+      enabled: false
+    },
+    link: {
+      tls: {
+        root_ca_certificate: "quic/server.crt"
+      }
     }
   }
 }

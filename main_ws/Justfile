@@ -175,3 +175,10 @@ save-maps name="":
 	echo ""
 	echo "Done: $MAP_DIR"
 	ls -la "$MAP_DIR"
+
+
+conf:
+	nvim src/bringup/config/launch_config.yaml
+
+cam:
+	nvim src/bringup/config/cameras.yaml

@@ -31,12 +31,17 @@ def _build_operator_actions(context):
     repo_root = os.path.dirname(this_dir)
     cert = os.path.join(repo_root, "quic", "server.crt")
 
+    # operator_config.yaml から robot_ip を読み込む（デフォルト: Tailscale IP）
+    cfg = _load_operator_config(this_dir)
+    robot_ip = cfg.get("robot_ip", "100.117.111.73")
+
     if os.path.isfile(cert):
         tls_block = f'    link: {{\n      tls: {{\n        root_ca_certificate: "{cert}"\n      }}\n    }}\n'
-        endpoints = '"tcp/192.168.11.10:7447", "tcp/100.114.200.30:7447"'
+        # QUIC優先、フォールバックでTCP
+        endpoints = f'"quic/{robot_ip}:7447", "tcp/{robot_ip}:7447"'
     else:
         tls_block = ""
-        endpoints = '"tcp/192.168.11.10:7447", "tcp/100.114.200.30:7447"'
+        endpoints = f'"tcp/{robot_ip}:7447"'
 
     ope_cfg_content = f"""\
 {{
@@ -46,7 +51,7 @@ def _build_operator_actions(context):
   }},
   scouting: {{ multicast: {{ enabled: false }} }},
   transport: {{
-    shared_memory: {{ enabled: true }},
+    shared_memory: {{ enabled: false }},
 {tls_block}  }}
 }}
 """
