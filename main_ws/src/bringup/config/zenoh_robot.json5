@@ -2,7 +2,8 @@
   mode: "peer",
   connect: {
     endpoints: [
-      "tcp/127.0.0.1:7447",
+      "quic/127.0.0.1:7447",
+      "udp/127.0.0.1:7447", "tcp/127.0.0.1:7447",
       "tcp/127.0.0.1:17447"
     ]
   },
@@ -10,6 +11,11 @@
     multicast: { enabled: false }
   },
   transport: {
-    shared_memory: { enabled: true }
+    shared_memory: { enabled: true },
+    link: {
+      tls: {
+        root_ca_certificate: "quic/server.crt"
+      }
+    }
   }
 }

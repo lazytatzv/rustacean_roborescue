@@ -11,8 +11,7 @@
   mode: "client",
   connect: {
     endpoints: [
-      "quic/ROBOT_IP:7447",
-      "tcp/ROBOT_IP:7447"
+      "quic/ROBOT_IP:7447"
     ]
   },
   scouting: {
